@@ -36,3 +36,4 @@ Current implementation notes:
 - Phase 9 details are documented in [docs/phase-9-movement-and-migration.md](docs/phase-9-movement-and-migration.md).
 - Phase 10 details are documented in [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md).
 - Phase 11 details are documented in [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md).
+- Phase 12 details are documented in [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md).

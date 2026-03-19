@@ -14,6 +14,7 @@ var validationErrors = WorldValidator.Validate(world)
     .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
     .Concat(DiscoveryCatalogValidator.Validate(discoveryCatalog))
     .Concat(AdvancementCatalogValidator.Validate(advancementCatalog))
+    .Concat(ChronicleValidator.Validate(world))
     .Concat(RegionEcologyValidator.Validate(world, floraCatalog, faunaCatalog))
     .Concat(PopulationGroupValidator.Validate(world))
     .ToArray();
@@ -40,6 +41,7 @@ var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentW
     .Concat(MigrationValidator.Validate(world, tickResult))
     .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
     .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
+    .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
     .ToArray();
 
 if (postTickValidationErrors.Length > 0)
@@ -54,16 +56,8 @@ if (postTickValidationErrors.Length > 0)
     return;
 }
 
-Console.WriteLine(WorldSummaryFormatter.Format(world));
+Console.WriteLine(ChronicleFeedFormatter.Format(simulationEngine.CurrentWorld.Chronicle));
 Console.WriteLine();
-Console.WriteLine(SimulationTickFormatter.Format(tickResult));
-Console.WriteLine();
-Console.WriteLine(WorldSummaryFormatter.Format(simulationEngine.CurrentWorld));
+Console.WriteLine(ChronicleDebugFormatter.Format(simulationEngine.CurrentWorld.Chronicle));
 Console.WriteLine();
 Console.WriteLine(PopulationGroupSummaryFormatter.Format(simulationEngine.CurrentWorld));
-Console.WriteLine();
-Console.WriteLine(SpeciesCatalogSummaryFormatter.Format(floraCatalog, faunaCatalog));
-Console.WriteLine();
-Console.WriteLine(DiscoveryCatalogSummaryFormatter.Format(discoveryCatalog));
-Console.WriteLine();
-Console.WriteLine(AdvancementCatalogSummaryFormatter.Format(advancementCatalog));

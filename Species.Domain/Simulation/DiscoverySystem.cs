@@ -121,7 +121,7 @@ public sealed class DiscoverySystem
         }
 
         return new DiscoveryResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle),
             changes);
     }
 

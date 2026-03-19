@@ -83,7 +83,7 @@ public sealed class MigrationSystem
         }
 
         return new MigrationResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle),
             changes);
     }
 

@@ -64,7 +64,7 @@ public sealed class FloraSimulationSystem
         }
 
         return new FloraSimulationResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, world.PopulationGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, world.PopulationGroups, world.Chronicle),
             changes);
     }
 

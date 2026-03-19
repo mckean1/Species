@@ -24,6 +24,11 @@ public static class WorldValidator
             errors.Add("World population groups collection cannot be null.");
         }
 
+        if (world.Chronicle is null)
+        {
+            errors.Add("World chronicle cannot be null.");
+        }
+
         foreach (var region in world.Regions)
         {
             if (!regionsById.TryAdd(region.Id, region))

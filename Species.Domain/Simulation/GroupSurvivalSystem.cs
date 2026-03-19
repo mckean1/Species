@@ -91,7 +91,7 @@ public sealed class GroupSurvivalSystem
             .ToArray();
 
         return new GroupSurvivalResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle),
             changes);
     }
 

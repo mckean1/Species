@@ -59,7 +59,7 @@ public sealed class PressureCalculationSystem
         }
 
         return new PressureCalculationResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle),
             changes);
     }
 

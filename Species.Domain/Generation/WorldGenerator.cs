@@ -75,7 +75,7 @@ public static class WorldGenerator
             PopulationGroupSpawningConstants.DefaultGroupCount,
             random);
 
-        return new World(worldSeed, 1, 1, regions, populationGroups);
+        return new World(worldSeed, 1, 1, regions, populationGroups, provisionalWorld.Chronicle);
     }
 
     private static Dictionary<int, HashSet<int>> BuildNeighborMap(int regionCount, Random random)

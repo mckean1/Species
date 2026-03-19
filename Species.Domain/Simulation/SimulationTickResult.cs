@@ -12,7 +12,9 @@ public sealed class SimulationTickResult
         IReadOnlyList<GroupSurvivalChange> groupSurvivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
-        IReadOnlyList<AdvancementChange> advancementChanges)
+        IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<ChronicleEntry> recordedChronicleEntries,
+        IReadOnlyList<ChronicleEntry> revealedChronicleEntries)
     {
         World = world;
         FloraChanges = floraChanges;
@@ -22,6 +24,8 @@ public sealed class SimulationTickResult
         MigrationChanges = migrationChanges;
         DiscoveryChanges = discoveryChanges;
         AdvancementChanges = advancementChanges;
+        RecordedChronicleEntries = recordedChronicleEntries;
+        RevealedChronicleEntries = revealedChronicleEntries;
     }
 
     public World World { get; }
@@ -39,4 +43,8 @@ public sealed class SimulationTickResult
     public IReadOnlyList<DiscoveryChange> DiscoveryChanges { get; }
 
     public IReadOnlyList<AdvancementChange> AdvancementChanges { get; }
+
+    public IReadOnlyList<ChronicleEntry> RecordedChronicleEntries { get; }
+
+    public IReadOnlyList<ChronicleEntry> RevealedChronicleEntries { get; }
 }

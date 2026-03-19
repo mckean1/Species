@@ -138,7 +138,7 @@ public sealed class AdvancementSystem
         }
 
         return new AdvancementResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle),
             changes);
     }
 
