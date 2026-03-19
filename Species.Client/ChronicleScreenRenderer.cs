@@ -32,7 +32,7 @@ public static class ChronicleScreenRenderer
         var lines = new List<string>(layout.TotalHeight)
         {
             HorizontalBorder(layout.InnerWidth),
-            BorderLine($"{PaneTitle}Chronicle{Reset}", layout.InnerWidth),
+            BuildTopBar(world, layout.InnerWidth),
             HorizontalBorder(layout.InnerWidth),
             CombinePaneHeaders(world, layout.RecordsWidth, layout.SituationWidth)
         };
@@ -343,12 +343,19 @@ public static class ChronicleScreenRenderer
 
     private static string CombinePaneHeaders(World world, int recordsWidth, int situationWidth)
     {
-        var left = PadBetween(
-            $"{PaneTitle}Records{Reset}",
-            $"{White}{FormatMonthYear(world.CurrentMonth, world.CurrentYear)}{Reset}",
-            Math.Max(0, recordsWidth - 2));
+        var left = PadVisible($"{PaneTitle}Records{Reset}", Math.Max(0, recordsWidth - 2));
         var right = PadVisible($"{PaneTitle}Situation{Reset}", Math.Max(0, situationWidth - 2));
         return $"| {left} | {right} |";
+    }
+
+    private static string BuildTopBar(World world, int innerWidth)
+    {
+        return BorderLine(
+            PadBetween(
+                $"{PaneTitle}Chronicle{Reset}",
+                $"{White}{FormatMonthYear(world.CurrentMonth, world.CurrentYear)}{Reset}",
+                innerWidth),
+            innerWidth);
     }
 
     private static string CombinePaneBodyRow(string recordsLine, string situationLine, int recordsWidth, int situationWidth)
