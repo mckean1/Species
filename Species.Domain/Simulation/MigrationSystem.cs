@@ -191,6 +191,12 @@ public sealed class MigrationSystem
             score += group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(currentRegion.Id, region.Id))
                 ? DiscoveryConstants.KnownRouteBonus
                 : -DiscoveryConstants.UnknownRoutePenalty;
+
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.OrganizedTravelId) &&
+                group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(currentRegion.Id, region.Id)))
+            {
+                score += AdvancementConstants.OrganizedTravelKnownRouteBonus;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, region.Id, StringComparison.Ordinal))
@@ -283,7 +289,9 @@ public sealed class MigrationSystem
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
-            DiscoveryEvidence = group.DiscoveryEvidence.Clone()
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
+            LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
     }
 

@@ -63,6 +63,15 @@ public static class SimulationTickFormatter
                 $"{change.GroupId} | {change.GroupName} | Known=[{change.KnownDiscoveriesSummary}] | Evidence={change.EvidenceSummary} | Checks={change.CheckSummary} | Unlocked=[{change.UnlockedDiscoveriesSummary}] | Effect={change.DecisionEffectSummary}");
         }
 
+        lines.Add(string.Empty);
+        lines.Add("Advancements:");
+
+        foreach (var change in tickResult.AdvancementChanges)
+        {
+            lines.Add(
+                $"{change.GroupId} | {change.GroupName} | RelevantDiscoveries=[{change.RelevantDiscoveriesSummary}] | Learned=[{change.LearnedAdvancementsSummary}] | Evidence={change.EvidenceSummary} | Checks={change.CheckSummary} | Unlocked=[{change.UnlockedAdvancementsSummary}] | Effect={change.PracticalEffectSummary}");
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 }

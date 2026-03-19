@@ -31,4 +31,8 @@ public sealed class PopulationGroup
     public HashSet<string> KnownDiscoveryIds { get; init; } = new(StringComparer.Ordinal);
 
     public DiscoveryEvidenceState DiscoveryEvidence { get; set; } = new();
+
+    public HashSet<string> LearnedAdvancementIds { get; init; } = new(StringComparer.Ordinal);
+
+    public AdvancementEvidenceState AdvancementEvidence { get; set; } = new();
 }

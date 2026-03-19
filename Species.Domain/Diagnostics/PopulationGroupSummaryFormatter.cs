@@ -25,9 +25,12 @@ public static class PopulationGroupSummaryFormatter
             var knownDiscoveries = group.KnownDiscoveryIds.Count == 0
                 ? "none"
                 : string.Join(", ", group.KnownDiscoveryIds.OrderBy(id => id, StringComparer.Ordinal));
+            var learnedAdvancements = group.LearnedAdvancementIds.Count == 0
+                ? "none"
+                : string.Join(", ", group.LearnedAdvancementIds.OrderBy(id => id, StringComparer.Ordinal));
 
             lines.Add(
-                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | LastRegion={group.LastRegionId} ({lastRegionName}) | MonthsSinceLastMove={group.MonthsSinceLastMove} | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}]");
+                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | LastRegion={group.LastRegionId} ({lastRegionName}) | MonthsSinceLastMove={group.MonthsSinceLastMove} | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}] | LearnedAdvancements=[{learnedAdvancements}]");
         }
 
         return string.Join(Environment.NewLine, lines);

@@ -100,6 +100,16 @@ public static class PopulationGroupValidator
             {
                 errors.Add($"Population group {group.Id} has null DiscoveryEvidence.");
             }
+
+            if (group.LearnedAdvancementIds is null)
+            {
+                errors.Add($"Population group {group.Id} has null LearnedAdvancementIds.");
+            }
+
+            if (group.AdvancementEvidence is null)
+            {
+                errors.Add($"Population group {group.Id} has null AdvancementEvidence.");
+            }
         }
 
         return errors;

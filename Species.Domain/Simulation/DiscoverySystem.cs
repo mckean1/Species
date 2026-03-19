@@ -217,7 +217,9 @@ public sealed class DiscoverySystem
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
-            DiscoveryEvidence = group.DiscoveryEvidence.Clone()
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
+            LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
     }
 }

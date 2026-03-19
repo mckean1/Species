@@ -10,7 +10,8 @@ public sealed class GroupSurvivalSystem
     public GroupSurvivalResult Run(
         World world,
         FloraSpeciesCatalog floraCatalog,
-        FaunaSpeciesCatalog faunaCatalog)
+        FaunaSpeciesCatalog faunaCatalog,
+        AdvancementCatalog advancementCatalog)
     {
         var mutableRegions = world.Regions.ToDictionary(
             region => region.Id,
@@ -36,14 +37,15 @@ public sealed class GroupSurvivalSystem
             var primaryAction = ResolvePrimaryAction(group.SubsistenceMode);
             var fallbackAction = ResolveFallbackAction(group.SubsistenceMode);
 
-            var primaryAcquisition = AcquireFood(primaryAction, monthlyFoodNeed, regionState, floraCatalog, faunaCatalog);
+            var primaryAcquisition = AcquireFood(primaryAction, monthlyFoodNeed, group, regionState, floraCatalog, faunaCatalog, advancementCatalog);
             var remainingNeed = Math.Max(0, monthlyFoodNeed - primaryAcquisition.FoodGained);
             var fallbackAcquisition = remainingNeed > 0
-                ? AcquireFood(fallbackAction, remainingNeed, regionState, floraCatalog, faunaCatalog)
+                ? AcquireFood(fallbackAction, remainingNeed, group, regionState, floraCatalog, faunaCatalog, advancementCatalog)
                 : AcquisitionResult.Empty(fallbackAction);
 
             var totalFoodAcquired = primaryAcquisition.FoodGained + fallbackAcquisition.FoodGained;
-            var availableFood = totalFoodAcquired + storedFoodBefore;
+            var effectiveStoredFood = ApplyStoredFoodEffect(group, storedFoodBefore);
+            var availableFood = totalFoodAcquired + effectiveStoredFood;
             var consumedForNeed = Math.Min(monthlyFoodNeed, availableFood);
             var shortage = Math.Max(0, monthlyFoodNeed - consumedForNeed);
             var storedFoodAfter = Math.Max(0, availableFood - consumedForNeed);
@@ -123,23 +125,28 @@ public sealed class GroupSurvivalSystem
     private static AcquisitionResult AcquireFood(
         string action,
         int neededFood,
+        PopulationGroup group,
         MutableRegionState regionState,
         FloraSpeciesCatalog floraCatalog,
-        FaunaSpeciesCatalog faunaCatalog)
+        FaunaSpeciesCatalog faunaCatalog,
+        AdvancementCatalog advancementCatalog)
     {
         return action switch
         {
-            "Gather" => GatherFood(neededFood, regionState, floraCatalog),
-            "Hunt" => HuntFood(neededFood, regionState, faunaCatalog),
+            "Gather" => GatherFood(neededFood, group, regionState, floraCatalog, advancementCatalog),
+            "Hunt" => HuntFood(neededFood, group, regionState, faunaCatalog, advancementCatalog),
             _ => AcquisitionResult.Empty(action)
         };
     }
 
     private static AcquisitionResult GatherFood(
         int neededFood,
+        PopulationGroup group,
         MutableRegionState regionState,
-        FloraSpeciesCatalog floraCatalog)
+        FloraSpeciesCatalog floraCatalog,
+        AdvancementCatalog advancementCatalog)
     {
+        var foodMultiplier = ResolveGatheringMultiplier(group, regionState.Region, advancementCatalog);
         var foodSources = regionState.FloraPopulations
             .Where(entry => entry.Value > 0)
             .Select(entry =>
@@ -147,7 +154,7 @@ public sealed class GroupSurvivalSystem
                 var species = floraCatalog.GetById(entry.Key);
                 return species is null
                     ? null
-                    : new FoodSource(entry.Key, entry.Value, Math.Max(1, (int)MathF.Round(species.FoodValue * GroupSurvivalConstants.FoodUnitScale, MidpointRounding.AwayFromZero)));
+                    : new FoodSource(entry.Key, entry.Value, Math.Max(1, (int)MathF.Round(species.FoodValue * GroupSurvivalConstants.FoodUnitScale * foodMultiplier, MidpointRounding.AwayFromZero)));
             })
             .Where(source => source is not null)
             .Select(source => source!)
@@ -158,9 +165,12 @@ public sealed class GroupSurvivalSystem
 
     private static AcquisitionResult HuntFood(
         int neededFood,
+        PopulationGroup group,
         MutableRegionState regionState,
-        FaunaSpeciesCatalog faunaCatalog)
+        FaunaSpeciesCatalog faunaCatalog,
+        AdvancementCatalog advancementCatalog)
     {
+        var foodMultiplier = ResolveHuntingMultiplier(group, regionState.Region, advancementCatalog);
         var foodSources = regionState.FaunaPopulations
             .Where(entry => entry.Value > 0)
             .Select(entry =>
@@ -168,7 +178,7 @@ public sealed class GroupSurvivalSystem
                 var species = faunaCatalog.GetById(entry.Key);
                 return species is null
                     ? null
-                    : new FoodSource(entry.Key, entry.Value, Math.Max(1, (int)MathF.Round(species.FoodYield * GroupSurvivalConstants.FoodUnitScale, MidpointRounding.AwayFromZero)));
+                    : new FoodSource(entry.Key, entry.Value, Math.Max(1, (int)MathF.Round(species.FoodYield * GroupSurvivalConstants.FoodUnitScale * foodMultiplier, MidpointRounding.AwayFromZero)));
             })
             .Where(source => source is not null)
             .Select(source => source!)
@@ -294,7 +304,9 @@ public sealed class GroupSurvivalSystem
             },
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
-            DiscoveryEvidence = group.DiscoveryEvidence.Clone()
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
+            LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
     }
 
@@ -306,6 +318,54 @@ public sealed class GroupSurvivalSystem
         {
             return new AcquisitionResult(action, 0, $"{action} gained 0 food from [none]");
         }
+    }
+
+    private static int ApplyStoredFoodEffect(PopulationGroup group, int storedFoodBefore)
+    {
+        if (!group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId))
+        {
+            return storedFoodBefore;
+        }
+
+        return (int)MathF.Round(storedFoodBefore * AdvancementConstants.FoodStorageStoredFoodMultiplier, MidpointRounding.AwayFromZero);
+    }
+
+    private static float ResolveGatheringMultiplier(PopulationGroup group, Region region, AdvancementCatalog advancementCatalog)
+    {
+        _ = advancementCatalog;
+        var multiplier = 1.0f;
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedGatheringId))
+        {
+            multiplier *= AdvancementConstants.ImprovedGatheringMultiplier;
+        }
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LocalResourceUseId) &&
+            group.KnownDiscoveryIds.Contains($"discovery-local-region-conditions:{region.Id}"))
+        {
+            multiplier *= AdvancementConstants.LocalResourceUseMultiplier;
+        }
+
+        return multiplier;
+    }
+
+    private static float ResolveHuntingMultiplier(PopulationGroup group, Region region, AdvancementCatalog advancementCatalog)
+    {
+        _ = advancementCatalog;
+        var multiplier = 1.0f;
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedHuntingId))
+        {
+            multiplier *= AdvancementConstants.ImprovedHuntingMultiplier;
+        }
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LocalResourceUseId) &&
+            group.KnownDiscoveryIds.Contains($"discovery-local-region-conditions:{region.Id}"))
+        {
+            multiplier *= AdvancementConstants.LocalResourceUseMultiplier;
+        }
+
+        return multiplier;
     }
 
     private sealed class MutableRegionState

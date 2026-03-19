@@ -8,10 +8,12 @@ var floraCatalog = FloraSpeciesCatalog.CreateStarterSet();
 var faunaCatalog = FaunaSpeciesCatalog.CreateStarterSet();
 var world = WorldGenerator.Create(floraCatalog, faunaCatalog);
 var discoveryCatalog = DiscoveryCatalog.CreateForWorld(world);
+var advancementCatalog = AdvancementCatalog.CreateStarterSet();
 var validationErrors = WorldValidator.Validate(world)
     .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
     .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
     .Concat(DiscoveryCatalogValidator.Validate(discoveryCatalog))
+    .Concat(AdvancementCatalogValidator.Validate(advancementCatalog))
     .Concat(RegionEcologyValidator.Validate(world, floraCatalog, faunaCatalog))
     .Concat(PopulationGroupValidator.Validate(world))
     .ToArray();
@@ -28,7 +30,7 @@ if (validationErrors.Length > 0)
     return;
 }
 
-var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog);
+var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
 var tickResult = simulationEngine.Tick();
 var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentWorld)
     .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
@@ -37,6 +39,7 @@ var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentW
     .Concat(GroupSurvivalValidator.Validate(world, tickResult))
     .Concat(MigrationValidator.Validate(world, tickResult))
     .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
+    .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
     .ToArray();
 
 if (postTickValidationErrors.Length > 0)
@@ -62,3 +65,5 @@ Console.WriteLine();
 Console.WriteLine(SpeciesCatalogSummaryFormatter.Format(floraCatalog, faunaCatalog));
 Console.WriteLine();
 Console.WriteLine(DiscoveryCatalogSummaryFormatter.Format(discoveryCatalog));
+Console.WriteLine();
+Console.WriteLine(AdvancementCatalogSummaryFormatter.Format(advancementCatalog));

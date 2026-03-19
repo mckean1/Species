@@ -14,6 +14,7 @@ Current implementation notes:
 - Phase 8 group survival and consumption is implemented.
 - Phase 9 movement and migration is implemented.
 - Phase 10 discovery MVP is implemented.
+- Phase 11 advancement MVP is implemented.
 - The console client generates a deterministic connected world and prints a debug summary.
 - The console client also prints starter flora and fauna definition summaries.
 - The world debug summary now includes seeded flora and fauna populations per region.
@@ -23,6 +24,7 @@ Current implementation notes:
 - The console client now prints group survival, stored food use, shortage, and starvation results.
 - The console client now prints migration decisions, neighbor scores, and movement outcomes.
 - The console client now prints discovery evidence, unlock checks, and discovery definitions.
+- The console client now prints advancement evidence, unlock checks, learned advancements, and advancement definitions.
 - Phase 1 details are documented in [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md).
 - Phase 2 details are documented in [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md).
 - Phase 3 details are documented in [docs/phase-3-region-ecology-state.md](docs/phase-3-region-ecology-state.md).
@@ -33,3 +35,4 @@ Current implementation notes:
 - Phase 8 details are documented in [docs/phase-8-group-survival-and-consumption.md](docs/phase-8-group-survival-and-consumption.md).
 - Phase 9 details are documented in [docs/phase-9-movement-and-migration.md](docs/phase-9-movement-and-migration.md).
 - Phase 10 details are documented in [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md).
+- Phase 11 details are documented in [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md).
