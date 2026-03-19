@@ -95,6 +95,11 @@ public static class PopulationGroupValidator
             {
                 errors.Add($"Population group {group.Id} has null KnownDiscoveryIds.");
             }
+
+            if (group.DiscoveryEvidence is null)
+            {
+                errors.Add($"Population group {group.Id} has null DiscoveryEvidence.");
+            }
         }
 
         return errors;

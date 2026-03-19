@@ -54,6 +54,15 @@ public static class SimulationTickFormatter
                 $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | MigrationPressure={change.MigrationPressure} | StoredFood={change.StoredFood} | Considered={change.ConsideredMigration} | CurrentScore={change.CurrentRegionScore:0.0} | Neighbors=[{change.NeighborScoresSummary}] | Winner={change.WinningRegionId} ({change.WinningRegionName})={change.WinningRegionScore:0.0} | Moved={change.Moved} | NewRegion={change.NewRegionId} ({change.NewRegionName}) | LastRegionId={change.LastRegionId} | MonthsSinceLastMove={change.MonthsSinceLastMove} | Reason={change.DecisionReason}");
         }
 
+        lines.Add(string.Empty);
+        lines.Add("Discoveries:");
+
+        foreach (var change in tickResult.DiscoveryChanges)
+        {
+            lines.Add(
+                $"{change.GroupId} | {change.GroupName} | Known=[{change.KnownDiscoveriesSummary}] | Evidence={change.EvidenceSummary} | Checks={change.CheckSummary} | Unlocked=[{change.UnlockedDiscoveriesSummary}] | Effect={change.DecisionEffectSummary}");
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 }

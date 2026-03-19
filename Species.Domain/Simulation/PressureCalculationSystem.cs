@@ -79,6 +79,7 @@ public sealed class PressureCalculationSystem
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
             Pressures = pressures
         };
     }

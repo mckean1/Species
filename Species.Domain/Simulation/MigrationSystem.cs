@@ -9,6 +9,7 @@ public sealed class MigrationSystem
 {
     public MigrationResult Run(
         World world,
+        DiscoveryCatalog discoveryCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         IReadOnlyList<GroupSurvivalChange> survivalChanges)
     {
@@ -27,10 +28,10 @@ public sealed class MigrationSystem
 
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
             var shouldConsiderMigration = ShouldConsiderMigration(group, survivalChange);
-            var currentScore = ScoreRegion(group, currentRegion, faunaCatalog);
+            var currentScore = ScoreRegion(group, currentRegion, currentRegion, discoveryCatalog, faunaCatalog);
             var evaluatedNeighbors = currentRegion.NeighborIds
                 .Where(regionsById.ContainsKey)
-                .Select(neighborId => BuildCandidate(group, regionsById[neighborId], faunaCatalog))
+                .Select(neighborId => BuildCandidate(group, currentRegion, regionsById[neighborId], discoveryCatalog, faunaCatalog))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Region.Id, StringComparer.Ordinal)
                 .ToArray();
@@ -115,12 +116,22 @@ public sealed class MigrationSystem
         return storedFoodPerPopulationUnit <= MigrationConstants.LowStoredFoodPerPopulationUnit;
     }
 
-    private static CandidateScore BuildCandidate(PopulationGroup group, Region region, FaunaSpeciesCatalog faunaCatalog)
+    private static CandidateScore BuildCandidate(
+        PopulationGroup group,
+        Region currentRegion,
+        Region region,
+        DiscoveryCatalog discoveryCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
     {
-        return new CandidateScore(region, ScoreRegion(group, region, faunaCatalog));
+        return new CandidateScore(region, ScoreRegion(group, currentRegion, region, discoveryCatalog, faunaCatalog));
     }
 
-    private static float ScoreRegion(PopulationGroup group, Region region, FaunaSpeciesCatalog faunaCatalog)
+    private static float ScoreRegion(
+        PopulationGroup group,
+        Region currentRegion,
+        Region region,
+        DiscoveryCatalog discoveryCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
     {
         var floraSupport = MathF.Min(100.0f, (region.Ecosystem.FloraPopulations.Values.Sum() / MigrationConstants.FloraSupportScale) * 100.0f);
         var faunaSupport = MathF.Min(100.0f, (region.Ecosystem.FaunaPopulations.Values.Sum() / MigrationConstants.FaunaSupportScale) * 100.0f);
@@ -132,6 +143,15 @@ public sealed class MigrationSystem
             _ => 50.0f
         };
         var threatPenalty = MathF.Min(100.0f, (GetCarnivoreThreat(region, faunaCatalog) / MigrationConstants.ThreatSupportScale) * 100.0f);
+        var floraConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFloraDiscoveryId(region.Id))
+            ? DiscoveryConstants.KnownLocalFloraConfidence
+            : DiscoveryConstants.UnknownLocalFloraConfidence;
+        var faunaConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id))
+            ? DiscoveryConstants.KnownLocalFaunaConfidence
+            : DiscoveryConstants.UnknownLocalFaunaConfidence;
+        var waterConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id))
+            ? DiscoveryConstants.KnownLocalWaterConfidence
+            : DiscoveryConstants.UnknownLocalWaterConfidence;
 
         var (floraWeight, faunaWeight, waterWeight, threatWeight) = group.SubsistenceMode switch
         {
@@ -152,14 +172,26 @@ public sealed class MigrationSystem
                 MigrationConstants.MixedThreatWeight)
         };
 
-        var score = floraSupport * floraWeight +
-                    faunaSupport * faunaWeight +
-                    waterSupport * waterWeight +
+        var score = (floraSupport * floraConfidence) * floraWeight +
+                    (faunaSupport * faunaConfidence) * faunaWeight +
+                    (waterSupport * waterConfidence) * waterWeight +
                     (100.0f - threatPenalty) * threatWeight;
 
         score += group.KnownRegionIds.Contains(region.Id)
             ? MigrationConstants.KnownRegionBonus
             : -MigrationConstants.UnknownRegionPenalty;
+
+        if (group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalRegionConditionsDiscoveryId(region.Id)))
+        {
+            score += DiscoveryConstants.LocalRegionConditionsBonus;
+        }
+
+        if (!string.Equals(currentRegion.Id, region.Id, StringComparison.Ordinal))
+        {
+            score += group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(currentRegion.Id, region.Id))
+                ? DiscoveryConstants.KnownRouteBonus
+                : -DiscoveryConstants.UnknownRoutePenalty;
+        }
 
         if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, region.Id, StringComparison.Ordinal))
         {
@@ -250,7 +282,8 @@ public sealed class MigrationSystem
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
-            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal)
+            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone()
         };
     }
 

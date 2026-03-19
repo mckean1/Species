@@ -29,4 +29,6 @@ public sealed class PopulationGroup
     public HashSet<string> KnownRegionIds { get; init; } = new(StringComparer.Ordinal);
 
     public HashSet<string> KnownDiscoveryIds { get; init; } = new(StringComparer.Ordinal);
+
+    public DiscoveryEvidenceState DiscoveryEvidence { get; set; } = new();
 }

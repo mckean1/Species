@@ -55,7 +55,8 @@ public static class PopulationGroupSpawner
                 LastRegionId = string.Empty,
                 MonthsSinceLastMove = 0,
                 KnownRegionIds = new HashSet<string>(GetKnownRegionIds(region), StringComparer.Ordinal),
-                KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal)
+                KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal),
+                DiscoveryEvidence = new DiscoveryEvidenceState()
             });
         }
 

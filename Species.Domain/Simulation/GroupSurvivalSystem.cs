@@ -293,7 +293,8 @@ public sealed class GroupSurvivalSystem
                 MigrationPressure = group.Pressures.MigrationPressure
             },
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
-            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal)
+            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone()
         };
     }
 
