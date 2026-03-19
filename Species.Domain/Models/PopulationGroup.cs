@@ -20,6 +20,8 @@ public sealed class PopulationGroup
 
     public SubsistenceMode SubsistenceMode { get; set; }
 
+    public PressureState Pressures { get; set; } = new();
+
     public HashSet<string> KnownRegionIds { get; init; } = new(StringComparer.Ordinal);
 
     public HashSet<string> KnownDiscoveryIds { get; init; } = new(StringComparer.Ordinal);

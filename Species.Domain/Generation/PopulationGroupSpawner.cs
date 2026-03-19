@@ -51,6 +51,7 @@ public static class PopulationGroupSpawner
                 Population = population,
                 StoredFood = storedFood,
                 SubsistenceMode = subsistenceMode,
+                Pressures = new PressureState(),
                 KnownRegionIds = new HashSet<string>(GetKnownRegionIds(region), StringComparer.Ordinal),
                 KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal)
             });

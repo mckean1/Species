@@ -42,6 +42,30 @@ public static class SimulationTickValidator
             }
         }
 
+        foreach (var change in tickResult.GroupPressureChanges)
+        {
+            if (change.Pressures.FoodPressure is < 0 or > 100 ||
+                change.Pressures.WaterPressure is < 0 or > 100 ||
+                change.Pressures.ThreatPressure is < 0 or > 100 ||
+                change.Pressures.OvercrowdingPressure is < 0 or > 100 ||
+                change.Pressures.MigrationPressure is < 0 or > 100)
+            {
+                errors.Add($"Pressure recalculation produced an out-of-range pressure for {change.GroupId}.");
+            }
+
+            var synthesizedMigration = (int)Math.Round(
+                (change.Pressures.FoodPressure * 0.35) +
+                (change.Pressures.WaterPressure * 0.15) +
+                (change.Pressures.ThreatPressure * 0.20) +
+                (change.Pressures.OvercrowdingPressure * 0.30),
+                MidpointRounding.AwayFromZero);
+
+            if (Math.Abs(change.Pressures.MigrationPressure - synthesizedMigration) > 1)
+            {
+                errors.Add($"MigrationPressure for {change.GroupId} is inconsistent with component pressures.");
+            }
+        }
+
         return errors;
     }
 }

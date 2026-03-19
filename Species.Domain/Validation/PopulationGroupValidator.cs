@@ -51,6 +51,19 @@ public static class PopulationGroupValidator
                 errors.Add($"Population group {group.Id} has negative StoredFood.");
             }
 
+            if (group.Pressures is null)
+            {
+                errors.Add($"Population group {group.Id} has null Pressures.");
+            }
+            else
+            {
+                ValidatePressureRange(group.Id, nameof(group.Pressures.FoodPressure), group.Pressures.FoodPressure, errors);
+                ValidatePressureRange(group.Id, nameof(group.Pressures.WaterPressure), group.Pressures.WaterPressure, errors);
+                ValidatePressureRange(group.Id, nameof(group.Pressures.ThreatPressure), group.Pressures.ThreatPressure, errors);
+                ValidatePressureRange(group.Id, nameof(group.Pressures.OvercrowdingPressure), group.Pressures.OvercrowdingPressure, errors);
+                ValidatePressureRange(group.Id, nameof(group.Pressures.MigrationPressure), group.Pressures.MigrationPressure, errors);
+            }
+
             if (group.KnownRegionIds is null)
             {
                 errors.Add($"Population group {group.Id} has null KnownRegionIds.");
@@ -75,5 +88,13 @@ public static class PopulationGroupValidator
         }
 
         return errors;
+    }
+
+    private static void ValidatePressureRange(string groupId, string pressureName, int value, ICollection<string> errors)
+    {
+        if (value is < 0 or > 100)
+        {
+            errors.Add($"Population group {groupId} has {pressureName} outside the 0-100 range.");
+        }
     }
 }

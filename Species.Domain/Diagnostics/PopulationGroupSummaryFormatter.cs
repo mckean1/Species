@@ -24,7 +24,7 @@ public static class PopulationGroupSummaryFormatter
                 : string.Join(", ", group.KnownDiscoveryIds.OrderBy(id => id, StringComparer.Ordinal));
 
             lines.Add(
-                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}]");
+                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}]");
         }
 
         return string.Join(Environment.NewLine, lines);

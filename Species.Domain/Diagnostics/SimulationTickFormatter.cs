@@ -27,6 +27,15 @@ public static class SimulationTickFormatter
                 $"{change.RegionId} | {change.RegionName} | {change.FaunaSpeciesId} ({change.FaunaSpeciesName}) | {change.PreviousPopulation} -> {change.NewPopulation} | Needed={change.FoodNeeded:0.00} | Consumed={change.FoodConsumed:0.00} | Fulfillment={change.FulfillmentRatio:0.00} | Habitat={change.HabitatSupport:0.00} | Outcome={change.Outcome} | FloraConsumed=[{change.ConsumedFloraSummary}] | FaunaConsumed=[{change.ConsumedFaunaSummary}] | Cause={change.PrimaryCause}");
         }
 
+        lines.Add(string.Empty);
+        lines.Add("Group Pressures:");
+
+        foreach (var change in tickResult.GroupPressureChanges)
+        {
+            lines.Add(
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Population={change.Population} | StoredFood={change.StoredFood} | Food={change.Pressures.FoodPressure} | Water={change.Pressures.WaterPressure} | Threat={change.Pressures.ThreatPressure} | Overcrowding={change.Pressures.OvercrowdingPressure} | Migration={change.Pressures.MigrationPressure} | FoodReason={change.FoodPressureReason} | ThreatReason={change.ThreatPressureReason} | MigrationReason={change.MigrationPressureReason}");
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 }

@@ -7,11 +7,13 @@ public sealed class SimulationTickResult
     public SimulationTickResult(
         World world,
         IReadOnlyList<FloraPopulationChange> floraChanges,
-        IReadOnlyList<FaunaPopulationChange> faunaChanges)
+        IReadOnlyList<FaunaPopulationChange> faunaChanges,
+        IReadOnlyList<GroupPressureChange> groupPressureChanges)
     {
         World = world;
         FloraChanges = floraChanges;
         FaunaChanges = faunaChanges;
+        GroupPressureChanges = groupPressureChanges;
     }
 
     public World World { get; }
@@ -19,4 +21,6 @@ public sealed class SimulationTickResult
     public IReadOnlyList<FloraPopulationChange> FloraChanges { get; }
 
     public IReadOnlyList<FaunaPopulationChange> FaunaChanges { get; }
+
+    public IReadOnlyList<GroupPressureChange> GroupPressureChanges { get; }
 }
