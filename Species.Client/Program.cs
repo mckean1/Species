@@ -1,5 +1,4 @@
 using Species.Domain.Catalogs;
-using Species.Domain.Diagnostics;
 using Species.Domain.Generation;
 using Species.Domain.Simulation;
 using Species.Domain.Validation;
@@ -56,8 +55,72 @@ if (postTickValidationErrors.Length > 0)
     return;
 }
 
-Console.WriteLine(ChronicleFeedFormatter.Format(simulationEngine.CurrentWorld.Chronicle));
-Console.WriteLine();
-Console.WriteLine(ChronicleDebugFormatter.Format(simulationEngine.CurrentWorld.Chronicle));
-Console.WriteLine();
-Console.WriteLine(PopulationGroupSummaryFormatter.Format(simulationEngine.CurrentWorld));
+var viewState = new PlayerViewState();
+var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld).ToArray();
+if (viewErrors.Length > 0)
+{
+    Console.WriteLine("View validation failed:");
+
+    foreach (var error in viewErrors)
+    {
+        Console.WriteLine($"- {error}");
+    }
+
+    return;
+}
+
+RenderCurrentScreen();
+
+if (Console.IsInputRedirected)
+{
+    return;
+}
+
+while (true)
+{
+    var key = Console.ReadKey(intercept: true);
+    if (key.Key == ConsoleKey.Escape)
+    {
+        break;
+    }
+
+    if (key.Key == ConsoleKey.Tab)
+    {
+        viewState.CycleScreen();
+    }
+    else if (viewState.CurrentScreen == PlayerScreen.RegionViewer)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.RightArrow:
+            case ConsoleKey.D:
+            case ConsoleKey.N:
+                viewState.MoveToNextRegion(simulationEngine.CurrentWorld.Regions.Count);
+                break;
+            case ConsoleKey.LeftArrow:
+            case ConsoleKey.A:
+            case ConsoleKey.P:
+                viewState.MoveToPreviousRegion(simulationEngine.CurrentWorld.Regions.Count);
+                break;
+        }
+    }
+
+    viewState.ClampRegionIndex(simulationEngine.CurrentWorld.Regions.Count);
+    RenderCurrentScreen();
+}
+
+void RenderCurrentScreen()
+{
+    if (!Console.IsOutputRedirected)
+    {
+        try
+        {
+            Console.Clear();
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    Console.WriteLine(PlayerScreenRenderer.Render(simulationEngine.CurrentWorld, viewState, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog));
+}

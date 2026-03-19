@@ -37,3 +37,4 @@ Current implementation notes:
 - Phase 10 details are documented in [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md).
 - Phase 11 details are documented in [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md).
 - Phase 12 details are documented in [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md).
+- Phase 13 details are documented in [docs/phase-13-region-viewer-and-screen-navigation.md](docs/phase-13-region-viewer-and-screen-navigation.md).
