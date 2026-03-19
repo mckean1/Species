@@ -23,11 +23,11 @@ public static class ChronicleScreenRenderer
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     ];
 
-    public static string Render(World world, bool isSimulationRunning, TerminalViewport viewport)
+    public static string Render(World world, string focalGroupId, bool isSimulationRunning, TerminalViewport viewport)
     {
         var layout = ChronicleLayout.Create(viewport);
-        var focusGroup = GetFocusGroup(world);
-        var recordsLines = BuildRecordsPane(world, layout.RecordsContentWidth, layout.BodyHeight);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var recordsLines = BuildRecordsPane(world, focusGroup, layout.RecordsContentWidth, layout.BodyHeight);
         var situationLines = BuildSituationPane(focusGroup, layout.SituationContentWidth, layout.BodyHeight, isSimulationRunning);
         var lines = new List<string>(layout.TotalHeight)
         {
@@ -51,27 +51,7 @@ public static class ChronicleScreenRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static PopulationGroup? GetFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
-    }
-
-    private static List<string> BuildRecordsPane(World world, int contentWidth, int availableHeight)
+    private static List<string> BuildRecordsPane(World world, PopulationGroup? focusGroup, int contentWidth, int availableHeight)
     {
         var lines = new List<string>(availableHeight);
         if (availableHeight <= 0 || contentWidth <= 0)
@@ -79,17 +59,19 @@ public static class ChronicleScreenRenderer
             return lines;
         }
 
-        var visibleEntries = world.Chronicle.GetVisibleFeedEntries();
-        if (visibleEntries.Count == 0)
+        var visibleEntries = world.Chronicle.GetVisibleFeedEntries()
+            .Where(entry => focusGroup is not null && string.Equals(entry.GroupId, focusGroup.Id, StringComparison.Ordinal))
+            .ToArray();
+        if (visibleEntries.Length == 0)
         {
             AppendWrappedText(lines, availableHeight, contentWidth, "No visible records yet.", Dim);
-            AppendWrappedText(lines, availableHeight, contentWidth, "Advance time to let history unfold.", Dim);
+            AppendWrappedText(lines, availableHeight, contentWidth, focusGroup is null ? "No focal polity is active yet." : "Advance time to let this polity's history unfold.", Dim);
             return lines;
         }
 
         var isTruncated = false;
 
-        for (var index = 0; index < visibleEntries.Count; index++)
+        for (var index = 0; index < visibleEntries.Length; index++)
         {
             if (index > 0 && visibleEntries[index - 1].EventYear != visibleEntries[index].EventYear)
             {

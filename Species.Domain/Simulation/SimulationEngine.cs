@@ -47,9 +47,9 @@ public sealed class SimulationEngine
         var advancedWorld = AdvanceMonth(CurrentWorld);
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
-        var pressureResult = pressureCalculationSystem.Run(faunaResult.World, faunaCatalog);
+        var pressureResult = pressureCalculationSystem.Run(faunaResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
         var survivalResult = groupSurvivalSystem.Run(pressureResult.World, floraCatalog, faunaCatalog, advancementCatalog);
-        var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, faunaCatalog, survivalResult.Changes);
+        var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
         var discoveryResult = discoverySystem.Run(migrationResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
         var advancementResult = advancementSystem.Run(discoveryResult.World, discoveryCatalog, advancementCatalog, survivalResult.Changes, migrationResult.Changes);
         var chronicleResult = chronicleSystem.Run(advancementResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes);

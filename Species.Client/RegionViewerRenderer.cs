@@ -18,6 +18,7 @@ public static class RegionViewerRenderer
 
     public static string Render(
         World world,
+        string focalGroupId,
         int regionIndex,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
@@ -25,7 +26,7 @@ public static class RegionViewerRenderer
         AdvancementCatalog advancementCatalog,
         TerminalViewport viewport)
     {
-        var data = RegionsScreenDataBuilder.Build(world, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
+        var data = RegionsScreenDataBuilder.Build(world, focalGroupId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var topListHeight = Math.Max(8, Math.Min(12, viewport.Height / 3));
         var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 8);
@@ -77,10 +78,8 @@ public static class RegionViewerRenderer
             for (var index = startIndex; index < endIndex; index++)
             {
                 var region = data.Regions[index];
-                var familiarity = region.Knowledge.Contains("Not yet discovered", StringComparer.Ordinal)
-                    ? "Partial"
-                    : "Known";
-                var presence = region.PresencePopulation > 0 ? region.PresencePopulation.ToString("N0") : "None";
+                var familiarity = region.Familiarity;
+                var presence = region.PresenceText;
                 var row = FitVisible(region.Name, columnWidths[0]) + " | " +
                           FitVisible(region.Biome, columnWidths[1]) + " | " +
                           FitVisible(familiarity, columnWidths[2]) + " | " +

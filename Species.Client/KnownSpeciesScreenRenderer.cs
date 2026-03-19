@@ -1,4 +1,5 @@
 using System.Text;
+using Species.Domain.Catalogs;
 using Species.Domain.Models;
 
 public static class KnownSpeciesScreenRenderer
@@ -16,11 +17,13 @@ public static class KnownSpeciesScreenRenderer
 
     public static string Render(
         World world,
+        string focalGroupId,
+        FaunaSpeciesCatalog faunaCatalog,
         int selectedIndex,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = KnownSpeciesScreenDataBuilder.Build(world, selectedIndex);
+        var data = KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalGroupId, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);

@@ -2,6 +2,8 @@ public sealed class PlayerViewState
 {
     public PlayerScreen CurrentScreen { get; private set; } = PlayerScreen.Chronicle;
 
+    public string FocalGroupId { get; private set; } = string.Empty;
+
     public int CurrentRegionIndex { get; private set; }
 
     public int CurrentKnownPolityIndex { get; private set; }
@@ -12,7 +14,12 @@ public sealed class PlayerViewState
 
     public int CurrentKnownSpeciesIndex { get; private set; }
 
-    public bool IsSimulationRunning { get; private set; }
+    public bool IsSimulationRunning { get; private set; } = true;
+
+    public void EnsureFocalGroup(Species.Domain.Models.World world)
+    {
+        FocalGroupId = PlayerFocus.ResolveId(world, FocalGroupId);
+    }
 
     public void CycleScreen()
     {

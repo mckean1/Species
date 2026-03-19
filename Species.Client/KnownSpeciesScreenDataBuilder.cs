@@ -4,10 +4,10 @@ using Species.Domain.Models;
 
 public static class KnownSpeciesScreenDataBuilder
 {
-    public static KnownSpeciesScreenData Build(World world, int selectedIndex)
+    public static KnownSpeciesScreenData Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalGroupId, int selectedIndex)
     {
-        var focusGroup = SelectFocusGroup(world);
-        var items = BuildSpecies(world, focusGroup);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var items = BuildSpecies(world, focusGroup, faunaCatalog);
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
 
         return new KnownSpeciesScreenData(
@@ -17,7 +17,7 @@ public static class KnownSpeciesScreenDataBuilder
             clampedIndex);
     }
 
-    private static IReadOnlyList<KnownSpeciesSummary> BuildSpecies(World world, PopulationGroup? focusGroup)
+    private static IReadOnlyList<KnownSpeciesSummary> BuildSpecies(World world, PopulationGroup? focusGroup, FaunaSpeciesCatalog faunaCatalog)
     {
         if (focusGroup is null)
         {
@@ -57,7 +57,7 @@ public static class KnownSpeciesScreenDataBuilder
 
         foreach (var faunaEntry in knownFaunaById.OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
-            var fauna = FaunaSpeciesCatalog.CreateStarterSet().GetById(faunaEntry.Key);
+            var fauna = faunaCatalog.GetById(faunaEntry.Key);
             if (fauna is null)
             {
                 continue;
@@ -76,6 +76,10 @@ public static class KnownSpeciesScreenDataBuilder
     {
         var speciesGroups = world.PopulationGroups
             .Where(group => string.Equals(group.SpeciesId, focusGroup.SpeciesId, StringComparison.Ordinal))
+            .Where(group =>
+                string.Equals(group.Id, focusGroup.Id, StringComparison.Ordinal) ||
+                focusGroup.KnownRegionIds.Contains(group.CurrentRegionId) ||
+                focusGroup.KnownRegionIds.Contains(group.OriginRegionId))
             .ToArray();
         var regions = speciesGroups
             .Select(group => regionsById.GetValueOrDefault(group.CurrentRegionId))
@@ -123,6 +127,15 @@ public static class KnownSpeciesScreenDataBuilder
                 ? $"A known prey and grazing species encountered in {habitat}."
                 : $"A known omnivorous species encountered in {habitat}.";
 
+        var observedBiomes = regions
+            .Select(region => FormatBiome(region.Biome))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var observedWater = regions
+            .Select(region => FormatWater(region.WaterAvailability))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
         return new KnownSpeciesSummary(
             fauna.Id,
             fauna.Name,
@@ -132,8 +145,8 @@ public static class KnownSpeciesScreenDataBuilder
             status,
             overview,
             [
-                $"Known habitat: {string.Join(", ", fauna.CoreBiomes.Select(FormatBiome))}",
-                $"Water fit: {string.Join(", ", fauna.SupportedWaterAvailabilities.Select(FormatWater))}",
+                $"Observed habitat: {string.Join(", ", observedBiomes)}",
+                $"Observed water conditions: {string.Join(", ", observedWater)}",
                 $"Known range: {habitat}"
             ],
             BuildFaunaTraits(fauna),
@@ -231,26 +244,6 @@ public static class KnownSpeciesScreenDataBuilder
         }
 
         return context;
-    }
-
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
     }
 
     private static string BuildPlayerSpeciesName(string speciesId)

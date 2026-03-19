@@ -14,6 +14,7 @@ The distinction is strict:
 - Advancement = "we can"
 
 Discoveries improve decision-making only.
+They widen what the polity can safely see or estimate about the world.
 
 Discoveries do not directly improve:
 
@@ -80,13 +81,21 @@ Examples:
 
 ## Decision Effects Only
 
-Discoveries now affect decision inputs, especially migration scoring:
+Discoveries now affect decision inputs, especially migration scoring and other planning pressure:
 
 - known local flora improves how flora opportunity is recognized
 - known local fauna improves how fauna opportunity and threat are recognized
 - known local water sources improve water-aware evaluation
 - known local region conditions improve confidence in the region profile
 - known routes reduce uncertainty when evaluating a neighboring move
+
+The implementation now preserves a small distinction between:
+
+- world truth
+- actor knowledge / observed regional view
+- player-facing presentation of that knowledge
+
+Unknown stays unknown, partial experience stays partial, and discoveries promote specific fields from uncertain estimates into known local facts.
 
 These are decision-context effects only. They do not modify direct action output.
 

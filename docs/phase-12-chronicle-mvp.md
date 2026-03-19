@@ -6,6 +6,8 @@ Phase 12 adds a dedicated `Chronicle` as the main player-facing output layer. Ch
 
 This phase replaces the old player-facing raw monthly log output with Chronicle-driven output. The Chronicle remains concise, sparse, and one-line oriented.
 
+The Chronicle feed is now focal-polity-facing rather than omniscient. The player sees the history of the focal polity, not a god-view feed of every polity in the world.
+
 ## Chronicle Purpose
 
 The Chronicle is now the main player-facing simulation output.
@@ -71,6 +73,8 @@ Only notable outcomes create Chronicle records in MVP form:
 - advancement unlock
 
 Routine monthly stability and low-value internal simulation steps are intentionally excluded.
+
+Player-facing Chronicle presentation should not reveal hidden-world truth the focal polity would not have.
 
 ## Wording Rules
 

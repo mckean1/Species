@@ -17,13 +17,14 @@ public static class KnownPolitiesScreenRenderer
 
     public static string Render(
         World world,
+        string focalGroupId,
         int selectedPolityIndex,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = KnownPolitiesScreenDataBuilder.Build(world, selectedPolityIndex, discoveryCatalog, advancementCatalog);
+        var data = KnownPolitiesScreenDataBuilder.Build(world, focalGroupId, selectedPolityIndex, discoveryCatalog, advancementCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var detailWidth = Math.Max(24, innerWidth - listWidth - 3);

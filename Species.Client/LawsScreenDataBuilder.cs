@@ -2,9 +2,9 @@ using Species.Domain.Models;
 
 public static class LawsScreenDataBuilder
 {
-    public static LawsScreenData Build(World world, int selectedIndex)
+    public static LawsScreenData Build(World world, string focalGroupId, int selectedIndex)
     {
-        var focusGroup = SelectFocusGroup(world);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         var polityName = focusGroup?.Name ?? "Unknown polity";
         var items = Array.Empty<LawScreenItem>();
 
@@ -22,26 +22,6 @@ public static class LawsScreenDataBuilder
                 "No draft laws available",
                 "When law data is introduced, active and draft laws will appear here"
             ]);
-    }
-
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
     }
 
     private static string FormatMonthYear(int month, int year)

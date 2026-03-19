@@ -5,11 +5,12 @@ public static class KnownPolitiesScreenDataBuilder
 {
     public static KnownPolitiesScreenData Build(
         World world,
+        string focalGroupId,
         int selectedPolityIndex,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var focusGroup = SelectFocusGroup(world);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var knownPolities = GetKnownPolities(world, focusGroup, regionsById, discoveryCatalog, advancementCatalog);
         var clampedIndex = knownPolities.Count == 0
@@ -21,26 +22,6 @@ public static class KnownPolitiesScreenDataBuilder
             knownPolities,
             knownPolities.Count == 0 ? null : knownPolities[clampedIndex],
             clampedIndex);
-    }
-
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
     }
 
     private static IReadOnlyList<KnownPolitySummary> GetKnownPolities(
@@ -112,7 +93,7 @@ public static class KnownPolitiesScreenDataBuilder
             "Unknown",
             coreRegionName,
             currentRegionName,
-            $"{group.Population:N0}",
+            KnowledgePresentation.ApproximatePopulation(group.Population, exactAllowed: isNearby),
             relationship,
             isNearby ? "Nearby" : "Distant",
             visiblePressureSummary,
@@ -181,31 +162,33 @@ public static class KnownPolitiesScreenDataBuilder
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
+        _ = discoveryCatalog;
+        _ = advancementCatalog;
         var traits = new List<string>();
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedGatheringId))
+        if (group.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Gatherer)
         {
-            traits.Add("Strong foragers");
+            traits.Add("Often seen foraging");
         }
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.OrganizedTravelId))
+        if (group.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Hunter)
         {
-            traits.Add("Highly mobile");
+            traits.Add("Often seen hunting");
         }
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId))
+        if (group.Pressures.MigrationPressure >= 60)
         {
-            traits.Add("Maintains stored food");
-        }
-
-        if (group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalRegionConditionsDiscoveryId(group.CurrentRegionId)))
-        {
-            traits.Add("Knows its local ground well");
+            traits.Add("Frequently on the move");
         }
 
         if (group.StoredFood > group.Population)
         {
-            traits.Add("Appears provisioned");
+            traits.Add("Carries visible provisions");
+        }
+
+        if (group.Pressures.ThreatPressure < 40)
+        {
+            traits.Add("Moves with some confidence");
         }
 
         return traits.Count > 0 ? traits.Take(3).ToArray() : ["No notable traits observed"];

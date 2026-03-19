@@ -35,12 +35,15 @@ The MVP now preserves this monthly order:
 The MVP player-facing structure is now:
 
 - Chronicle as the main/default screen
-- Region Viewer as the supporting current-state screen
+- Region Viewer and supporting knowledge/polity screens for current state
 - `TAB` cycles between screens and wraps
-- `ENTER` advances one month in the client
+- `SPACE` toggles run/pause
+- simulation advances automatically while running
+- `ENTER` advances one month only while paused
 
 Chronicle remains the main player-facing history view.
 Region Viewer remains a player-facing state view, not a debug console.
+Player-facing screens respect focal-polity knowledge limits instead of exposing global truth.
 
 ## Discoveries Versus Advancements
 
@@ -51,6 +54,7 @@ The distinction remains strict:
 
 Discoveries affect decision-making only.
 Advancements affect execution/capability directly.
+Decision systems now consume knowledge-safe region views instead of raw hidden region truth for forward-looking evaluation.
 
 ## Logging / Output Cleanup
 
@@ -76,9 +80,9 @@ The integration pass also keeps Chronicle conservative by avoiding routine low-v
 Region Viewer now presents:
 
 - current date
-- region basics
-- flora and fauna populations
-- groups in the region
+- region basics only when known
+- flora and fauna only when discovered or plausibly observed
+- groups in the region without exact hidden internals
 - neighbor visibility
 - short discovery/advancement summaries where useful
 
@@ -101,6 +105,8 @@ The biggest remaining tuning hotspots after this pass are:
 - discovery and advancement threshold pacing
 - Chronicle hardship-event thresholds and pacing
 - starting group viability versus early ecological carrying capacity
+
+The cleanup pass also replaces stable-ID first-come food contention with explicit region-level proportional allocation plus deterministic rotating tie resolution, so shared scarcity is no longer biased by group ordering.
 
 ## Deferred
 

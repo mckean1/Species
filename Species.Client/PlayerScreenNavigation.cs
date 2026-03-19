@@ -53,7 +53,7 @@ public static class PlayerScreenNavigation
             var text =
                 $"{dim}[1]{reset} Chronicle  {dim}[2]{reset} Polity  {dim}[3]{reset} Advancements  {dim}[4]{reset} Laws  " +
                 $"{dim}[5]{reset} Regions  {dim}[6]{reset} Known Polities  {dim}[7]{reset} Known Species  " +
-                $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Pause";
+                $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
                 ? text
@@ -63,7 +63,7 @@ public static class PlayerScreenNavigation
         if (width >= 78)
         {
             var text =
-                $"{dim}[1-7]{reset} Screens  {dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Pause  {dim}[ESC]{reset} Quit";
+                $"{dim}[1-7]{reset} Screens  {dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step  {dim}[ESC]{reset} Quit";
 
             return selectionLabel is null
                 ? text
@@ -71,7 +71,7 @@ public static class PlayerScreenNavigation
         }
 
         return selectionLabel is null
-            ? $"{dim}[1-7]{reset}  {dim}[TAB]{reset}  {dim}[SPACE]{reset}"
-            : $"{dim}[1-7]{reset}  {dim}[TAB]{reset}  {dim}[< >]{reset}";
+            ? $"{dim}[1-7]{reset}  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}"
+            : $"{dim}[1-7]{reset}  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}  {dim}[< >]{reset}";
     }
 }

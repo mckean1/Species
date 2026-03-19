@@ -1,13 +1,17 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
-using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
 
 public sealed class PressureCalculationSystem
 {
-    public PressureCalculationResult Run(World world, FaunaSpeciesCatalog faunaCatalog)
+    public PressureCalculationResult Run(
+        World world,
+        DiscoveryCatalog discoveryCatalog,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
     {
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
@@ -21,14 +25,18 @@ public sealed class PressureCalculationSystem
                 continue;
             }
 
-            var localFloraSupport = region.Ecosystem.FloraPopulations.Values.Sum();
-            var localFaunaSupport = region.Ecosystem.FaunaPopulations.Values.Sum();
-            var carnivoreThreat = GetCarnivoreThreat(region, faunaCatalog);
-
-            var foodPressure = CalculateFoodPressure(group, localFloraSupport, localFaunaSupport);
-            var waterPressure = CalculateWaterPressure(region.WaterAvailability);
-            var threatPressure = CalculateThreatPressure(carnivoreThreat);
-            var overcrowdingPressure = CalculateOvercrowdingPressure(group.Population, localFloraSupport + localFaunaSupport);
+            var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
+            var regionKnowledge = knowledgeContext.ObserveRegion(region, group.CurrentRegionId);
+            var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
+            var weightedFoodPotential = SubsistenceSupportModel.CalculateWeightedFoodPotential(
+                group,
+                regionKnowledge.GatheringPotentialFood,
+                regionKnowledge.HuntingPotentialFood);
+            var visibleFoodSupport = SubsistenceSupportModel.NormalizeFoodSupport(weightedFoodPotential, monthlyFoodNeed);
+            var foodPressure = CalculateFoodPressure(group, visibleFoodSupport);
+            var waterPressure = CalculateWaterPressure(regionKnowledge.WaterSupport);
+            var threatPressure = CalculateThreatPressure(regionKnowledge.ThreatPressure);
+            var overcrowdingPressure = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
             var migrationPressure = CalculateMigrationPressure(foodPressure, waterPressure, threatPressure, overcrowdingPressure);
 
             var pressures = new PressureState
@@ -50,10 +58,10 @@ public sealed class PressureCalculationSystem
                 Population = group.Population,
                 StoredFood = group.StoredFood,
                 Pressures = pressures,
-                FoodPressureReason = BuildFoodPressureReason(group, localFloraSupport, localFaunaSupport, foodPressure),
-                WaterPressureReason = BuildWaterPressureReason(region.WaterAvailability),
-                ThreatPressureReason = BuildThreatPressureReason(carnivoreThreat, threatPressure),
-                OvercrowdingPressureReason = BuildOvercrowdingReason(group.Population, localFloraSupport + localFaunaSupport, overcrowdingPressure),
+                FoodPressureReason = BuildFoodPressureReason(group, regionKnowledge, visibleFoodSupport, foodPressure),
+                WaterPressureReason = BuildWaterPressureReason(regionKnowledge),
+                ThreatPressureReason = BuildThreatPressureReason(regionKnowledge, threatPressure),
+                OvercrowdingPressureReason = BuildOvercrowdingReason(group.Population, weightedFoodPotential, monthlyFoodNeed, overcrowdingPressure),
                 MigrationPressureReason = BuildMigrationReason(foodPressure, waterPressure, threatPressure, overcrowdingPressure, migrationPressure)
             });
         }
@@ -86,54 +94,44 @@ public sealed class PressureCalculationSystem
         };
     }
 
-    private static int CalculateFoodPressure(PopulationGroup group, int localFloraSupport, int localFaunaSupport)
+    private static int CalculateFoodPressure(PopulationGroup group, int visibleFoodSupport)
     {
         var foodReserveMonths = group.Population == 0
             ? PressureCalculationConstants.StoredFoodMonthsSafe
             : (float)group.StoredFood / Math.Max(1, group.Population);
         var storedFoodSafety = MathF.Min(1.0f, foodReserveMonths / PressureCalculationConstants.StoredFoodMonthsSafe);
-        var localSupport = localFloraSupport + localFaunaSupport;
-        var ecologySupport = MathF.Min(1.0f, localSupport / PressureCalculationConstants.LocalFoodSupportScale);
-        var populationStrain = localSupport <= 0
-            ? 1.0f
-            : MathF.Min(1.0f, group.Population / (localSupport * PressureCalculationConstants.OvercrowdingSupportScale));
+        var ecologySupport = visibleFoodSupport / PressureCalculationConstants.PressureScaleMaximum;
 
         var pressure = (1.0f - storedFoodSafety) * 45.0f +
-                       (1.0f - ecologySupport) * 35.0f +
-                       populationStrain * 20.0f;
+                       (1.0f - ecologySupport) * 55.0f;
 
         return ClampPressure(pressure);
     }
 
-    private static int CalculateWaterPressure(WaterAvailability waterAvailability)
+    private static int CalculateWaterPressure(float waterSupport)
     {
-        return waterAvailability switch
-        {
-            WaterAvailability.Low => 80,
-            WaterAvailability.Medium => 40,
-            WaterAvailability.High => 10,
-            _ => 50
-        };
+        return ClampPressure(100.0f - waterSupport);
     }
 
-    private static int CalculateThreatPressure(int carnivoreThreat)
+    private static int CalculateThreatPressure(float threatPressure)
     {
-        return ClampPressure((carnivoreThreat / PressureCalculationConstants.ThreatCarnivoreScale) * PressureCalculationConstants.PressureScaleMaximum);
+        return ClampPressure(threatPressure);
     }
 
-    private static int CalculateOvercrowdingPressure(int population, int localSupport)
+    private static int CalculateOvercrowdingPressure(int population, float weightedFoodPotential, int monthlyFoodNeed)
     {
         if (population <= 0)
         {
             return 0;
         }
 
-        if (localSupport <= 0)
+        if (weightedFoodPotential <= 0 || monthlyFoodNeed <= 0)
         {
             return 100;
         }
 
-        var ratio = population / (localSupport * PressureCalculationConstants.OvercrowdingSupportScale);
+        var supportCapacity = weightedFoodPotential / monthlyFoodNeed;
+        var ratio = population / Math.Max(1.0f, supportCapacity * population * PressureCalculationConstants.OvercrowdingSupportScale);
         return ClampPressure(MathF.Max(0.0f, (ratio - 0.5f) * 100.0f));
     }
 
@@ -147,65 +145,45 @@ public sealed class PressureCalculationSystem
         return ClampPressure(pressure);
     }
 
-    private static int GetCarnivoreThreat(Region region, FaunaSpeciesCatalog faunaCatalog)
-    {
-        var threat = 0;
-
-        foreach (var fauna in region.Ecosystem.FaunaPopulations)
-        {
-            var species = faunaCatalog.GetById(fauna.Key);
-            if (species?.DietCategory == DietCategory.Carnivore)
-            {
-                threat += fauna.Value;
-            }
-        }
-
-        return threat;
-    }
-
-    private static int ClampPressure(float value)
-    {
-        return (int)MathF.Round(Math.Clamp(value, 0.0f, PressureCalculationConstants.PressureScaleMaximum), MidpointRounding.AwayFromZero);
-    }
-
-    private static string BuildFoodPressureReason(PopulationGroup group, int localFloraSupport, int localFaunaSupport, int pressure)
+    private static string BuildFoodPressureReason(PopulationGroup group, RegionKnowledgeSnapshot knowledge, int visibleFoodSupport, int pressure)
     {
         if (pressure >= 70)
         {
-            return $"High because StoredFood is {group.StoredFood} and local food support is {localFloraSupport + localFaunaSupport}.";
+            return $"High because stored food is thin and only {DescribeKnowledge(knowledge.OverallKnowledge)} food support is visible.";
         }
 
         if (pressure >= 40)
         {
-            return $"Moderate because population {group.Population} is leaning on local support {localFloraSupport + localFaunaSupport}.";
+            return $"Moderate because the polity can account for about {visibleFoodSupport}% of current food need from what it knows.";
         }
 
-        return $"Low because StoredFood is {group.StoredFood} and local food support is {localFloraSupport + localFaunaSupport}.";
+        return $"Low because stored food and known local support look manageable.";
     }
 
-    private static string BuildWaterPressureReason(WaterAvailability waterAvailability)
+    private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge)
     {
-        return waterAvailability switch
+        return knowledge.WaterKnowledge switch
         {
-            WaterAvailability.Low => "High because the region has low water availability.",
-            WaterAvailability.Medium => "Moderate because the region has medium water availability.",
-            WaterAvailability.High => "Low because the region has high water availability.",
-            _ => "Derived from regional water availability."
+            KnowledgeLevel.Known => "Derived from known local water sources.",
+            KnowledgeLevel.Partial => "Derived from partial water observations in the current region.",
+            KnowledgeLevel.Rumored => "Derived from rumors and route familiarity rather than confirmed water knowledge.",
+            _ => "Derived from uncertain local water knowledge."
         };
     }
 
-    private static string BuildThreatPressureReason(int carnivoreThreat, int pressure)
+    private static string BuildThreatPressureReason(RegionKnowledgeSnapshot knowledge, int pressure)
     {
         return pressure >= 60
-            ? $"Elevated because carnivore abundance is {carnivoreThreat}."
-            : $"Derived from carnivore abundance {carnivoreThreat}.";
+            ? $"Elevated because {DescribeKnowledge(knowledge.FaunaKnowledge)} local danger signs are unfavorable."
+            : $"Derived from {DescribeKnowledge(knowledge.FaunaKnowledge)} local threat knowledge.";
     }
 
-    private static string BuildOvercrowdingReason(int population, int localSupport, int pressure)
+    private static string BuildOvercrowdingReason(int population, float weightedFoodPotential, int monthlyFoodNeed, int pressure)
     {
+        var supportMonths = monthlyFoodNeed <= 0 ? 0.0f : weightedFoodPotential / monthlyFoodNeed;
         return pressure >= 60
-            ? $"High because population {population} is large relative to support {localSupport}."
-            : $"Derived from population {population} versus support {localSupport}.";
+            ? $"High because population {population} is pressing against about {supportMonths:0.0} months of visible local support."
+            : $"Derived from population {population} versus visible local carrying support.";
     }
 
     private static string BuildMigrationReason(int foodPressure, int waterPressure, int threatPressure, int overcrowdingPressure, int migrationPressure)
@@ -213,5 +191,21 @@ public sealed class PressureCalculationSystem
         return migrationPressure >= 60
             ? $"Elevated because food={foodPressure}, water={waterPressure}, threat={threatPressure}, overcrowding={overcrowdingPressure}."
             : $"Synthesized from food={foodPressure}, water={waterPressure}, threat={threatPressure}, overcrowding={overcrowdingPressure}.";
+    }
+
+    private static int ClampPressure(float value)
+    {
+        return (int)MathF.Round(Math.Clamp(value, 0.0f, PressureCalculationConstants.PressureScaleMaximum), MidpointRounding.AwayFromZero);
+    }
+
+    private static string DescribeKnowledge(KnowledgeLevel level)
+    {
+        return level switch
+        {
+            KnowledgeLevel.Known => "known",
+            KnowledgeLevel.Partial => "partially known",
+            KnowledgeLevel.Rumored => "rumored",
+            _ => "uncertain"
+        };
     }
 }

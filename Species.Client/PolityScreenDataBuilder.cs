@@ -5,10 +5,11 @@ public static class PolityScreenDataBuilder
 {
     public static PolityScreenData Build(
         World world,
+        string focalGroupId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var focusGroup = SelectFocusGroup(world);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         if (focusGroup is null)
         {
             return new PolityScreenData(
@@ -56,26 +57,6 @@ public static class PolityScreenDataBuilder
                 .Where(part => !string.Equals(part, "species", StringComparison.OrdinalIgnoreCase))
                 .Select(part => char.ToUpperInvariant(part[0]) + part[1..]))
         };
-    }
-
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
     }
 
     private static IReadOnlyList<PolityPressureItem> BuildPressureItems(PressureState pressures)

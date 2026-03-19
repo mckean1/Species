@@ -36,8 +36,9 @@ if (validationErrors.Length > 0)
 
 var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
 var viewState = new PlayerViewState();
+viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
 var chronicleFrameRenderer = new ConsoleFrameRenderer();
-var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, advancementCatalog).ToArray();
+var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog).ToArray();
 if (viewErrors.Length > 0)
 {
     Console.WriteLine("View validation failed:");
@@ -82,6 +83,16 @@ while (true)
             elapsedSinceLastTick.Restart();
             shouldRender = true;
         }
+        else if (key.Key == ConsoleKey.Enter && !viewState.IsSimulationRunning)
+        {
+            if (!AdvanceOneMonth())
+            {
+                break;
+            }
+
+            elapsedSinceLastTick.Restart();
+            shouldRender = true;
+        }
         else if (key.Key == ConsoleKey.Tab)
         {
             viewState.CycleScreen();
@@ -107,43 +118,57 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownPolities)
         {
+            var polityCount = KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
                 case ConsoleKey.D:
                 case ConsoleKey.N:
-                    viewState.MoveToNextKnownPolity(simulationEngine.CurrentWorld.PopulationGroups.Count);
-                    shouldRender = true;
+                    if (polityCount > 0)
+                    {
+                        viewState.MoveToNextKnownPolity(polityCount);
+                        shouldRender = true;
+                    }
                     break;
                 case ConsoleKey.LeftArrow:
                 case ConsoleKey.A:
                 case ConsoleKey.P:
-                    viewState.MoveToPreviousKnownPolity(simulationEngine.CurrentWorld.PopulationGroups.Count);
-                    shouldRender = true;
+                    if (polityCount > 0)
+                    {
+                        viewState.MoveToPreviousKnownPolity(polityCount);
+                        shouldRender = true;
+                    }
                     break;
             }
         }
         else if (viewState.CurrentScreen == PlayerScreen.Advancements)
         {
+            var advancementCount = AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
                 case ConsoleKey.D:
                 case ConsoleKey.N:
-                    viewState.MoveToNextAdvancement(advancementCatalog.Definitions.Count);
-                    shouldRender = true;
+                    if (advancementCount > 0)
+                    {
+                        viewState.MoveToNextAdvancement(advancementCount);
+                        shouldRender = true;
+                    }
                     break;
                 case ConsoleKey.LeftArrow:
                 case ConsoleKey.A:
                 case ConsoleKey.P:
-                    viewState.MoveToPreviousAdvancement(advancementCatalog.Definitions.Count);
-                    shouldRender = true;
+                    if (advancementCount > 0)
+                    {
+                        viewState.MoveToPreviousAdvancement(advancementCount);
+                        shouldRender = true;
+                    }
                     break;
             }
         }
         else if (viewState.CurrentScreen == PlayerScreen.Laws)
         {
-            var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.CurrentLawIndex).Laws.Count;
+            var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentLawIndex).Laws.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
@@ -168,7 +193,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownSpecies)
         {
-            var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.CurrentKnownSpeciesIndex).Species.Count;
+            var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalGroupId, viewState.CurrentKnownSpeciesIndex).Species.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
@@ -205,11 +230,12 @@ while (true)
         shouldRender = true;
     }
 
-    viewState.ClampRegionIndex(simulationEngine.CurrentWorld.Regions.Count);
-    viewState.ClampKnownPolityIndex(simulationEngine.CurrentWorld.PopulationGroups.Count);
-    viewState.ClampAdvancementIndex(advancementCatalog.Definitions.Count);
-    viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.CurrentLawIndex).Laws.Count);
-    viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.CurrentKnownSpeciesIndex).Species.Count);
+    viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
+    viewState.ClampRegionIndex(RegionsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
+    viewState.ClampKnownPolityIndex(KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
+    viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
+    viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentLawIndex).Laws.Count);
+    viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalGroupId, viewState.CurrentKnownSpeciesIndex).Species.Count);
 
     if (shouldRender)
     {
@@ -232,7 +258,7 @@ bool AdvanceOneMonth()
         .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
         .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
         .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
-        .Concat(PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, advancementCatalog))
+        .Concat(PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog))
         .ToArray();
 
     if (postTickValidationErrors.Length == 0)

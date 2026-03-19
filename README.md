@@ -8,8 +8,11 @@ Current MVP structure:
 - Chronicle is the main/default player-facing screen.
 - Region Viewer is the supporting current-state player screen.
 - `TAB` cycles between screens and wraps.
-- `ENTER` advances one month in the console client.
-- Discoveries are knowledge and affect decision-making.
+- `SPACE` toggles pause/unpause in the console client.
+- Simulation auto-advances while running.
+- `ENTER` advances one month only while paused.
+- Discoveries are knowledge and affect decision-making through knowledge-safe views.
+- Player-facing screens respect focal-polity knowledge limits instead of global world truth.
 - Advancements are capability and affect execution.
 - The old player-facing raw log/output model has been replaced by Chronicle-first presentation.
 - The removed MVP adaptation layer has not been reintroduced.

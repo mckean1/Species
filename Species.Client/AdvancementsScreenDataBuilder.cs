@@ -6,11 +6,12 @@ public static class AdvancementsScreenDataBuilder
 {
     public static AdvancementsScreenData Build(
         World world,
+        string focalGroupId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         int selectedIndex)
     {
-        var focusGroup = SelectFocusGroup(world);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var items = advancementCatalog.Definitions
             .Select(definition => BuildItem(definition, focusGroup, regionsById, discoveryCatalog))
@@ -307,26 +308,6 @@ public static class AdvancementsScreenDataBuilder
             AdvancementScreenStatus.Completed => 2,
             _ => 3
         };
-    }
-
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
     }
 
     private static string FormatMonthYear(int month, int year)

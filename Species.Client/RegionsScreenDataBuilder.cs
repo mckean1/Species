@@ -1,24 +1,29 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 public static class RegionsScreenDataBuilder
 {
     public static RegionsScreenData Build(
         World world,
+        string focalGroupId,
         int selectedRegionIndex,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog)
     {
-        var focusGroup = SelectFocusGroup(world);
+        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         var regionCandidates = GetKnownRegions(world, focusGroup);
         var selectedIndex = regionCandidates.Count == 0
             ? 0
             : Math.Clamp(selectedRegionIndex, 0, regionCandidates.Count - 1);
+        var knowledgeContext = focusGroup is null
+            ? null
+            : GroupKnowledgeContext.Create(world, focusGroup, discoveryCatalog, floraCatalog, faunaCatalog);
 
         var summaries = regionCandidates
-            .Select(region => BuildSummary(region, world, focusGroup, floraCatalog, faunaCatalog, discoveryCatalog))
+            .Select(region => BuildSummary(region, world, focusGroup, knowledgeContext, floraCatalog, faunaCatalog, discoveryCatalog))
             .ToArray();
 
         return new RegionsScreenData(
@@ -28,37 +33,23 @@ public static class RegionsScreenDataBuilder
             selectedIndex);
     }
 
-    private static PopulationGroup? SelectFocusGroup(World world)
-    {
-        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
-        if (latestEntry is not null)
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .FirstOrDefault();
-    }
-
     private static IReadOnlyList<Region> GetKnownRegions(World world, PopulationGroup? focusGroup)
     {
-        if (focusGroup is null || focusGroup.KnownRegionIds.Count == 0)
+        if (focusGroup is null)
+        {
+            return [];
+        }
+
+        if (focusGroup.KnownRegionIds.Count == 0)
         {
             return world.Regions
+                .Where(region => string.Equals(region.Id, focusGroup.CurrentRegionId, StringComparison.Ordinal))
                 .OrderBy(region => region.Name, StringComparer.Ordinal)
                 .ToArray();
         }
 
         return world.Regions
-            .Where(region => focusGroup.KnownRegionIds.Contains(region.Id))
+            .Where(region => focusGroup.KnownRegionIds.Contains(region.Id) || string.Equals(region.Id, focusGroup.CurrentRegionId, StringComparison.Ordinal))
             .OrderBy(region => region.Name, StringComparer.Ordinal)
             .ToArray();
     }
@@ -67,20 +58,29 @@ public static class RegionsScreenDataBuilder
         Region region,
         World world,
         PopulationGroup? focusGroup,
+        GroupKnowledgeContext? knowledgeContext,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog)
     {
+        var snapshot = focusGroup is null || knowledgeContext is null
+            ? null
+            : knowledgeContext.ObserveRegion(region, focusGroup.CurrentRegionId);
         var groupsHere = world.PopulationGroups
             .Where(group => string.Equals(group.CurrentRegionId, region.Id, StringComparison.Ordinal))
             .OrderByDescending(group => group.Population)
             .ThenBy(group => group.Name, StringComparer.Ordinal)
             .ToArray();
 
+        var exactPresenceVisible = snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known;
         var presencePopulation = groupsHere.Sum(group => group.Population);
-        var topFlora = ResolveTopPopulationNames(region.Ecosystem.FloraPopulations, floraCatalog.GetById).Take(3).ToArray();
-        var topFauna = ResolveTopPopulationNames(region.Ecosystem.FaunaPopulations, faunaCatalog.GetById).Take(3).ToArray();
-        var knowledge = BuildKnowledge(region, focusGroup, discoveryCatalog);
+        var topFlora = snapshot?.FloraKnowledge == KnowledgeLevel.Known
+            ? ResolveTopPopulationNames(region.Ecosystem.FloraPopulations, floraCatalog.GetById).Take(3).ToArray()
+            : Array.Empty<string>();
+        var topFauna = snapshot?.FaunaKnowledge == KnowledgeLevel.Known
+            ? ResolveTopPopulationNames(region.Ecosystem.FaunaPopulations, faunaCatalog.GetById).Take(3).ToArray()
+            : Array.Empty<string>();
+        var knowledge = BuildKnowledge(region, snapshot, focusGroup, discoveryCatalog);
         var carnivoreThreat = region.Ecosystem.FaunaPopulations.Sum(entry =>
         {
             var fauna = faunaCatalog.GetById(entry.Key);
@@ -91,13 +91,17 @@ public static class RegionsScreenDataBuilder
             ? 0
             : (int)Math.Round(groupsHere.Average(group => group.Pressures.ThreatPressure), MidpointRounding.AwayFromZero);
 
-        var threatScore = Math.Clamp(Math.Max(groupThreat, carnivoreThreat / 2), 0, 100);
-        var threatText = threatScore switch
-        {
-            >= 70 => "Dangerous",
-            >= 40 => "Watchful",
-            _ => "Calm"
-        };
+        var threatScore = snapshot is null
+            ? Math.Clamp(Math.Max(groupThreat, carnivoreThreat / 2), 0, 100)
+            : (int)MathF.Round(snapshot.ThreatPressure, MidpointRounding.AwayFromZero);
+        var threatText = snapshot is null
+            ? threatScore switch
+            {
+                >= 70 => "Dangerous",
+                >= 40 => "Watchful",
+                _ => "Calm"
+            }
+            : KnowledgePresentation.DescribeThreat(snapshot);
 
         var context = new List<string>();
         if (focusGroup is not null)
@@ -123,49 +127,65 @@ public static class RegionsScreenDataBuilder
             context.Add("Other groups are present");
         }
 
-        if (region.WaterAvailability == WaterAvailability.High)
+        if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.High)
         {
             context.Add("Water is reliable");
         }
-        else if (region.WaterAvailability == WaterAvailability.Low)
+        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.Low)
         {
             context.Add("Water is scarce");
         }
 
-        if (region.Fertility >= 0.70)
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility >= 0.70)
         {
             context.Add("Land looks productive");
         }
-        else if (region.Fertility <= 0.35)
+        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility <= 0.35)
         {
             context.Add("Resources appear thin");
         }
 
         var opportunities = new List<string>();
-        if (region.WaterAvailability == WaterAvailability.High)
+        if (snapshot is not null && snapshot.WaterKnowledge != KnowledgeLevel.Unknown)
         {
-            opportunities.Add("Strong water access");
+            opportunities.Add(KnowledgePresentation.DescribeWater(snapshot));
         }
 
-        if (region.Fertility >= 0.65)
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility >= 0.65)
         {
             opportunities.Add("Fertile ground");
+        }
+        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial)
+        {
+            opportunities.Add("Land quality only partly known");
         }
 
         if (topFlora.Length > 0)
         {
             opportunities.Add($"Useful flora: {string.Join(", ", topFlora.Take(2))}");
         }
+        else if (snapshot is not null)
+        {
+            opportunities.Add(KnowledgePresentation.DescribeFoodSigns(snapshot.FloraKnowledge, "Local flora cataloged", "Useful plants observed", "Rumors of forage", "Flora not yet observed"));
+        }
 
         var risks = new List<string>();
-        if (threatScore >= 40)
+        if (snapshot is not null)
+        {
+            risks.Add(KnowledgePresentation.DescribeThreat(snapshot));
+        }
+        else if (threatScore >= 40)
         {
             risks.Add($"{threatText} local conditions");
         }
 
-        if (region.WaterAvailability == WaterAvailability.Low)
+        if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.Low)
         {
             risks.Add("Limited water");
+        }
+        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Partial)
+        {
+            risks.Add("Water availability uncertain");
         }
 
         if (groupsHere.Any(group => group.Pressures.OvercrowdingPressure >= 60))
@@ -176,11 +196,13 @@ public static class RegionsScreenDataBuilder
         return new RegionSummary(
             region.Id,
             region.Name,
-            region.Biome.ToString(),
-            region.WaterAvailability.ToString(),
-            region.Fertility.ToString("0.00"),
-            presencePopulation,
-            groupsHere.Select(group => $"{group.Name} ({group.Population:N0})").ToArray(),
+            snapshot is null ? "Known" : KnowledgePresentation.DescribeRegionFamiliarity(snapshot),
+            snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsKnownRegion == true ? region.Biome.ToString() : "Unknown",
+            snapshot is null ? region.WaterAvailability.ToString() : KnowledgePresentation.DescribeWater(snapshot),
+            snapshot?.ConditionsKnowledge == KnowledgeLevel.Known ? region.Fertility.ToString("0.00") : snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial ? "Estimated" : "Unknown",
+            exactPresenceVisible ? presencePopulation : 0,
+            exactPresenceVisible ? presencePopulation.ToString("N0") : (groupsHere.Length > 0 ? "Signs" : "None"),
+            BuildGroupPresence(groupsHere, exactPresenceVisible),
             topFlora.Length > 0 ? topFlora : ["None known"],
             topFauna.Length > 0 ? topFauna : ["None known"],
             knowledge,
@@ -191,7 +213,7 @@ public static class RegionsScreenDataBuilder
             threatScore);
     }
 
-    private static IReadOnlyList<string> BuildKnowledge(Region region, PopulationGroup? focusGroup, DiscoveryCatalog discoveryCatalog)
+    private static IReadOnlyList<string> BuildKnowledge(Region region, RegionKnowledgeSnapshot? snapshot, PopulationGroup? focusGroup, DiscoveryCatalog discoveryCatalog)
     {
         if (focusGroup is null)
         {
@@ -199,6 +221,11 @@ public static class RegionsScreenDataBuilder
         }
 
         var knowledge = new List<string>();
+
+        if (snapshot is not null)
+        {
+            knowledge.Add($"Familiarity: {KnowledgePresentation.Describe(snapshot.OverallKnowledge)}");
+        }
 
         if (focusGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id)))
         {
@@ -221,6 +248,21 @@ public static class RegionsScreenDataBuilder
         }
 
         return knowledge.Count > 0 ? knowledge : ["Not yet discovered"];
+    }
+
+    private static IReadOnlyList<string> BuildGroupPresence(IReadOnlyList<PopulationGroup> groupsHere, bool exactPresenceVisible)
+    {
+        if (groupsHere.Count == 0)
+        {
+            return ["No notable presence"];
+        }
+
+        if (!exactPresenceVisible)
+        {
+            return ["Signs of habitation reported"];
+        }
+
+        return groupsHere.Select(group => $"{group.Name} ({group.Population:N0})").ToArray();
     }
 
     private static IReadOnlyList<string> ResolveTopPopulationNames<TDefinition>(
@@ -272,10 +314,12 @@ public sealed record RegionsScreenData(
 public sealed record RegionSummary(
     string Id,
     string Name,
+    string Familiarity,
     string Biome,
     string WaterAvailability,
     string Fertility,
     int PresencePopulation,
+    string PresenceText,
     IReadOnlyList<string> GroupPresence,
     IReadOnlyList<string> Flora,
     IReadOnlyList<string> Fauna,

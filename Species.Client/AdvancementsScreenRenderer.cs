@@ -17,13 +17,14 @@ public static class AdvancementsScreenRenderer
 
     public static string Render(
         World world,
+        string focalGroupId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         int selectedIndex,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = AdvancementsScreenDataBuilder.Build(world, discoveryCatalog, advancementCatalog, selectedIndex);
+        var data = AdvancementsScreenDataBuilder.Build(world, focalGroupId, discoveryCatalog, advancementCatalog, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(36, ((innerWidth - 3) * 10) / 21);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);

@@ -4,6 +4,8 @@
 
 Phase 9 adds the first real movement response for population groups. Groups now consider whether to leave their current region after the month's survival outcome, compare only neighboring regions, and move at most one region per month when a nearby option is meaningfully better.
 
+Migration scoring now uses a knowledge-safe regional view rather than direct world truth. Unknown neighboring regions are evaluated from rumor/default expectations and known-world baselines, while previously visited regions can be judged from partial or fully discovered local knowledge.
+
 This phase adds migration decisions and movement execution only. It does not add settlements, diplomacy, territorial control, long-range exploration, pathfinding, or route systems.
 
 ## Monthly Order
@@ -45,15 +47,17 @@ There are no world jumps, no multi-hop searches, and no long-range route plans i
 
 Migration scoring is survival-oriented and uses:
 
-- flora support
-- fauna support
-- water availability
-- local carnivore threat
+- subsistence-aware gathering support
+- subsistence-aware hunting support
+- water knowledge
+- local threat knowledge
 - a small known-region bonus
 - a small unknown-region penalty
 - a return-to-last-region penalty
 
 The current region is always scored alongside neighbors so a group can stay when leaving is not justified.
+
+Exact hidden support, exact hidden threat, and exact hidden resource totals are not used for undiscovered regions. Partial experience produces partial estimates instead of exact truth.
 
 ## SubsistenceMode Influence
 
@@ -100,6 +104,8 @@ Phase 9 adds monthly debug output for:
 - `LastRegionId`
 - `MonthsSinceLastMove`
 - decision reasons
+
+These diagnostics now reflect knowledge-safe estimates rather than omniscient region scoring.
 
 ## Deferred
 

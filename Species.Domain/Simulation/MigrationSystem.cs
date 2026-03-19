@@ -1,6 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -10,6 +11,7 @@ public sealed class MigrationSystem
     public MigrationResult Run(
         World world,
         DiscoveryCatalog discoveryCatalog,
+        FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         IReadOnlyList<GroupSurvivalChange> survivalChanges)
     {
@@ -27,11 +29,12 @@ public sealed class MigrationSystem
             }
 
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
+            var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
             var shouldConsiderMigration = ShouldConsiderMigration(group, survivalChange);
-            var currentScore = ScoreRegion(group, currentRegion, currentRegion, discoveryCatalog, faunaCatalog);
+            var currentScore = ScoreRegion(group, currentRegion, knowledgeContext.ObserveRegion(currentRegion, currentRegion.Id));
             var evaluatedNeighbors = currentRegion.NeighborIds
                 .Where(regionsById.ContainsKey)
-                .Select(neighborId => BuildCandidate(group, currentRegion, regionsById[neighborId], discoveryCatalog, faunaCatalog))
+                .Select(neighborId => BuildCandidate(group, currentRegion, regionsById[neighborId], knowledgeContext))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Region.Id, StringComparer.Ordinal)
                 .ToArray();
@@ -120,38 +123,25 @@ public sealed class MigrationSystem
         PopulationGroup group,
         Region currentRegion,
         Region region,
-        DiscoveryCatalog discoveryCatalog,
-        FaunaSpeciesCatalog faunaCatalog)
+        GroupKnowledgeContext knowledgeContext)
     {
-        return new CandidateScore(region, ScoreRegion(group, currentRegion, region, discoveryCatalog, faunaCatalog));
+        return new CandidateScore(region, ScoreRegion(group, currentRegion, knowledgeContext.ObserveRegion(region, currentRegion.Id)));
     }
 
     private static float ScoreRegion(
         PopulationGroup group,
         Region currentRegion,
-        Region region,
-        DiscoveryCatalog discoveryCatalog,
-        FaunaSpeciesCatalog faunaCatalog)
+        RegionKnowledgeSnapshot knowledge)
     {
-        var floraSupport = MathF.Min(100.0f, (region.Ecosystem.FloraPopulations.Values.Sum() / MigrationConstants.FloraSupportScale) * 100.0f);
-        var faunaSupport = MathF.Min(100.0f, (region.Ecosystem.FaunaPopulations.Values.Sum() / MigrationConstants.FaunaSupportScale) * 100.0f);
-        var waterSupport = region.WaterAvailability switch
-        {
-            WaterAvailability.Low => 25.0f,
-            WaterAvailability.Medium => 60.0f,
-            WaterAvailability.High => 100.0f,
-            _ => 50.0f
-        };
-        var threatPenalty = MathF.Min(100.0f, (GetCarnivoreThreat(region, faunaCatalog) / MigrationConstants.ThreatSupportScale) * 100.0f);
-        var floraConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFloraDiscoveryId(region.Id))
-            ? DiscoveryConstants.KnownLocalFloraConfidence
-            : DiscoveryConstants.UnknownLocalFloraConfidence;
-        var faunaConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id))
-            ? DiscoveryConstants.KnownLocalFaunaConfidence
-            : DiscoveryConstants.UnknownLocalFaunaConfidence;
-        var waterConfidence = group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id))
-            ? DiscoveryConstants.KnownLocalWaterConfidence
-            : DiscoveryConstants.UnknownLocalWaterConfidence;
+        var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
+        var floraSupport = SubsistenceSupportModel.NormalizeFoodSupport(knowledge.GatheringPotentialFood, monthlyFoodNeed);
+        var faunaSupport = SubsistenceSupportModel.NormalizeFoodSupport(knowledge.HuntingPotentialFood, monthlyFoodNeed);
+        var waterSupport = knowledge.WaterSupport;
+        var threatPenalty = knowledge.ThreatPressure;
+        var floraConfidence = ResolveConfidence(knowledge.FloraKnowledge);
+        var faunaConfidence = ResolveConfidence(knowledge.FaunaKnowledge);
+        var waterConfidence = ResolveConfidence(knowledge.WaterKnowledge);
+        var routeConfidence = ResolveConfidence(knowledge.RouteKnowledge);
 
         var (floraWeight, faunaWeight, waterWeight, threatWeight) = group.SubsistenceMode switch
         {
@@ -175,31 +165,33 @@ public sealed class MigrationSystem
         var score = (floraSupport * floraConfidence) * floraWeight +
                     (faunaSupport * faunaConfidence) * faunaWeight +
                     (waterSupport * waterConfidence) * waterWeight +
-                    (100.0f - threatPenalty) * threatWeight;
+                    (100.0f - (threatPenalty * routeConfidence)) * threatWeight;
 
-        score += group.KnownRegionIds.Contains(region.Id)
+        score += knowledge.IsKnownRegion
             ? MigrationConstants.KnownRegionBonus
             : -MigrationConstants.UnknownRegionPenalty;
 
-        if (group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalRegionConditionsDiscoveryId(region.Id)))
+        if (knowledge.ConditionsKnowledge == KnowledgeLevel.Known)
         {
             score += DiscoveryConstants.LocalRegionConditionsBonus;
         }
 
-        if (!string.Equals(currentRegion.Id, region.Id, StringComparison.Ordinal))
+        if (!string.Equals(currentRegion.Id, knowledge.RegionId, StringComparison.Ordinal))
         {
-            score += group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(currentRegion.Id, region.Id))
+            score += knowledge.RouteKnowledge == KnowledgeLevel.Known
                 ? DiscoveryConstants.KnownRouteBonus
-                : -DiscoveryConstants.UnknownRoutePenalty;
+                : knowledge.RouteKnowledge == KnowledgeLevel.Partial || knowledge.RouteKnowledge == KnowledgeLevel.Rumored
+                    ? -DiscoveryConstants.UnknownRoutePenalty * 0.5f
+                    : -DiscoveryConstants.UnknownRoutePenalty;
 
             if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.OrganizedTravelId) &&
-                group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(currentRegion.Id, region.Id)))
+                knowledge.RouteKnowledge == KnowledgeLevel.Known)
             {
                 score += AdvancementConstants.OrganizedTravelKnownRouteBonus;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, region.Id, StringComparison.Ordinal))
+        if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, knowledge.RegionId, StringComparison.Ordinal))
         {
             score -= MigrationConstants.ReturnToLastRegionPenalty;
         }
@@ -207,20 +199,15 @@ public sealed class MigrationSystem
         return score;
     }
 
-    private static int GetCarnivoreThreat(Region region, FaunaSpeciesCatalog faunaCatalog)
+    private static float ResolveConfidence(KnowledgeLevel level)
     {
-        var threat = 0;
-
-        foreach (var fauna in region.Ecosystem.FaunaPopulations)
+        return level switch
         {
-            var species = faunaCatalog.GetById(fauna.Key);
-            if (species?.DietCategory == DietCategory.Carnivore)
-            {
-                threat += fauna.Value;
-            }
-        }
-
-        return threat;
+            KnowledgeLevel.Known => 1.00f,
+            KnowledgeLevel.Partial => 0.82f,
+            KnowledgeLevel.Rumored => 0.62f,
+            _ => 0.45f
+        };
     }
 
     private static string BuildNeighborSummary(IReadOnlyList<CandidateScore> evaluatedNeighbors)
