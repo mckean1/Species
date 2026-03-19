@@ -1,3 +1,4 @@
+using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
@@ -38,7 +39,11 @@ public static class WorldGenerator
         "Run"
     ];
 
-    public static World Create(int? seed = null, int? regionCount = null)
+    public static World Create(
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        int? seed = null,
+        int? regionCount = null)
     {
         var worldSeed = seed ?? WorldGenerationConstants.DefaultSeed;
         var totalRegions = Math.Max(regionCount ?? WorldGenerationConstants.DefaultRegionCount, WorldGenerationConstants.MinimumRegionCount);
@@ -58,8 +63,10 @@ public static class WorldGenerator
                 .Select(neighborIndex => $"region-{neighborIndex + 1:D2}")
                 .OrderBy(neighborId => neighborId, StringComparer.Ordinal)
                 .ToArray();
+            var provisionalRegion = new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors);
+            var ecosystem = RegionEcosystemSeeder.Seed(provisionalRegion, floraCatalog, faunaCatalog, random);
 
-            regions.Add(new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors));
+            regions.Add(new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors, ecosystem));
         }
 
         return new World(worldSeed, regions);

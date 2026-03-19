@@ -14,8 +14,19 @@ public static class WorldSummaryFormatter
 
         foreach (var region in world.Regions)
         {
+            var flora = region.Ecosystem.FloraPopulations.Count == 0
+                ? "none"
+                : string.Join(", ", region.Ecosystem.FloraPopulations
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => $"{entry.Key}:{entry.Value:0.00}"));
+            var fauna = region.Ecosystem.FaunaPopulations.Count == 0
+                ? "none"
+                : string.Join(", ", region.Ecosystem.FaunaPopulations
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => $"{entry.Key}:{entry.Value:0.00}"));
+
             lines.Add(
-                $"{region.Id} | {region.Name} | Biome={region.Biome} | Water={region.WaterAvailability} | Fertility={region.Fertility:0.00} | Neighbors=[{string.Join(", ", region.NeighborIds)}]");
+                $"{region.Id} | {region.Name} | Biome={region.Biome} | Water={region.WaterAvailability} | Fertility={region.Fertility:0.00} | Neighbors=[{string.Join(", ", region.NeighborIds)}] | Flora=[{flora}] | Fauna=[{fauna}]");
         }
 
         return string.Join(Environment.NewLine, lines);
