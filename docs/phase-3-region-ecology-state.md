@@ -13,7 +13,7 @@ This phase adds initial ecology only. It does not simulate growth, decline, feed
 - `FloraPopulations`: flora population values keyed by flora species ID.
 - `FaunaPopulations`: fauna population values keyed by fauna species ID.
 
-The values are normalized aggregate population levels, not individual entities or groups.
+The values are aggregate whole-number population levels, not individual entities or groups.
 
 ## Storage Model
 

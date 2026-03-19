@@ -9,6 +9,16 @@ public static class WorldValidator
         var errors = new List<string>();
         var regionsById = new Dictionary<string, Region>(StringComparer.Ordinal);
 
+        if (world.CurrentYear < 1)
+        {
+            errors.Add("World year must be at least 1.");
+        }
+
+        if (world.CurrentMonth is < 1 or > 12)
+        {
+            errors.Add("World month must be between 1 and 12.");
+        }
+
         foreach (var region in world.Regions)
         {
             if (!regionsById.TryAdd(region.Id, region))

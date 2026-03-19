@@ -29,7 +29,7 @@ public static class RegionEcologyValidator
                     errors.Add($"Region {region.Id} references unknown flora species {floraPopulation.Key}.");
                 }
 
-                if (floraPopulation.Value < 0.0f)
+                if (floraPopulation.Value < 0)
                 {
                     errors.Add($"Region {region.Id} has negative flora population for {floraPopulation.Key}.");
                 }
@@ -42,7 +42,7 @@ public static class RegionEcologyValidator
                     errors.Add($"Region {region.Id} references unknown fauna species {faunaPopulation.Key}.");
                 }
 
-                if (faunaPopulation.Value < 0.0f)
+                if (faunaPopulation.Value < 0)
                 {
                     errors.Add($"Region {region.Id} has negative fauna population for {faunaPopulation.Key}.");
                 }
