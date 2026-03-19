@@ -11,6 +11,7 @@ var validationErrors = WorldValidator.Validate(world)
     .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
     .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
     .Concat(RegionEcologyValidator.Validate(world, floraCatalog, faunaCatalog))
+    .Concat(PopulationGroupValidator.Validate(world))
     .ToArray();
 
 if (validationErrors.Length > 0)
@@ -29,6 +30,7 @@ var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog);
 var tickResult = simulationEngine.Tick();
 var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentWorld)
     .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
+    .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
     .Concat(SimulationTickValidator.Validate(world, tickResult))
     .ToArray();
 
@@ -49,5 +51,7 @@ Console.WriteLine();
 Console.WriteLine(SimulationTickFormatter.Format(tickResult));
 Console.WriteLine();
 Console.WriteLine(WorldSummaryFormatter.Format(simulationEngine.CurrentWorld));
+Console.WriteLine();
+Console.WriteLine(PopulationGroupSummaryFormatter.Format(simulationEngine.CurrentWorld));
 Console.WriteLine();
 Console.WriteLine(SpeciesCatalogSummaryFormatter.Format(floraCatalog, faunaCatalog));

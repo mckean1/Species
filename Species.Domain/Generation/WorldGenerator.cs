@@ -69,7 +69,13 @@ public static class WorldGenerator
             regions.Add(new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors, ecosystem));
         }
 
-        return new World(worldSeed, 1, 1, regions);
+        var provisionalWorld = new World(worldSeed, 1, 1, regions);
+        var populationGroups = PopulationGroupSpawner.Spawn(
+            provisionalWorld,
+            PopulationGroupSpawningConstants.DefaultGroupCount,
+            random);
+
+        return new World(worldSeed, 1, 1, regions, populationGroups);
     }
 
     private static Dictionary<int, HashSet<int>> BuildNeighborMap(int regionCount, Random random)

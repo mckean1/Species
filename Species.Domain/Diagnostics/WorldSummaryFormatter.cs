@@ -10,7 +10,8 @@ public static class WorldSummaryFormatter
         {
             $"World Seed: {world.Seed}",
             $"Simulation Date: Year {world.CurrentYear}, Month {world.CurrentMonth}",
-            $"Total Regions: {world.Regions.Count}"
+            $"Total Regions: {world.Regions.Count}",
+            $"Population Groups: {world.PopulationGroups.Count}"
         };
 
         foreach (var region in world.Regions)

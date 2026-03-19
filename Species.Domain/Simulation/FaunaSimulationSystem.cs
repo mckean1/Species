@@ -86,7 +86,7 @@ public sealed class FaunaSimulationSystem
         }
 
         return new FaunaSimulationResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, world.PopulationGroups),
             changes);
     }
 
