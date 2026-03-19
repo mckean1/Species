@@ -2,6 +2,10 @@ using Species.Domain.Catalogs;
 using Species.Domain.Generation;
 using Species.Domain.Simulation;
 using Species.Domain.Validation;
+using System.Diagnostics;
+
+const int TickDelayMilliseconds = 500;
+const int InputPollDelayMilliseconds = 25;
 
 var floraCatalog = FloraSpeciesCatalog.CreateStarterSet();
 var faunaCatalog = FaunaSpeciesCatalog.CreateStarterSet();
@@ -32,6 +36,7 @@ if (validationErrors.Length > 0)
 
 var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
 var viewState = new PlayerViewState();
+var chronicleFrameRenderer = new ConsoleFrameRenderer();
 var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld).ToArray();
 if (viewErrors.Length > 0)
 {
@@ -52,44 +57,71 @@ if (Console.IsInputRedirected)
     return;
 }
 
+var elapsedSinceLastTick = Stopwatch.StartNew();
+
 while (true)
 {
-    var key = Console.ReadKey(intercept: true);
-    if (key.Key == ConsoleKey.Escape)
+    var shouldRender = false;
+
+    while (Console.KeyAvailable)
     {
-        break;
+        var key = Console.ReadKey(intercept: true);
+        if (key.Key == ConsoleKey.Escape)
+        {
+            return;
+        }
+
+        if (key.Key == ConsoleKey.Spacebar)
+        {
+            viewState.ToggleSimulation();
+            elapsedSinceLastTick.Restart();
+            shouldRender = true;
+        }
+        else if (key.Key == ConsoleKey.Tab)
+        {
+            viewState.CycleScreen();
+            shouldRender = true;
+        }
+        else if (viewState.CurrentScreen == PlayerScreen.RegionViewer)
+        {
+            switch (key.Key)
+            {
+                case ConsoleKey.RightArrow:
+                case ConsoleKey.D:
+                case ConsoleKey.N:
+                    viewState.MoveToNextRegion(simulationEngine.CurrentWorld.Regions.Count);
+                    shouldRender = true;
+                    break;
+                case ConsoleKey.LeftArrow:
+                case ConsoleKey.A:
+                case ConsoleKey.P:
+                    viewState.MoveToPreviousRegion(simulationEngine.CurrentWorld.Regions.Count);
+                    shouldRender = true;
+                    break;
+            }
+        }
     }
 
-    if (key.Key is ConsoleKey.Enter or ConsoleKey.Spacebar)
+    if (viewState.IsSimulationRunning && elapsedSinceLastTick.ElapsedMilliseconds >= TickDelayMilliseconds)
     {
+        elapsedSinceLastTick.Restart();
+
         if (!AdvanceOneMonth())
         {
             break;
         }
-    }
-    else if (key.Key == ConsoleKey.Tab)
-    {
-        viewState.CycleScreen();
-    }
-    else if (viewState.CurrentScreen == PlayerScreen.RegionViewer)
-    {
-        switch (key.Key)
-        {
-            case ConsoleKey.RightArrow:
-            case ConsoleKey.D:
-            case ConsoleKey.N:
-                viewState.MoveToNextRegion(simulationEngine.CurrentWorld.Regions.Count);
-                break;
-            case ConsoleKey.LeftArrow:
-            case ConsoleKey.A:
-            case ConsoleKey.P:
-                viewState.MoveToPreviousRegion(simulationEngine.CurrentWorld.Regions.Count);
-                break;
-        }
+
+        shouldRender = true;
     }
 
     viewState.ClampRegionIndex(simulationEngine.CurrentWorld.Regions.Count);
-    RenderCurrentScreen();
+
+    if (shouldRender)
+    {
+        RenderCurrentScreen();
+    }
+
+    Thread.Sleep(InputPollDelayMilliseconds);
 }
 
 bool AdvanceOneMonth()
@@ -117,6 +149,7 @@ bool AdvanceOneMonth()
     {
         try
         {
+            chronicleFrameRenderer.Reset();
             Console.Clear();
         }
         catch (IOException)
@@ -135,6 +168,24 @@ bool AdvanceOneMonth()
 
 void RenderCurrentScreen()
 {
+    var viewport = TerminalViewport.GetCurrent();
+    var frame = PlayerScreenRenderer.Render(
+        simulationEngine.CurrentWorld,
+        viewState,
+        floraCatalog,
+        faunaCatalog,
+        discoveryCatalog,
+        advancementCatalog,
+        viewport);
+
+    if (viewState.CurrentScreen == PlayerScreen.Chronicle)
+    {
+        chronicleFrameRenderer.Render(frame, viewport);
+        return;
+    }
+
+    chronicleFrameRenderer.Reset();
+
     if (!Console.IsOutputRedirected)
     {
         try
@@ -146,5 +197,5 @@ void RenderCurrentScreen()
         }
     }
 
-    Console.WriteLine(PlayerScreenRenderer.Render(simulationEngine.CurrentWorld, viewState, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog));
+    Console.WriteLine(frame);
 }

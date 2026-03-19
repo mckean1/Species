@@ -9,11 +9,12 @@ public static class PlayerScreenRenderer
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog,
-        AdvancementCatalog advancementCatalog)
+        AdvancementCatalog advancementCatalog,
+        TerminalViewport viewport)
     {
         return viewState.CurrentScreen switch
         {
-            PlayerScreen.Chronicle => ChronicleScreenRenderer.Render(world),
+            PlayerScreen.Chronicle => ChronicleScreenRenderer.Render(world, viewState.IsSimulationRunning, viewport),
             PlayerScreen.RegionViewer => RegionViewerRenderer.Render(world, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog),
             _ => throw new NotSupportedException($"Unsupported screen {viewState.CurrentScreen}.")
         };

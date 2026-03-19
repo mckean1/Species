@@ -4,6 +4,8 @@ public sealed class PlayerViewState
 
     public int CurrentRegionIndex { get; private set; }
 
+    public bool IsSimulationRunning { get; private set; }
+
     public void CycleScreen()
     {
         CurrentScreen = CurrentScreen == PlayerScreen.Chronicle
@@ -45,5 +47,10 @@ public sealed class PlayerViewState
         {
             CurrentRegionIndex = regionCount - 1;
         }
+    }
+
+    public void ToggleSimulation()
+    {
+        IsSimulationRunning = !IsSimulationRunning;
     }
 }
