@@ -36,6 +36,15 @@ public static class SimulationTickFormatter
                 $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Population={change.Population} | StoredFood={change.StoredFood} | Food={change.Pressures.FoodPressure} | Water={change.Pressures.WaterPressure} | Threat={change.Pressures.ThreatPressure} | Overcrowding={change.Pressures.OvercrowdingPressure} | Migration={change.Pressures.MigrationPressure} | FoodReason={change.FoodPressureReason} | ThreatReason={change.ThreatPressureReason} | MigrationReason={change.MigrationPressureReason}");
         }
 
+        lines.Add(string.Empty);
+        lines.Add("Group Survival:");
+
+        foreach (var change in tickResult.GroupSurvivalChanges)
+        {
+            lines.Add(
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Mode={change.SubsistenceMode} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 }

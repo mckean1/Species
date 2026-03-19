@@ -32,6 +32,7 @@ var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentW
     .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
     .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
     .Concat(SimulationTickValidator.Validate(world, tickResult))
+    .Concat(GroupSurvivalValidator.Validate(world, tickResult))
     .ToArray();
 
 if (postTickValidationErrors.Length > 0)

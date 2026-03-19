@@ -10,6 +10,7 @@ public sealed class SimulationEngine
     private readonly FloraSimulationSystem floraSimulationSystem;
     private readonly FaunaSimulationSystem faunaSimulationSystem;
     private readonly PressureCalculationSystem pressureCalculationSystem;
+    private readonly GroupSurvivalSystem groupSurvivalSystem;
 
     public SimulationEngine(
         World initialWorld,
@@ -22,6 +23,7 @@ public sealed class SimulationEngine
         floraSimulationSystem = new FloraSimulationSystem();
         faunaSimulationSystem = new FaunaSimulationSystem();
         pressureCalculationSystem = new PressureCalculationSystem();
+        groupSurvivalSystem = new GroupSurvivalSystem();
     }
 
     public World CurrentWorld { get; private set; }
@@ -32,10 +34,11 @@ public sealed class SimulationEngine
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
         var pressureResult = pressureCalculationSystem.Run(faunaResult.World, faunaCatalog);
-        var finalizedWorld = FinalizeTick(pressureResult.World);
+        var survivalResult = groupSurvivalSystem.Run(pressureResult.World, floraCatalog, faunaCatalog);
+        var finalizedWorld = FinalizeTick(survivalResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes);
     }
 
     private static World AdvanceMonth(World world)
