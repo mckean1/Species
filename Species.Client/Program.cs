@@ -33,6 +33,7 @@ var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentW
     .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
     .Concat(SimulationTickValidator.Validate(world, tickResult))
     .Concat(GroupSurvivalValidator.Validate(world, tickResult))
+    .Concat(MigrationValidator.Validate(world, tickResult))
     .ToArray();
 
 if (postTickValidationErrors.Length > 0)

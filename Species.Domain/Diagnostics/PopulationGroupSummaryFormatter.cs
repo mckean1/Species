@@ -16,6 +16,9 @@ public static class PopulationGroupSummaryFormatter
         {
             var currentRegionName = regionNamesById.GetValueOrDefault(group.CurrentRegionId, "Unknown Region");
             var originRegionName = regionNamesById.GetValueOrDefault(group.OriginRegionId, "Unknown Region");
+            var lastRegionName = string.IsNullOrWhiteSpace(group.LastRegionId)
+                ? "none"
+                : regionNamesById.GetValueOrDefault(group.LastRegionId, "Unknown Region");
             var knownRegions = group.KnownRegionIds.Count == 0
                 ? "none"
                 : string.Join(", ", group.KnownRegionIds.OrderBy(id => id, StringComparer.Ordinal));
@@ -24,7 +27,7 @@ public static class PopulationGroupSummaryFormatter
                 : string.Join(", ", group.KnownDiscoveryIds.OrderBy(id => id, StringComparer.Ordinal));
 
             lines.Add(
-                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}]");
+                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | LastRegion={group.LastRegionId} ({lastRegionName}) | MonthsSinceLastMove={group.MonthsSinceLastMove} | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}]");
         }
 
         return string.Join(Environment.NewLine, lines);

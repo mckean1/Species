@@ -282,6 +282,8 @@ public sealed class GroupSurvivalSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
+            LastRegionId = group.LastRegionId,
+            MonthsSinceLastMove = group.MonthsSinceLastMove,
             Pressures = new PressureState
             {
                 FoodPressure = group.Pressures.FoodPressure,

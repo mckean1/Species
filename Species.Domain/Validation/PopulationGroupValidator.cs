@@ -51,6 +51,16 @@ public static class PopulationGroupValidator
                 errors.Add($"Population group {group.Id} has negative StoredFood.");
             }
 
+            if (group.MonthsSinceLastMove < 0)
+            {
+                errors.Add($"Population group {group.Id} has negative MonthsSinceLastMove.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(group.LastRegionId) && !regionIds.Contains(group.LastRegionId))
+            {
+                errors.Add($"Population group {group.Id} references invalid LastRegionId {group.LastRegionId}.");
+            }
+
             if (group.Pressures is null)
             {
                 errors.Add($"Population group {group.Id} has null Pressures.");

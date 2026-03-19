@@ -45,6 +45,15 @@ public static class SimulationTickFormatter
                 $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Mode={change.SubsistenceMode} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
         }
 
+        lines.Add(string.Empty);
+        lines.Add("Migration:");
+
+        foreach (var change in tickResult.MigrationChanges)
+        {
+            lines.Add(
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | MigrationPressure={change.MigrationPressure} | StoredFood={change.StoredFood} | Considered={change.ConsideredMigration} | CurrentScore={change.CurrentRegionScore:0.0} | Neighbors=[{change.NeighborScoresSummary}] | Winner={change.WinningRegionId} ({change.WinningRegionName})={change.WinningRegionScore:0.0} | Moved={change.Moved} | NewRegion={change.NewRegionId} ({change.NewRegionName}) | LastRegionId={change.LastRegionId} | MonthsSinceLastMove={change.MonthsSinceLastMove} | Reason={change.DecisionReason}");
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 }
