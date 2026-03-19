@@ -17,6 +17,8 @@ public static class ChronicleValidator
         }
 
         var visibleEntries = world.Chronicle.GetVisibleFeedEntries();
+        var seenRecordSequences = new HashSet<int>();
+        var seenRevealSequences = new HashSet<int>();
         for (var index = 1; index < visibleEntries.Count; index++)
         {
             if (visibleEntries[index - 1].RevealSequence < visibleEntries[index].RevealSequence)
@@ -28,9 +30,26 @@ public static class ChronicleValidator
 
         foreach (var entry in world.Chronicle.Entries)
         {
+            if (!seenRecordSequences.Add(entry.RecordSequence))
+            {
+                errors.Add($"Chronicle entry record sequence {entry.RecordSequence} is duplicated.");
+            }
+
             if (string.IsNullOrWhiteSpace(entry.Message))
             {
                 errors.Add($"Chronicle entry {entry.RecordSequence} has a blank message.");
+            }
+
+            if (entry.IsRevealed)
+            {
+                if (entry.RevealedYear is null || entry.RevealedMonth is null || entry.RevealSequence is null)
+                {
+                    errors.Add($"Chronicle entry {entry.RecordSequence} is revealed without complete reveal metadata.");
+                }
+                else if (!seenRevealSequences.Add(entry.RevealSequence.Value))
+                {
+                    errors.Add($"Chronicle reveal sequence {entry.RevealSequence.Value} is duplicated.");
+                }
             }
 
             if (entry.Category == ChronicleEventCategory.Discovery &&

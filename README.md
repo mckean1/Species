@@ -2,29 +2,41 @@
 
 MVP simulation prototype for a region-based world model.
 
-Current implementation notes:
+Current MVP structure:
 
-- Phase 1 world and region foundation is implemented.
-- Phase 2 species definition catalogs for ecology are implemented.
-- Phase 3 region ecology state seeding is implemented.
-- Phase 4 monthly flora simulation and the SimulationEngine tick orchestrator are implemented.
-- Phase 5 monthly fauna simulation and ecology consumption are implemented.
-- Phase 6 population group actor spawning is implemented.
-- Phase 7 group pressure recalculation is implemented.
-- Phase 8 group survival and consumption is implemented.
-- Phase 9 movement and migration is implemented.
-- Phase 10 discovery MVP is implemented.
-- Phase 11 advancement MVP is implemented.
-- The console client generates a deterministic connected world and prints a debug summary.
-- The console client also prints starter flora and fauna definition summaries.
-- The world debug summary now includes seeded flora and fauna populations per region.
-- The console client now runs a monthly tick and prints flora and fauna change details.
-- The console client also prints population group state for inspection.
-- The console client now prints recalculated group pressures and pressure reasons.
-- The console client now prints group survival, stored food use, shortage, and starvation results.
-- The console client now prints migration decisions, neighbor scores, and movement outcomes.
-- The console client now prints discovery evidence, unlock checks, and discovery definitions.
-- The console client now prints advancement evidence, unlock checks, learned advancements, and advancement definitions.
+- `SimulationEngine` is the canonical monthly orchestrator.
+- Chronicle is the main/default player-facing screen.
+- Region Viewer is the supporting current-state player screen.
+- `TAB` cycles between screens and wraps.
+- `ENTER` advances one month in the console client.
+- Discoveries are knowledge and affect decision-making.
+- Advancements are capability and affect execution.
+- The old player-facing raw log/output model has been replaced by Chronicle-first presentation.
+- The removed MVP adaptation layer has not been reintroduced.
+- Long-term biological change remains deferred to a later mutation / inheritance / evolution system.
+
+Canonical monthly flow:
+
+1. Advance month
+2. Flora simulation
+3. Fauna simulation
+4. Group pressure recalculation
+5. Group survival and consumption
+6. Migration decision and movement
+7. Discovery evaluation
+8. Advancement evaluation
+9. Chronicle update and feed progression
+10. End-of-tick finalization
+
+Main tuning hotspots:
+
+- flora growth/decline tuning
+- fauna food consumption and depletion pressure
+- group food need and starvation severity
+- migration thresholds and score margins
+- discovery and advancement pacing
+- Chronicle hardship-event noisiness
+- starting group viability
 - Phase 1 details are documented in [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md).
 - Phase 2 details are documented in [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md).
 - Phase 3 details are documented in [docs/phase-3-region-ecology-state.md](docs/phase-3-region-ecology-state.md).
@@ -38,3 +50,4 @@ Current implementation notes:
 - Phase 11 details are documented in [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md).
 - Phase 12 details are documented in [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md).
 - Phase 13 details are documented in [docs/phase-13-region-viewer-and-screen-navigation.md](docs/phase-13-region-viewer-and-screen-navigation.md).
+- MVP integration / cleanup notes are documented in [docs/mvp-integration-balance-cleanup-pass.md](docs/mvp-integration-balance-cleanup-pass.md).

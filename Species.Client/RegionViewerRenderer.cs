@@ -37,7 +37,8 @@ public static class RegionViewerRenderer
         {
             "Species MVP",
             "Screen: Region Viewer",
-            "Controls: TAB switch screen | Left/Right browse regions | ESC quit",
+            $"Date: Year {world.CurrentYear}, Month {world.CurrentMonth}",
+            "Controls: ENTER advance month | TAB switch screen | Left/Right browse regions | ESC quit",
             string.Empty,
             $"Region {Array.IndexOf(orderedRegions, region) + 1} of {orderedRegions.Length}",
             $"{region.Name} ({region.Id})",

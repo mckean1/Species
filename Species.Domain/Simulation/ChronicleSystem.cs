@@ -30,11 +30,12 @@ public sealed class ChronicleSystem
         IReadOnlyList<AdvancementChange> advancementChanges)
     {
         var entries = new List<ChronicleEntry>();
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
         var nextRecordSequence = world.Chronicle.NextRecordSequence;
 
         foreach (var change in migrationChanges.Where(change => change.Moved))
         {
-            entries.Add(BuildEntry(
+            AddEntry(entries, seenKeys, BuildEntry(
                 world,
                 nextRecordSequence++,
                 change.GroupId,
@@ -49,7 +50,7 @@ public sealed class ChronicleSystem
         {
             if (change.Shortage >= ChronicleConstants.MeaningfulShortageThreshold)
             {
-                entries.Add(BuildEntry(
+                AddEntry(entries, seenKeys, BuildEntry(
                     world,
                     nextRecordSequence++,
                     change.GroupId,
@@ -62,7 +63,7 @@ public sealed class ChronicleSystem
 
             if (change.StarvationLoss >= ChronicleConstants.MeaningfulDeclineThreshold && change.FinalPopulation > 0)
             {
-                entries.Add(BuildEntry(
+                AddEntry(entries, seenKeys, BuildEntry(
                     world,
                     nextRecordSequence++,
                     change.GroupId,
@@ -75,7 +76,7 @@ public sealed class ChronicleSystem
 
             if (change.FinalPopulation == 0)
             {
-                entries.Add(BuildEntry(
+                AddEntry(entries, seenKeys, BuildEntry(
                     world,
                     nextRecordSequence++,
                     change.GroupId,
@@ -91,7 +92,7 @@ public sealed class ChronicleSystem
         {
             foreach (var discoveryName in SplitSummary(change.UnlockedDiscoveriesSummary))
             {
-                entries.Add(BuildEntry(
+                AddEntry(entries, seenKeys, BuildEntry(
                     world,
                     nextRecordSequence++,
                     change.GroupId,
@@ -106,7 +107,7 @@ public sealed class ChronicleSystem
         {
             foreach (var advancementName in SplitSummary(change.UnlockedAdvancementsSummary))
             {
-                entries.Add(BuildEntry(
+                AddEntry(entries, seenKeys, BuildEntry(
                     world,
                     nextRecordSequence++,
                     change.GroupId,
@@ -118,6 +119,15 @@ public sealed class ChronicleSystem
         }
 
         return entries;
+    }
+
+    private static void AddEntry(ICollection<ChronicleEntry> entries, ISet<string> seenKeys, ChronicleEntry entry)
+    {
+        var key = $"{entry.EventYear}:{entry.EventMonth}:{entry.GroupId}:{entry.Category}:{entry.Message}";
+        if (seenKeys.Add(key))
+        {
+            entries.Add(entry);
+        }
     }
 
     private static ChronicleEntry BuildEntry(

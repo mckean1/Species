@@ -31,30 +31,6 @@ if (validationErrors.Length > 0)
 }
 
 var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
-var tickResult = simulationEngine.Tick();
-var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentWorld)
-    .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
-    .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
-    .Concat(SimulationTickValidator.Validate(world, tickResult))
-    .Concat(GroupSurvivalValidator.Validate(world, tickResult))
-    .Concat(MigrationValidator.Validate(world, tickResult))
-    .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
-    .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
-    .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
-    .ToArray();
-
-if (postTickValidationErrors.Length > 0)
-{
-    Console.WriteLine("Post-tick validation failed:");
-
-    foreach (var error in postTickValidationErrors)
-    {
-        Console.WriteLine($"- {error}");
-    }
-
-    return;
-}
-
 var viewState = new PlayerViewState();
 var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld).ToArray();
 if (viewErrors.Length > 0)
@@ -84,7 +60,14 @@ while (true)
         break;
     }
 
-    if (key.Key == ConsoleKey.Tab)
+    if (key.Key is ConsoleKey.Enter or ConsoleKey.Spacebar)
+    {
+        if (!AdvanceOneMonth())
+        {
+            break;
+        }
+    }
+    else if (key.Key == ConsoleKey.Tab)
     {
         viewState.CycleScreen();
     }
@@ -107,6 +90,47 @@ while (true)
 
     viewState.ClampRegionIndex(simulationEngine.CurrentWorld.Regions.Count);
     RenderCurrentScreen();
+}
+
+bool AdvanceOneMonth()
+{
+    var previousWorld = simulationEngine.CurrentWorld;
+    var tickResult = simulationEngine.Tick();
+    var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentWorld)
+        .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
+        .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
+        .Concat(SimulationTickValidator.Validate(previousWorld, tickResult))
+        .Concat(GroupSurvivalValidator.Validate(previousWorld, tickResult))
+        .Concat(MigrationValidator.Validate(previousWorld, tickResult))
+        .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
+        .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
+        .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
+        .Concat(PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld))
+        .ToArray();
+
+    if (postTickValidationErrors.Length == 0)
+    {
+        return true;
+    }
+
+    if (!Console.IsOutputRedirected)
+    {
+        try
+        {
+            Console.Clear();
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    Console.WriteLine("Post-tick validation failed:");
+    foreach (var error in postTickValidationErrors)
+    {
+        Console.WriteLine($"- {error}");
+    }
+
+    return false;
 }
 
 void RenderCurrentScreen()

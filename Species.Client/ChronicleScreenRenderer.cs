@@ -10,7 +10,8 @@ public static class ChronicleScreenRenderer
             [
                 "Species MVP",
                 "Screen: Chronicle",
-                "Controls: TAB switch screen | ESC quit",
+                $"Date: Year {world.CurrentYear}, Month {world.CurrentMonth}",
+                "Controls: ENTER advance month | TAB switch screen | ESC quit",
                 string.Empty,
                 ChronicleFeedFormatter.Format(world.Chronicle)
             ]);

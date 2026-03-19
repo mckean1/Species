@@ -19,7 +19,8 @@ public static class ChronicleFeedFormatter
 
         if (visibleEntries.Length == 0)
         {
-            lines.Add("(No chronicle entries are visible yet.)");
+            lines.Add("No visible chronicle entries yet.");
+            lines.Add("Advance time to let history unfold.");
             return string.Join(Environment.NewLine, lines);
         }
 
