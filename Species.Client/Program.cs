@@ -1,14 +1,19 @@
-﻿
+using Species.Domain.Catalogs;
 using Species.Domain.Diagnostics;
 using Species.Domain.Generation;
 using Species.Domain.Validation;
 
 var world = WorldGenerator.Create();
-var validationErrors = WorldValidator.Validate(world);
+var floraCatalog = FloraSpeciesCatalog.CreateStarterSet();
+var faunaCatalog = FaunaSpeciesCatalog.CreateStarterSet();
+var validationErrors = WorldValidator.Validate(world)
+    .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
+    .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
+    .ToArray();
 
-if (validationErrors.Count > 0)
+if (validationErrors.Length > 0)
 {
-    Console.WriteLine("World generation failed validation:");
+    Console.WriteLine("Startup validation failed:");
 
     foreach (var error in validationErrors)
     {
@@ -19,3 +24,5 @@ if (validationErrors.Count > 0)
 }
 
 Console.WriteLine(WorldSummaryFormatter.Format(world));
+Console.WriteLine();
+Console.WriteLine(SpeciesCatalogSummaryFormatter.Format(floraCatalog, faunaCatalog));

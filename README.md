@@ -5,5 +5,8 @@ MVP simulation prototype for a region-based world model.
 Current implementation notes:
 
 - Phase 1 world and region foundation is implemented.
+- Phase 2 species definition catalogs for ecology are implemented.
 - The console client generates a deterministic connected world and prints a debug summary.
+- The console client also prints starter flora and fauna definition summaries.
 - Phase 1 details are documented in [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md).
+- Phase 2 details are documented in [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md).
