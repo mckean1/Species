@@ -365,37 +365,7 @@ public static class ChronicleScreenRenderer
 
     private static string BuildFooter(int innerWidth)
     {
-        IReadOnlyList<Segment> segments = innerWidth switch
-        {
-            >= 64 =>
-            [
-                new Segment("[TAB]", Dim),
-                new Segment(" Next screen   "),
-                new Segment("[SPACE]", Dim),
-                new Segment(" Run/Pause   "),
-                new Segment("[ESC]", Dim),
-                new Segment(" Quit")
-            ],
-            >= 44 =>
-            [
-                new Segment("[TAB]", Dim),
-                new Segment(" Screen   "),
-                new Segment("[SPACE]", Dim),
-                new Segment(" Run   "),
-                new Segment("[ESC]", Dim),
-                new Segment(" Quit")
-            ],
-            _ =>
-            [
-                new Segment("[TAB]", Dim),
-                new Segment("  "),
-                new Segment("[SPACE]", Dim),
-                new Segment("  "),
-                new Segment("[ESC]", Dim)
-            ]
-        };
-
-        return BorderLine(RenderSegments(segments, null, innerWidth), innerWidth);
+        return BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset), innerWidth);
     }
 
     private static IReadOnlyList<string> WrapSegments(

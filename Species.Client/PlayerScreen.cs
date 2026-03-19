@@ -1,5 +1,10 @@
 public enum PlayerScreen
 {
     Chronicle,
-    RegionViewer
+    Polity,
+    Advancements,
+    Laws,
+    Regions,
+    KnownPolities,
+    KnownSpecies
 }

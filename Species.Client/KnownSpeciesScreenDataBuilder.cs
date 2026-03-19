@@ -1,0 +1,343 @@
+using Species.Domain.Catalogs;
+using Species.Domain.Enums;
+using Species.Domain.Models;
+
+public static class KnownSpeciesScreenDataBuilder
+{
+    public static KnownSpeciesScreenData Build(World world, int selectedIndex)
+    {
+        var focusGroup = SelectFocusGroup(world);
+        var items = BuildSpecies(world, focusGroup);
+        var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
+
+        return new KnownSpeciesScreenData(
+            FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            items,
+            items.Count == 0 ? null : items[clampedIndex],
+            clampedIndex);
+    }
+
+    private static IReadOnlyList<KnownSpeciesSummary> BuildSpecies(World world, PopulationGroup? focusGroup)
+    {
+        if (focusGroup is null)
+        {
+            return [];
+        }
+
+        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+        var summaries = new List<KnownSpeciesSummary>
+        {
+            BuildOwnSpeciesSummary(world, focusGroup, regionsById)
+        };
+
+        var knownFaunaById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
+        foreach (var regionId in focusGroup.KnownRegionIds)
+        {
+            if (!focusGroup.KnownDiscoveryIds.Contains($"discovery-local-fauna:{regionId}") ||
+                !regionsById.TryGetValue(regionId, out var region))
+            {
+                continue;
+            }
+
+            foreach (var faunaId in region.Ecosystem.FaunaPopulations
+                         .Where(entry => entry.Value > 0)
+                         .OrderByDescending(entry => entry.Value)
+                         .Take(3)
+                         .Select(entry => entry.Key))
+            {
+                if (!knownFaunaById.TryGetValue(faunaId, out var regions))
+                {
+                    regions = [];
+                    knownFaunaById.Add(faunaId, regions);
+                }
+
+                regions.Add(region);
+            }
+        }
+
+        foreach (var faunaEntry in knownFaunaById.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            var fauna = FaunaSpeciesCatalog.CreateStarterSet().GetById(faunaEntry.Key);
+            if (fauna is null)
+            {
+                continue;
+            }
+
+            summaries.Add(BuildFaunaSummary(fauna, faunaEntry.Value));
+        }
+
+        return summaries;
+    }
+
+    private static KnownSpeciesSummary BuildOwnSpeciesSummary(
+        World world,
+        PopulationGroup focusGroup,
+        IReadOnlyDictionary<string, Region> regionsById)
+    {
+        var speciesGroups = world.PopulationGroups
+            .Where(group => string.Equals(group.SpeciesId, focusGroup.SpeciesId, StringComparison.Ordinal))
+            .ToArray();
+        var regions = speciesGroups
+            .Select(group => regionsById.GetValueOrDefault(group.CurrentRegionId))
+            .Where(region => region is not null)
+            .Cast<Region>()
+            .DistinctBy(region => region.Id)
+            .ToArray();
+        var avgPressure = speciesGroups.Length == 0
+            ? 0
+            : (int)Math.Round(speciesGroups.Average(group => Math.Max(group.Pressures.FoodPressure, group.Pressures.WaterPressure)), MidpointRounding.AwayFromZero);
+
+        return new KnownSpeciesSummary(
+            focusGroup.SpeciesId,
+            BuildPlayerSpeciesName(focusGroup.SpeciesId),
+            "Our species",
+            true,
+            $"{speciesGroups.Sum(group => group.Population):N0}",
+            avgPressure >= 50 ? "familiar, pressured" : "familiar, common nearby",
+            "The species your polity belongs to.",
+            [
+                $"Known population: {speciesGroups.Sum(group => group.Population):N0}",
+                $"Known range: {regions.Length} region{(regions.Length == 1 ? string.Empty : "s")}",
+                $"Dominant way of living: {FormatSubsistence(speciesGroups.GroupBy(group => group.SubsistenceMode).OrderByDescending(group => group.Count()).First().Key)}"
+            ],
+            BuildOwnTraits(speciesGroups, regions),
+            BuildOwnContext(focusGroup, regions));
+    }
+
+    private static KnownSpeciesSummary BuildFaunaSummary(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions)
+    {
+        var totalPopulation = regions.Sum(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(fauna.Id));
+        var isDangerous = fauna.DietCategory == DietCategory.Carnivore;
+        var prevalence = totalPopulation switch
+        {
+            >= 900 => "common nearby",
+            >= 350 => "present nearby",
+            _ => "rare"
+        };
+        var status = isDangerous ? $"{prevalence}, dangerous" : prevalence;
+        var habitat = string.Join(", ", regions.Select(region => region.Name).Distinct(StringComparer.Ordinal).Take(3));
+
+        var overview = isDangerous
+            ? $"A known predator species encountered in {habitat}."
+            : fauna.DietCategory == DietCategory.Herbivore
+                ? $"A known prey and grazing species encountered in {habitat}."
+                : $"A known omnivorous species encountered in {habitat}.";
+
+        return new KnownSpeciesSummary(
+            fauna.Id,
+            fauna.Name,
+            "Known fauna",
+            false,
+            ApproximatePopulation(totalPopulation),
+            status,
+            overview,
+            [
+                $"Known habitat: {string.Join(", ", fauna.CoreBiomes.Select(FormatBiome))}",
+                $"Water fit: {string.Join(", ", fauna.SupportedWaterAvailabilities.Select(FormatWater))}",
+                $"Known range: {habitat}"
+            ],
+            BuildFaunaTraits(fauna),
+            BuildFaunaContext(fauna, regions, totalPopulation));
+    }
+
+    private static IReadOnlyList<string> BuildOwnTraits(IReadOnlyList<PopulationGroup> groups, IReadOnlyList<Region> regions)
+    {
+        var traits = new List<string>
+        {
+            "Omnivorous subsistence inferred from mixed foraging and hunting systems."
+        };
+
+        if (groups.Average(group => group.Pressures.MigrationPressure) >= 45)
+        {
+            traits.Add("Mobility is moderate to high when pressures rise.");
+        }
+
+        if (regions.Any(region => region.WaterAvailability == WaterAvailability.High))
+        {
+            traits.Add("Performs best in well-watered known regions.");
+        }
+
+        if (groups.Any(group => group.LearnedAdvancementIds.Count > 0))
+        {
+            traits.Add("Cultural learning is visible through active advancements.");
+        }
+
+        return traits;
+    }
+
+    private static IReadOnlyList<string> BuildOwnContext(PopulationGroup focusGroup, IReadOnlyList<Region> regions)
+    {
+        var context = new List<string>
+        {
+            "This is your own species.",
+            focusGroup.Pressures.WaterPressure >= 40
+                ? "Water access is currently the main species-level concern for your polity."
+                : "No single species-level pressure dominates your polity right now."
+        };
+
+        if (regions.Count > 1)
+        {
+            context.Add("Known neighboring regions give this species room to adapt.");
+        }
+
+        return context;
+    }
+
+    private static IReadOnlyList<string> BuildFaunaTraits(FaunaSpeciesDefinition fauna)
+    {
+        var traits = new List<string>
+        {
+            $"Diet: {fauna.DietCategory}",
+            fauna.MigrationTendency >= 0.65f ? "Mobility: highly mobile" : fauna.MigrationTendency >= 0.45f ? "Mobility: moderately mobile" : "Mobility: relatively settled",
+            $"Yield / usefulness: {(fauna.FoodYield >= 0.60f ? "high" : fauna.FoodYield >= 0.35f ? "moderate" : "limited")}"
+        };
+
+        if (fauna.DietCategory == DietCategory.Carnivore)
+        {
+            traits.Add("Behavior: threatening where encountered.");
+        }
+        else if (fauna.DietCategory == DietCategory.Herbivore)
+        {
+            traits.Add("Behavior: likely useful as prey.");
+        }
+        else
+        {
+            traits.Add("Behavior: opportunistic omnivore.");
+        }
+
+        return traits;
+    }
+
+    private static IReadOnlyList<string> BuildFaunaContext(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions, int totalPopulation)
+    {
+        var context = new List<string>();
+
+        if (fauna.DietCategory == DietCategory.Carnivore)
+        {
+            context.Add("Matters as a local threat when your polity moves or settles nearby.");
+        }
+        else
+        {
+            context.Add("Matters as a known food or environmental species in nearby regions.");
+        }
+
+        if (totalPopulation >= 900)
+        {
+            context.Add("Appears widespread in the regions your polity knows.");
+        }
+        else if (regions.Count <= 1)
+        {
+            context.Add("Known from only a narrow part of the player polity's world.");
+        }
+
+        return context;
+    }
+
+    private static PopulationGroup? SelectFocusGroup(World world)
+    {
+        var latestEntry = world.Chronicle.GetVisibleFeedEntries().FirstOrDefault();
+        if (latestEntry is not null)
+        {
+            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
+                string.Equals(group.Id, latestEntry.GroupId, StringComparison.Ordinal));
+
+            if (matchingGroup is not null)
+            {
+                return matchingGroup;
+            }
+        }
+
+        return world.PopulationGroups
+            .OrderByDescending(group => group.Population)
+            .ThenBy(group => group.Name, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
+    private static string BuildPlayerSpeciesName(string speciesId)
+    {
+        return speciesId switch
+        {
+            "species-human" => "Human",
+            _ => string.Join(' ', speciesId
+                .Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)
+                .Where(part => !string.Equals(part, "species", StringComparison.OrdinalIgnoreCase))
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..]))
+        };
+    }
+
+    private static string ApproximatePopulation(int value)
+    {
+        return value switch
+        {
+            >= 1000 => "many",
+            >= 400 => "several known groups",
+            >= 1 => "few known sightings",
+            _ => "unknown"
+        };
+    }
+
+    private static string FormatSubsistence(SubsistenceMode mode)
+    {
+        return mode switch
+        {
+            SubsistenceMode.Gatherer => "Gathering",
+            SubsistenceMode.Hunter => "Hunting",
+            _ => "Mixed foraging"
+        };
+    }
+
+    private static string FormatBiome(Biome biome)
+    {
+        return biome switch
+        {
+            Biome.Highlands => "Highlands",
+            Biome.Wetlands => "Wetlands",
+            _ => biome.ToString()
+        };
+    }
+
+    private static string FormatWater(WaterAvailability water)
+    {
+        return water.ToString();
+    }
+
+    private static string FormatMonthYear(int month, int year)
+    {
+        var monthText = month switch
+        {
+            1 => "Jan",
+            2 => "Feb",
+            3 => "Mar",
+            4 => "Apr",
+            5 => "May",
+            6 => "Jun",
+            7 => "Jul",
+            8 => "Aug",
+            9 => "Sep",
+            10 => "Oct",
+            11 => "Nov",
+            12 => "Dec",
+            _ => "Jan"
+        };
+
+        return $"{monthText} {year:D3}";
+    }
+}
+
+public sealed record KnownSpeciesScreenData(
+    string CurrentDate,
+    IReadOnlyList<KnownSpeciesSummary> Species,
+    KnownSpeciesSummary? SelectedSpecies,
+    int SelectedIndex);
+
+public sealed record KnownSpeciesSummary(
+    string Id,
+    string Name,
+    string Kind,
+    bool IsPlayerSpecies,
+    string Presence,
+    string Status,
+    string Overview,
+    IReadOnlyList<string> Facts,
+    IReadOnlyList<string> Traits,
+    IReadOnlyList<string> Relevance);
