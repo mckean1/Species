@@ -29,6 +29,19 @@ public static class SimulationTickValidator
             }
         }
 
+        foreach (var change in tickResult.FaunaChanges)
+        {
+            if (change.NewPopulation < 0)
+            {
+                errors.Add($"Fauna simulation produced a negative population for {change.FaunaSpeciesId} in {change.RegionId}.");
+            }
+
+            if (change.ConsumedFaunaSummary.Contains($"{change.FaunaSpeciesId}:", StringComparison.Ordinal))
+            {
+                errors.Add($"Fauna simulation allowed cannibalism for {change.FaunaSpeciesId} in {change.RegionId}.");
+            }
+        }
+
         return errors;
     }
 }

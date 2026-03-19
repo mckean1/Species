@@ -8,6 +8,7 @@ public sealed class SimulationEngine
     private readonly FloraSpeciesCatalog floraCatalog;
     private readonly FaunaSpeciesCatalog faunaCatalog;
     private readonly FloraSimulationSystem floraSimulationSystem;
+    private readonly FaunaSimulationSystem faunaSimulationSystem;
 
     public SimulationEngine(
         World initialWorld,
@@ -18,6 +19,7 @@ public sealed class SimulationEngine
         this.floraCatalog = floraCatalog;
         this.faunaCatalog = faunaCatalog;
         floraSimulationSystem = new FloraSimulationSystem();
+        faunaSimulationSystem = new FaunaSimulationSystem();
     }
 
     public World CurrentWorld { get; private set; }
@@ -26,11 +28,11 @@ public sealed class SimulationEngine
     {
         var advancedWorld = AdvanceMonth(CurrentWorld);
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
-        RunFaunaSimulationPlaceholder(floraResult.World);
-        var finalizedWorld = FinalizeTick(floraResult.World);
+        var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
+        var finalizedWorld = FinalizeTick(faunaResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes);
     }
 
     private static World AdvanceMonth(World world)
@@ -38,12 +40,6 @@ public sealed class SimulationEngine
         var nextMonth = world.CurrentMonth == 12 ? 1 : world.CurrentMonth + 1;
         var nextYear = world.CurrentMonth == 12 ? world.CurrentYear + 1 : world.CurrentYear;
         return new World(world.Seed, nextYear, nextMonth, world.Regions);
-    }
-
-    private void RunFaunaSimulationPlaceholder(World world)
-    {
-        _ = world;
-        _ = faunaCatalog;
     }
 
     private static World FinalizeTick(World world)
