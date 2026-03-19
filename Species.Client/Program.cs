@@ -4,7 +4,7 @@ using Species.Domain.Simulation;
 using Species.Domain.Validation;
 using System.Diagnostics;
 
-const int TickDelayMilliseconds = 500;
+const int TickDelayMilliseconds = 1000;
 const int InputPollDelayMilliseconds = 25;
 
 var floraCatalog = FloraSpeciesCatalog.CreateStarterSet();
