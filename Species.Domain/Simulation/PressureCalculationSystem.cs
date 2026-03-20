@@ -1,5 +1,6 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
+using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
@@ -21,7 +22,7 @@ public sealed class PressureCalculationSystem
         {
             if (!regionsById.TryGetValue(group.CurrentRegionId, out var region))
             {
-                updatedGroups.Add(CloneGroup(group, new PressureState()));
+                updatedGroups.Add(CloneGroup(group, group.Pressures.Clone()));
                 continue;
             }
 
@@ -33,26 +34,51 @@ public sealed class PressureCalculationSystem
                 regionKnowledge.GatheringPotentialFood,
                 regionKnowledge.HuntingPotentialFood);
             var visibleFoodSupport = SubsistenceSupportModel.NormalizeFoodSupport(weightedFoodPotential, monthlyFoodNeed);
-            var foodPressure = CalculateFoodPressure(group, visibleFoodSupport);
-            var waterPressure = CalculateWaterPressure(regionKnowledge.WaterSupport);
-            var threatPressure = CalculateThreatPressure(regionKnowledge.ThreatPressure);
-            var overcrowdingPressure = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
+            var foodContribution = CalculateFoodPressure(group, visibleFoodSupport);
+            var waterContribution = CalculateWaterPressure(regionKnowledge.WaterSupport);
+            var threatContribution = CalculateThreatPressure(regionKnowledge.ThreatPressure);
+            var overcrowdingContribution = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
 
             if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId))
             {
-                threatPressure = ClampPressure(threatPressure * AdvancementConstants.StrongerShelterThreatMultiplier);
-                overcrowdingPressure = ClampPressure(overcrowdingPressure * AdvancementConstants.StrongerShelterCrowdingMultiplier);
+                threatContribution = ClampPressure(threatContribution * AdvancementConstants.StrongerShelterThreatMultiplier);
+                overcrowdingContribution = ClampPressure(overcrowdingContribution * AdvancementConstants.StrongerShelterCrowdingMultiplier);
             }
 
-            var migrationPressure = CalculateMigrationPressure(foodPressure, waterPressure, threatPressure, overcrowdingPressure);
+            var migrationContribution = CalculateMigrationPressure(foodContribution, waterContribution, threatContribution, overcrowdingContribution);
+            var foodDetail = BuildPressureDetail(
+                PressureDefinitions.Food,
+                group.Pressures.Food,
+                foodContribution,
+                BuildFoodPressureReason(group, regionKnowledge, visibleFoodSupport, foodContribution));
+            var waterDetail = BuildPressureDetail(
+                PressureDefinitions.Water,
+                group.Pressures.Water,
+                waterContribution,
+                BuildWaterPressureReason(regionKnowledge, waterContribution));
+            var threatDetail = BuildPressureDetail(
+                PressureDefinitions.Threat,
+                group.Pressures.Threat,
+                threatContribution,
+                BuildThreatPressureReason(regionKnowledge, threatContribution));
+            var overcrowdingDetail = BuildPressureDetail(
+                PressureDefinitions.Overcrowding,
+                group.Pressures.Overcrowding,
+                overcrowdingContribution,
+                BuildOvercrowdingReason(group.Population, weightedFoodPotential, monthlyFoodNeed, overcrowdingContribution));
+            var migrationDetail = BuildPressureDetail(
+                PressureDefinitions.Migration,
+                group.Pressures.Migration,
+                migrationContribution,
+                BuildMigrationReason(foodContribution, waterContribution, threatContribution, overcrowdingContribution, migrationContribution));
 
             var pressures = new PressureState
             {
-                FoodPressure = foodPressure,
-                WaterPressure = waterPressure,
-                ThreatPressure = threatPressure,
-                OvercrowdingPressure = overcrowdingPressure,
-                MigrationPressure = migrationPressure
+                Food = ToPressureValue(foodDetail),
+                Water = ToPressureValue(waterDetail),
+                Threat = ToPressureValue(threatDetail),
+                Overcrowding = ToPressureValue(overcrowdingDetail),
+                Migration = ToPressureValue(migrationDetail)
             };
 
             updatedGroups.Add(CloneGroup(group, pressures));
@@ -65,11 +91,11 @@ public sealed class PressureCalculationSystem
                 Population = group.Population,
                 StoredFood = group.StoredFood,
                 Pressures = pressures,
-                FoodPressureReason = BuildFoodPressureReason(group, regionKnowledge, visibleFoodSupport, foodPressure),
-                WaterPressureReason = BuildWaterPressureReason(regionKnowledge),
-                ThreatPressureReason = BuildThreatPressureReason(regionKnowledge, threatPressure),
-                OvercrowdingPressureReason = BuildOvercrowdingReason(group.Population, weightedFoodPotential, monthlyFoodNeed, overcrowdingPressure),
-                MigrationPressureReason = BuildMigrationReason(foodPressure, waterPressure, threatPressure, overcrowdingPressure, migrationPressure)
+                Food = foodDetail,
+                Water = waterDetail,
+                Threat = threatDetail,
+                Overcrowding = overcrowdingDetail,
+                Migration = migrationDetail
             });
         }
 
@@ -98,7 +124,7 @@ public sealed class PressureCalculationSystem
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
             LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
             AdvancementEvidence = group.AdvancementEvidence.Clone(),
-            Pressures = pressures
+            Pressures = pressures.Clone()
         };
     }
 
@@ -168,28 +194,32 @@ public sealed class PressureCalculationSystem
         return $"Low because stored food and known local support look manageable.";
     }
 
-    private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge)
+    private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
     {
-        return knowledge.WaterKnowledge switch
+        var source = knowledge.WaterKnowledge switch
         {
             KnowledgeLevel.Known => "Derived from known local water sources.",
             KnowledgeLevel.Partial => "Derived from partial water observations in the current region.",
             KnowledgeLevel.Rumored => "Derived from rumors and route familiarity rather than confirmed water knowledge.",
             _ => "Derived from uncertain local water knowledge."
         };
+
+        return contribution >= 70
+            ? $"{source} Monthly strain is currently severe."
+            : source;
     }
 
-    private static string BuildThreatPressureReason(RegionKnowledgeSnapshot knowledge, int pressure)
+    private static string BuildThreatPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
     {
-        return pressure >= 60
+        return contribution >= 60
             ? $"Elevated because {DescribeKnowledge(knowledge.FaunaKnowledge)} local danger signs are unfavorable."
             : $"Derived from {DescribeKnowledge(knowledge.FaunaKnowledge)} local threat knowledge.";
     }
 
-    private static string BuildOvercrowdingReason(int population, float weightedFoodPotential, int monthlyFoodNeed, int pressure)
+    private static string BuildOvercrowdingReason(int population, float weightedFoodPotential, int monthlyFoodNeed, int contribution)
     {
         var supportMonths = monthlyFoodNeed <= 0 ? 0.0f : weightedFoodPotential / monthlyFoodNeed;
-        return pressure >= 60
+        return contribution >= 60
             ? $"High because population {population} is pressing against about {supportMonths:0.0} months of visible local support."
             : $"Derived from population {population} versus visible local carrying support.";
     }
@@ -199,6 +229,49 @@ public sealed class PressureCalculationSystem
         return migrationPressure >= 60
             ? $"Elevated because food={foodPressure}, water={waterPressure}, threat={threatPressure}, overcrowding={overcrowdingPressure}."
             : $"Synthesized from food={foodPressure}, water={waterPressure}, threat={threatPressure}, overcrowding={overcrowdingPressure}.";
+    }
+
+    private static PressureChangeDetail BuildPressureDetail(
+        PressureDefinition definition,
+        PressureValue prior,
+        int monthlyContribution,
+        string reasonText)
+    {
+        var afterContribution = prior.RawValue + monthlyContribution;
+        var decayedRaw = ApplyDecay(afterContribution, definition);
+        var boundedRaw = PressureMath.ApplySafetyBounds(decayedRaw, definition);
+        var finalValue = PressureMath.CreateValue(definition, boundedRaw);
+        return new PressureChangeDetail
+        {
+            PriorRaw = prior.RawValue,
+            MonthlyContribution = monthlyContribution,
+            DecayApplied = afterContribution - decayedRaw,
+            FinalRaw = finalValue.RawValue,
+            Effective = finalValue.EffectiveValue,
+            Display = finalValue.DisplayValue,
+            SeverityLabel = finalValue.SeverityLabel,
+            ReasonText = reasonText
+        };
+    }
+
+    private static int ApplyDecay(int rawValue, PressureDefinition definition)
+    {
+        return definition.DecayMode switch
+        {
+            PressureDecayMode.PassiveTowardZero => PressureMath.MoveTowardZero(rawValue, definition.DecayRate),
+            _ => rawValue
+        };
+    }
+
+    private static PressureValue ToPressureValue(PressureChangeDetail detail)
+    {
+        return new PressureValue
+        {
+            RawValue = detail.FinalRaw,
+            EffectiveValue = detail.Effective,
+            DisplayValue = detail.Display,
+            SeverityLabel = detail.SeverityLabel
+        };
     }
 
     private static int ClampPressure(float value)

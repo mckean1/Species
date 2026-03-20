@@ -83,6 +83,13 @@ Player-facing Chronicle presentation should not reveal hidden-world truth the fo
 
 Chronicle messages are one-line, concise, and group-first where practical.
 
+Persistent pressure changes the hardship side of Chronicle tuning. A pressure remaining high is not, by itself, a new Chronicle-worthy event every month. Hardship output should gate on meaningful change such as:
+
+- a severity band change
+- a dominant pressure shift
+- a threshold crossing
+- a materially worse shortage or decline outcome
+
 The wording distinction remains strict:
 
 - discoveries use `discovered`

@@ -29,7 +29,16 @@ Migration uses two stages:
 1. Consider moving
 2. Compare neighboring regions
 
-Groups consider migration when current conditions are stressful enough. `MigrationPressure` is the main trigger, with severe shortage, severe starvation, or very low `StoredFood` acting as simple supporting signals.
+Groups consider migration when current conditions are stressful enough. Migration decisions now use `group.Pressures.Migration.EffectiveValue` as the main trigger, with severe shortage, severe starvation, or very low `StoredFood` acting as simple supporting signals.
+
+The migration pressure shown to the player remains the compressed display value. Internal migration pressure is persistent, decays toward zero each month, and is not gameplay-capped at `100`.
+
+Because migration pressure now persists, migration tuning assumes memory rather than a fresh monthly reset:
+
+- the effective-pressure trigger is higher than the old fresh-month trigger
+- a short recent-move restraint reduces immediate re-migration
+- required destination margins rise after recent moves and when a return path is involved
+- severe shortage or starvation can still force migration consideration sooner
 
 Even when migration is considered, a group only moves if the best neighboring region is sufficiently better than the current region.
 
@@ -84,10 +93,11 @@ This is the minimal migration-history support for debugging, anti-thrashing, and
 
 ## Anti-Thrashing
 
-Phase 9 includes two simple anti-thrashing tools:
+Phase 9 includes simple anti-thrashing tools:
 
 - a neighbor must beat the current region by a minimum score margin
 - returning immediately to `LastRegionId` receives a penalty
+- very recent movement raises the score margin required for another move unless pressure is extreme
 
 This reduces obvious back-and-forth bouncing without introducing a route-memory system.
 

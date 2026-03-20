@@ -1,106 +1,98 @@
-# Phase 7: Group Pressure Framework
+# Phase 7 Pressure Framework
 
-## Scope
+The pressure model is now persistent. Groups still track five gameplay pressures, but each pressure carries three views of the same underlying state instead of a single capped monthly score.
 
-Phase 7 adds the first causal interpretation layer for `PopulationGroup` actors. Groups now own a `PressureState`, and that state is recalculated each month from current group conditions and current regional ecology.
+## Pressure State
 
-This phase calculates pressures only. It does not make groups act on them yet.
+Each `PopulationGroup` owns a `PressureState` with:
 
-## PressureState
+- `Food`
+- `Water`
+- `Threat`
+- `Overcrowding`
+- `Migration`
 
-`PressureState` is a compact derived state container stored on each `PopulationGroup`.
+Each entry is a `PressureValue`:
 
-It contains:
+- `RawValue`: simulation truth, carried forward month to month
+- `EffectiveValue`: gameplay-facing decision value, softened from raw extremes
+- `DisplayValue`: player-facing compressed `0..100` value
+- `SeverityLabel`: readable band derived from display
 
-- `FoodPressure`
-- `WaterPressure`
-- `ThreatPressure`
-- `OvercrowdingPressure`
-- `MigrationPressure`
+Read-only compatibility properties such as `FoodPressure` and `MigrationPressure` now map to `DisplayValue`.
 
-All pressure values use a whole-number `0-100` scale:
+## Core Rules
 
-- `0` = none
-- `100` = extreme
+- Internal pressure is not gameplay-capped at `100`.
+- Display pressure remains compressed into `0..100`.
+- Pressure persists month to month.
+- Each month, pressure decays passively toward zero.
+- Decisions should use `EffectiveValue`.
+- UI and summaries should use `DisplayValue` and `SeverityLabel`.
+- Downstream thresholds are retuned around persistent pressure memory rather than the old fresh-month `0..100` recalculation.
 
-## Monthly Recalculation
+## Definitions
 
-Pressure values are recalculated fresh each month through `SimulationEngine`.
+Current definitions are intentionally small and static:
 
-Current monthly order is:
+| Pressure | Shape | Curve | Decay | Monthly decay |
+| --- | --- | --- | --- | --- |
+| Food | OneSided | Persistent | PassiveTowardZero | 1 |
+| Water | OneSided | Persistent | PassiveTowardZero | 1 |
+| Threat | OneSided | Transient | PassiveTowardZero | 2 |
+| Overcrowding | OneSided | Persistent | PassiveTowardZero | 1 |
+| Migration | OneSided | Transient | PassiveTowardZero | 2 |
 
-1. Advance month
-2. Flora simulation
-3. Fauna simulation
-4. Group pressure recalculation
-5. End-of-tick finalization
+All current pressures are one-sided, but the framework keeps room for signed pressure later.
 
-The system overwrites the previous monthly pressure values rather than storing long-lived pressure memory.
+## Monthly Update Semantics
 
-## Pressure Meanings
+`PressureCalculationSystem` no longer treats its food, water, threat, overcrowding, and migration calculations as final monthly pressure values.
 
-### FoodPressure
+Instead, each monthly calculation is a contribution:
 
-Derived from:
+1. Start from previous `RawValue`
+2. Add this month's contribution
+3. Apply toward-zero decay
+4. Apply safety bounds
+5. Recompute `EffectiveValue`
+6. Recompute `DisplayValue`
+7. Recompute `SeverityLabel`
 
-- `StoredFood`
-- `Population`
-- local flora support
-- local fauna support
+This keeps causal inputs readable while giving the simulation memory.
 
-Low food reserves, weak ecology, and high population relative to support all increase `FoodPressure`.
+## Effective And Display Layers
 
-### WaterPressure
+`RawValue` can climb well beyond the old `0..100` range.
 
-Derived directly from regional `WaterAvailability`.
+`EffectiveValue` keeps the old decision scale readable by remaining roughly linear through lower values and then softening heavier accumulation.
 
-- low water -> high pressure
-- medium water -> moderate pressure
-- high water -> low pressure
+Gameplay systems should read `EffectiveValue`. This includes migration triggers, law pressure, bloc pressure, governance pressure, and other simulation decisions.
 
-### ThreatPressure
+`DisplayValue` compresses the effective value back into a player-readable `0..100` band.
 
-Derived from dangerous fauna in the current region.
+Player-facing summaries should read `DisplayValue` and `SeverityLabel`. Chronicle summaries, urgent warnings, and screen builders should not expose `RawValue` by default.
 
-For MVP Phase 7, carnivore abundance is the primary threat signal.
+Severity bands currently map from display as:
 
-### OvercrowdingPressure
-
-Derived from group population relative to broad local ecology support.
-
-Even a single group can experience overcrowding pressure if it is large relative to the support offered by the current region.
-
-### MigrationPressure
-
-Derived after the other pressures as a synthesis pressure.
-
-It combines food, water, threat, and overcrowding pressure into a simple “leave this place” signal for later phases.
+- `Calm`
+- `Low`
+- `Rising`
+- `High`
+- `Severe`
+- `Critical`
 
 ## Debugging
 
-Phase 7 adds debug output for:
+`GroupPressureChange` now records, for each pressure:
 
-- group identity
-- current region
-- population and stored food
-- all five pressures
-- simple reason hints for food, water, threat, overcrowding, and migration
+- prior raw
+- monthly contribution
+- decay applied
+- final raw
+- effective
+- display
+- severity label
+- reason text
 
-## Deferred
-
-The following remain intentionally deferred:
-
-- group gathering or hunting behavior
-- stored food consumption and starvation
-- migration execution
-- discovery, advancement, or adaptation behavior
-- diplomacy, politics, settlements, and culture
-- long-lived pressure memory systems
-- action selection or AI planning
-
-## Setup For Later Phases
-
-Phase 7 prepares:
-
-- Phase 8 by providing the pressure inputs needed for group survival and consumption behavior
-- Phase 9 by creating a derived “leave or stay” signal that later migration systems can act on
+This is intended for tuning the framework without exposing raw values in the normal player UI.

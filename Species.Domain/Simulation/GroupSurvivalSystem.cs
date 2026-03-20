@@ -92,7 +92,9 @@ public sealed class GroupSurvivalSystem
             var consumedForNeed = consumedFromActions + consumedFromStoredFood + settlementFoodUsed;
             var shortage = Math.Max(0, state.MonthlyFoodNeed - consumedForNeed);
             var storedFoodAfter = Math.Max(0, effectiveStoredFood - consumedFromStoredFood);
-            var starvationLoss = CalculateStarvationLoss(group.Population, state.MonthlyFoodNeed, shortage);
+            var hardshipPressure = Math.Max(group.Pressures.Food.EffectiveValue, group.Pressures.Water.EffectiveValue);
+            var hardshipSeverity = ResolveHardshipSeverity(group);
+            var starvationLoss = CalculateStarvationLoss(group.Population, state.MonthlyFoodNeed, shortage, hardshipPressure);
             var finalPopulation = Math.Max(0, group.Population - starvationLoss);
 
             changes.Add(new GroupSurvivalChange
@@ -114,11 +116,14 @@ public sealed class GroupSurvivalSystem
                 StoredFoodBefore = state.StoredFoodBefore,
                 StoredFoodAfter = storedFoodAfter,
                 SettlementFoodUsed = settlementFoodUsed,
+                FoodPressureEffective = group.Pressures.Food.EffectiveValue,
+                WaterPressureEffective = group.Pressures.Water.EffectiveValue,
+                HardshipSeverityLabel = hardshipSeverity,
                 Shortage = shortage,
                 StarvationLoss = starvationLoss,
                 FinalPopulation = finalPopulation,
                 Outcome = ResolveOutcome(group.Population, finalPopulation),
-                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, state.StoredFoodBefore, settlementFoodUsed, shortage, starvationLoss)
+                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, state.StoredFoodBefore, settlementFoodUsed, shortage, starvationLoss, hardshipPressure, hardshipSeverity)
             });
 
             if (finalPopulation > 0)
@@ -347,7 +352,7 @@ public sealed class GroupSurvivalSystem
         }
     }
 
-    private static int CalculateStarvationLoss(int startingPopulation, int monthlyFoodNeed, int shortage)
+    private static int CalculateStarvationLoss(int startingPopulation, int monthlyFoodNeed, int shortage, int hardshipPressure)
     {
         if (startingPopulation <= 0 || monthlyFoodNeed <= 0 || shortage <= 0)
         {
@@ -355,9 +360,10 @@ public sealed class GroupSurvivalSystem
         }
 
         var shortageRatio = shortage / (float)monthlyFoodNeed;
+        var starvationSeverity = ResolveStarvationSeverity(hardshipPressure);
         return Math.Min(
             startingPopulation,
-            (int)MathF.Ceiling(startingPopulation * shortageRatio * GroupSurvivalConstants.StarvationLossSeverity));
+            (int)MathF.Ceiling(startingPopulation * shortageRatio * starvationSeverity));
     }
 
     private static string ResolveOutcome(int startingPopulation, int finalPopulation)
@@ -396,11 +402,11 @@ public sealed class GroupSurvivalSystem
         return used;
     }
 
-    private static string ResolveSurvivalReason(int monthlyFoodNeed, int acquiredFood, int storedFoodBefore, int settlementFoodUsed, int shortage, int starvationLoss)
+    private static string ResolveSurvivalReason(int monthlyFoodNeed, int acquiredFood, int storedFoodBefore, int settlementFoodUsed, int shortage, int starvationLoss, int hardshipPressure, string hardshipSeverity)
     {
         if (starvationLoss > 0)
         {
-            return $"Group starved due to severe shortfall of {shortage}.";
+            return $"Group starved due to shortfall {shortage} under {hardshipSeverity.ToLowerInvariant()} hardship pressure (effective {hardshipPressure}).";
         }
 
         if (settlementFoodUsed > 0)
@@ -410,10 +416,40 @@ public sealed class GroupSurvivalSystem
 
         if (storedFoodBefore > 0 && acquiredFood < monthlyFoodNeed)
         {
-            return "Group used StoredFood to help cover monthly need.";
+            return $"Group used StoredFood to help cover monthly need while hardship pressure stayed {hardshipSeverity.ToLowerInvariant()} (effective {hardshipPressure}).";
+        }
+
+        if (shortage > 0)
+        {
+            return $"Group absorbed a shortfall of {shortage}, but losses stayed limited because effective hardship pressure was {hardshipPressure} ({hardshipSeverity.ToLowerInvariant()}).";
         }
 
         return $"Group acquired {acquiredFood} food and covered monthly need.";
+    }
+
+    private static float ResolveStarvationSeverity(int hardshipPressure)
+    {
+        var severity = GroupSurvivalConstants.StarvationLossSeverity;
+        if (hardshipPressure >= GroupSurvivalConstants.CriticalHardshipPressureThreshold)
+        {
+            severity += GroupSurvivalConstants.CriticalHardshipStarvationBonus;
+        }
+        else if (hardshipPressure >= GroupSurvivalConstants.SevereHardshipPressureThreshold)
+        {
+            severity += GroupSurvivalConstants.SevereHardshipStarvationBonus;
+        }
+        else if (hardshipPressure >= GroupSurvivalConstants.ModerateHardshipPressureThreshold)
+        {
+            severity += GroupSurvivalConstants.ModerateHardshipStarvationBonus;
+        }
+
+        return Math.Min(GroupSurvivalConstants.MaxStarvationLossSeverity, severity);
+    }
+
+    private static string ResolveHardshipSeverity(PopulationGroup group)
+    {
+        var display = Math.Max(group.Pressures.Food.DisplayValue, group.Pressures.Water.DisplayValue);
+        return PressureMath.ComputeSeverityLabel(display);
     }
 
     private static PopulationGroup CloneGroup(PopulationGroup group)
@@ -431,14 +467,7 @@ public sealed class GroupSurvivalSystem
             SubsistenceMode = group.SubsistenceMode,
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),

@@ -58,8 +58,8 @@ public sealed class EnactedLawSystem
         var activeSettlementCount = polity.Settlements.Count(settlement => settlement.IsActive);
         var peripheralSiteCount = polity.Settlements.Count(settlement => settlement.IsActive && !string.Equals(settlement.RegionId, context.CoreRegionId, StringComparison.Ordinal));
         var peripheralPresenceCount = polity.RegionalPresences.Count(presence => presence.IsCurrent && !string.Equals(presence.RegionId, context.CoreRegionId, StringComparison.Ordinal));
-        var shortagePressure = Math.Max(context.Pressures.FoodPressure, context.MaterialProduction.DeficitScore);
-        var crisisPressure = Math.Max(context.Pressures.ThreatPressure, context.Pressures.MigrationPressure);
+        var shortagePressure = Math.Max(context.Pressures.Food.EffectiveValue, context.MaterialProduction.DeficitScore);
+        var crisisPressure = Math.Max(context.Pressures.Threat.EffectiveValue, context.Pressures.Migration.EffectiveValue);
         var dissatisfiedBlocs = polity.PoliticalBlocs.Count(bloc => bloc.Satisfaction <= 40);
 
         var peripheralStrain = (peripheralSiteCount * 10) + (peripheralPresenceCount * 6) + (context.MaterialShortageMonths * 6);
@@ -90,7 +90,7 @@ public sealed class EnactedLawSystem
             - (HasLaw(activeLaws, GovernanceLawCatalog.ExtractionObligationId) ? 7 : 0);
 
         var cohesion = behavior.CohesionBaseline
-            - (context.Pressures.MigrationPressure / 6)
+            - (context.Pressures.Migration.EffectiveValue / 6)
             - (peripheralStrain / 7)
             - (context.ExternalPressure.RaidPressure / 8)
             - (context.ScaleState.FragmentationRisk / 8)
@@ -163,14 +163,12 @@ public sealed class EnactedLawSystem
                 total.MigrationPressureModifier + Scale(effect.MigrationPressureModifier, scale));
         }
 
-        updatedGroup.Pressures = new PressureState
-        {
-            FoodPressure = Clamp(updatedGroup.Pressures.FoodPressure + total.FoodPressureModifier),
-            WaterPressure = Clamp(updatedGroup.Pressures.WaterPressure + total.WaterPressureModifier),
-            ThreatPressure = Clamp(updatedGroup.Pressures.ThreatPressure + total.ThreatPressureModifier),
-            OvercrowdingPressure = Clamp(updatedGroup.Pressures.OvercrowdingPressure + total.OvercrowdingPressureModifier),
-            MigrationPressure = Clamp(updatedGroup.Pressures.MigrationPressure + total.MigrationPressureModifier)
-        };
+        updatedGroup.Pressures = updatedGroup.Pressures.Clone();
+        updatedGroup.Pressures.Food = PressureMath.ApplyRawAdjustment(PressureDefinitions.Food, updatedGroup.Pressures.Food, total.FoodPressureModifier);
+        updatedGroup.Pressures.Water = PressureMath.ApplyRawAdjustment(PressureDefinitions.Water, updatedGroup.Pressures.Water, total.WaterPressureModifier);
+        updatedGroup.Pressures.Threat = PressureMath.ApplyRawAdjustment(PressureDefinitions.Threat, updatedGroup.Pressures.Threat, total.ThreatPressureModifier);
+        updatedGroup.Pressures.Overcrowding = PressureMath.ApplyRawAdjustment(PressureDefinitions.Overcrowding, updatedGroup.Pressures.Overcrowding, total.OvercrowdingPressureModifier);
+        updatedGroup.Pressures.Migration = PressureMath.ApplyRawAdjustment(PressureDefinitions.Migration, updatedGroup.Pressures.Migration, total.MigrationPressureModifier);
 
         return updatedGroup;
     }
@@ -178,7 +176,7 @@ public sealed class EnactedLawSystem
     private static int ResolveTargetEnforcement(Polity polity, PolityContext context, EnactedLaw law)
     {
         var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
-        var baseline = behavior.EnforcementTendency + (polity.Governance.Authority / 8) + (context.Pressures.ThreatPressure / 10);
+        var baseline = behavior.EnforcementTendency + (polity.Governance.Authority / 8) + (context.Pressures.Threat.EffectiveValue / 10);
         baseline += context.ExternalPressure.Threat / 10;
         baseline += context.ScaleState.Centralization / 12;
         baseline -= Math.Max(0, 50 - polity.Governance.Legitimacy) / 4;
@@ -207,7 +205,7 @@ public sealed class EnactedLawSystem
         var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
         var baseline = behavior.ComplianceTendency + (polity.Governance.Legitimacy / 6) + (polity.Governance.Cohesion / 7);
         baseline += enforcementStrength / 10;
-        baseline -= context.Pressures.FoodPressure / 9;
+        baseline -= context.Pressures.Food.EffectiveValue / 9;
         baseline -= polity.Governance.PeripheralStrain / 9;
         baseline -= context.ExternalPressure.RaidPressure / 10;
         baseline -= context.ScaleState.DistanceStrain / 10;
@@ -285,14 +283,7 @@ public sealed class EnactedLawSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
@@ -307,4 +298,5 @@ public sealed class EnactedLawSystem
     {
         return Math.Clamp(value, 0, 100);
     }
+
 }

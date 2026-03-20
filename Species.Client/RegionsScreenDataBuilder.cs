@@ -94,7 +94,7 @@ public static class RegionsScreenDataBuilder
 
         var groupThreat = groupsHere.Length == 0
             ? 0
-            : (int)Math.Round(groupsHere.Average(group => group.Pressures.ThreatPressure), MidpointRounding.AwayFromZero);
+            : (int)Math.Round(groupsHere.Average(group => group.Pressures.Threat.DisplayValue), MidpointRounding.AwayFromZero);
 
         var threatScore = snapshot is null
             ? Math.Clamp(Math.Max(groupThreat, carnivoreThreat / 2), 0, 100)
@@ -215,7 +215,7 @@ public static class RegionsScreenDataBuilder
             risks.Add("Water availability uncertain");
         }
 
-        if (groupsHere.Any(group => group.Pressures.OvercrowdingPressure >= 60))
+        if (groupsHere.Any(group => group.Pressures.Overcrowding.DisplayValue >= 60))
         {
             risks.Add("Crowding pressure");
         }

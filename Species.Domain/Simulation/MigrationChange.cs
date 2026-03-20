@@ -12,9 +12,15 @@ public sealed class MigrationChange
 
     public required int MigrationPressure { get; init; }
 
+    public required int MigrationEffectivePressure { get; init; }
+
+    public required string MigrationSeverityLabel { get; init; }
+
     public required int StoredFood { get; init; }
 
     public required bool ConsideredMigration { get; init; }
+
+    public required float RequiredMoveMargin { get; init; }
 
     public required float CurrentRegionScore { get; init; }
 

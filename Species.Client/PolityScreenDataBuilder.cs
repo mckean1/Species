@@ -99,11 +99,11 @@ public static class PolityScreenDataBuilder
     {
         return
         [
-            new PolityPressureItem("Food Stores", pressures.FoodPressure),
-            new PolityPressureItem("Water", pressures.WaterPressure),
-            new PolityPressureItem("Threat", pressures.ThreatPressure),
-            new PolityPressureItem("Crowding", pressures.OvercrowdingPressure),
-            new PolityPressureItem("Migration", pressures.MigrationPressure)
+            new PolityPressureItem("Food Stores", pressures.Food.DisplayValue, pressures.Food.SeverityLabel),
+            new PolityPressureItem("Water", pressures.Water.DisplayValue, pressures.Water.SeverityLabel),
+            new PolityPressureItem("Threat", pressures.Threat.DisplayValue, pressures.Threat.SeverityLabel),
+            new PolityPressureItem("Crowding", pressures.Overcrowding.DisplayValue, pressures.Overcrowding.SeverityLabel),
+            new PolityPressureItem("Migration", pressures.Migration.DisplayValue, pressures.Migration.SeverityLabel)
         ];
     }
 
@@ -114,12 +114,12 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food Stores" => "Food stores are under strain",
-                "Water" => "Water access is tightening",
-                "Threat" => "Threat pressure is rising nearby",
-                "Crowding" => "Living conditions are becoming crowded",
-                "Migration" => "Migration pressure is increasing",
-                _ => $"{item.Label} pressure is building"
+                "Food Stores" => $"Food stores are {item.SeverityLabel.ToLowerInvariant()}",
+                "Water" => $"Water access is {item.SeverityLabel.ToLowerInvariant()}",
+                "Threat" => $"Threat pressure is {item.SeverityLabel.ToLowerInvariant()}",
+                "Crowding" => $"Crowding is {item.SeverityLabel.ToLowerInvariant()}",
+                "Migration" => $"Migration pressure is {item.SeverityLabel.ToLowerInvariant()}",
+                _ => $"{item.Label} pressure is {item.SeverityLabel.ToLowerInvariant()}"
             })
             .Take(4)
             .ToArray();
@@ -173,12 +173,12 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food Stores" => "Food stress is shaping daily life",
-                "Water" => "Reliable water is becoming harder to secure",
-                "Threat" => "Threat pressure is weighing on safety",
-                "Crowding" => "Crowding is tightening local conditions",
-                "Migration" => "Migration pressure is pulling at stability",
-                _ => $"{item.Label} pressure is elevated"
+                "Food Stores" => $"Food stress is {item.SeverityLabel.ToLowerInvariant()}",
+                "Water" => $"Reliable water is {item.SeverityLabel.ToLowerInvariant()}",
+                "Threat" => $"Threat pressure is {item.SeverityLabel.ToLowerInvariant()}",
+                "Crowding" => $"Crowding is {item.SeverityLabel.ToLowerInvariant()}",
+                "Migration" => $"Migration pressure is {item.SeverityLabel.ToLowerInvariant()}",
+                _ => $"{item.Label} pressure is {item.SeverityLabel.ToLowerInvariant()}"
             })
             .Take(3)
             .ToList();
@@ -473,6 +473,6 @@ public sealed record PolityScreenData(
     IReadOnlyList<string> PoliticalHistory,
     IReadOnlyList<PoliticalBlocScreenItem> PoliticalBlocs);
 
-public sealed record PolityPressureItem(string Label, int Value);
+public sealed record PolityPressureItem(string Label, int Value, string SeverityLabel);
 
 public sealed record PoliticalBlocScreenItem(string Name, int Influence, int Satisfaction);

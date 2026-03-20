@@ -82,14 +82,14 @@ public sealed class AdvancementSystem
             if (polityContext is not null &&
                 polityContext.PrimarySettlement is not null &&
                 polityContext.MaterialProduction.ShelterSupport >= 25 &&
-                (updatedGroup.Pressures.ThreatPressure >= 45 || polityContext.MaterialShortageMonths > 0))
+                (updatedGroup.Pressures.Threat.EffectiveValue >= 45 || polityContext.MaterialShortageMonths > 0))
             {
                 evidence.ShelterReadinessMonths++;
             }
 
             if (polityContext is not null &&
                 polityContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile &&
-                polityContext.Pressures.MigrationPressure < 60 &&
+                polityContext.Pressures.Migration.EffectiveValue < 60 &&
                 polityContext.MaterialProduction.DeficitScore < 60)
             {
                 evidence.StabilityMonths++;
@@ -314,14 +314,7 @@ public sealed class AdvancementSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),

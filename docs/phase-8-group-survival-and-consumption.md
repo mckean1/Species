@@ -67,6 +67,8 @@ After acquisition:
 
 Population loss is derived from the severity of the deficit. Groups may decline to `0`, which means extinction.
 
+With persistent pressure in place, starvation and hardship tuning should read effective food and water pressure as context, not as a direct substitute for actual shortage. One bad month should still be survivable when conditions recover, while repeated shortage under sustained effective pressure should feel harsher.
+
 There is no automatic reintroduction or respawn.
 
 ## Debugging

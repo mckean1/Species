@@ -30,7 +30,7 @@ public sealed class MigrationSystem
 
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
             var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
-            var shouldConsiderMigration = ShouldConsiderMigration(group, survivalChange);
+            var consideration = ResolveMigrationConsideration(group, survivalChange);
             var currentScore = ScoreRegion(group, currentRegion, knowledgeContext.ObserveRegion(currentRegion, currentRegion.Id));
             var evaluatedNeighbors = currentRegion.NeighborIds
                 .Where(regionsById.ContainsKey)
@@ -40,9 +40,10 @@ public sealed class MigrationSystem
                 .ToArray();
 
             var bestNeighbor = evaluatedNeighbors.FirstOrDefault();
-            var shouldMove = shouldConsiderMigration &&
+            var requiredMoveMargin = ResolveRequiredMoveMargin(group, consideration);
+            var shouldMove = consideration.ShouldConsider &&
                              bestNeighbor is not null &&
-                             bestNeighbor.Score >= currentScore + MigrationConstants.MinimumMoveMargin;
+                             bestNeighbor.Score >= currentScore + requiredMoveMargin;
 
             var updatedGroup = CloneGroup(group);
             string reason;
@@ -53,12 +54,12 @@ public sealed class MigrationSystem
                 updatedGroup.CurrentRegionId = bestNeighbor.Region.Id;
                 updatedGroup.MonthsSinceLastMove = 0;
                 updatedGroup.KnownRegionIds.Add(bestNeighbor.Region.Id);
-                reason = $"Moved because migration pressure was {group.Pressures.MigrationPressure} and {bestNeighbor.Region.Name} scored {bestNeighbor.Score:0.0} versus {currentScore:0.0}.";
+                reason = $"Moved because {consideration.ReasonText} {bestNeighbor.Region.Name} scored {bestNeighbor.Score:0.0} versus current {currentScore:0.0}, clearing the required move margin {requiredMoveMargin:0.0}.";
             }
             else
             {
                 updatedGroup.MonthsSinceLastMove = group.MonthsSinceLastMove + 1;
-                reason = BuildStayReason(group, shouldConsiderMigration, currentScore, bestNeighbor, survivalChange);
+                reason = BuildStayReason(group, consideration, currentScore, bestNeighbor, survivalChange, requiredMoveMargin);
             }
 
             updatedGroups.Add(updatedGroup);
@@ -68,9 +69,12 @@ public sealed class MigrationSystem
                 GroupName = group.Name,
                 CurrentRegionId = group.CurrentRegionId,
                 CurrentRegionName = currentRegion.Name,
-                MigrationPressure = group.Pressures.MigrationPressure,
+                MigrationPressure = group.Pressures.Migration.DisplayValue,
+                MigrationEffectivePressure = group.Pressures.Migration.EffectiveValue,
+                MigrationSeverityLabel = group.Pressures.Migration.SeverityLabel,
                 StoredFood = group.StoredFood,
-                ConsideredMigration = shouldConsiderMigration,
+                ConsideredMigration = consideration.ShouldConsider,
+                RequiredMoveMargin = requiredMoveMargin,
                 CurrentRegionScore = currentScore,
                 NeighborScoresSummary = BuildNeighborSummary(evaluatedNeighbors),
                 WinningRegionId = bestNeighbor?.Region.Id ?? group.CurrentRegionId,
@@ -90,33 +94,68 @@ public sealed class MigrationSystem
             changes);
     }
 
-    private static bool ShouldConsiderMigration(PopulationGroup group, GroupSurvivalChange? survivalChange)
+    private static MigrationConsideration ResolveMigrationConsideration(PopulationGroup group, GroupSurvivalChange? survivalChange)
     {
-        if (group.Pressures.MigrationPressure >= MigrationConstants.MigrationPressureTrigger)
+        var effectivePressure = group.Pressures.Migration.EffectiveValue;
+        var severity = group.Pressures.Migration.SeverityLabel.ToLowerInvariant();
+
+        if (group.MonthsSinceLastMove <= MigrationConstants.RecentMoveCooldownMonths &&
+            effectivePressure < MigrationConstants.ExtremeMigrationPressureTrigger)
         {
-            return true;
+            return new MigrationConsideration(
+                false,
+                $"migration pressure was {effectivePressure} effective ({severity}, display {group.Pressures.Migration.DisplayValue}) but the group moved {group.MonthsSinceLastMove} month(s) ago and recent-move restraint held");
+        }
+
+        if (effectivePressure >= MigrationConstants.ExtremeMigrationPressureTrigger)
+        {
+            return new MigrationConsideration(
+                true,
+                $"migration pressure was extreme at {effectivePressure} effective ({severity}, display {group.Pressures.Migration.DisplayValue})");
+        }
+
+        if (effectivePressure >= MigrationConstants.MigrationPressureTrigger)
+        {
+            return new MigrationConsideration(
+                true,
+                $"migration pressure was {effectivePressure} effective ({severity}, display {group.Pressures.Migration.DisplayValue}) and crossed the trigger {MigrationConstants.MigrationPressureTrigger}");
         }
 
         if (survivalChange is null)
         {
-            return false;
+            return new MigrationConsideration(
+                false,
+                $"migration pressure was {effectivePressure} effective ({severity}, display {group.Pressures.Migration.DisplayValue}) and no acute survival trigger was present");
         }
 
         if (survivalChange.Shortage >= MigrationConstants.SevereShortageTrigger)
         {
-            return true;
+            return new MigrationConsideration(
+                true,
+                $"shortage {survivalChange.Shortage} crossed the severe-shortage trigger {MigrationConstants.SevereShortageTrigger} while migration pressure remained {effectivePressure}");
         }
 
         if (survivalChange.StarvationLoss >= MigrationConstants.SevereStarvationTrigger)
         {
-            return true;
+            return new MigrationConsideration(
+                true,
+                $"starvation loss {survivalChange.StarvationLoss} crossed the starvation trigger {MigrationConstants.SevereStarvationTrigger} while migration pressure remained {effectivePressure}");
         }
 
         var storedFoodPerPopulationUnit = group.Population <= 0
             ? 0.0f
             : group.StoredFood / (float)group.Population;
 
-        return storedFoodPerPopulationUnit <= MigrationConstants.LowStoredFoodPerPopulationUnit;
+        if (storedFoodPerPopulationUnit <= MigrationConstants.LowStoredFoodPerPopulationUnit)
+        {
+            return new MigrationConsideration(
+                true,
+                $"stored food per population unit fell to {storedFoodPerPopulationUnit:0.00}, below the low-stores trigger {MigrationConstants.LowStoredFoodPerPopulationUnit:0.00}");
+        }
+
+        return new MigrationConsideration(
+            false,
+            $"migration pressure stayed below the trigger at {effectivePressure} effective ({severity}, display {group.Pressures.Migration.DisplayValue}) and survival remained tolerable");
     }
 
     private static CandidateScore BuildCandidate(
@@ -224,32 +263,59 @@ public sealed class MigrationSystem
 
     private static string BuildStayReason(
         PopulationGroup group,
-        bool consideredMigration,
+        MigrationConsideration consideration,
         float currentScore,
         CandidateScore? bestNeighbor,
-        GroupSurvivalChange? survivalChange)
+        GroupSurvivalChange? survivalChange,
+        float requiredMoveMargin)
     {
-        if (!consideredMigration)
+        if (!consideration.ShouldConsider)
         {
-            return $"Stayed because migration pressure {group.Pressures.MigrationPressure} was below the trigger and survival this month was tolerable.";
+            return $"Stayed because {consideration.ReasonText}.";
         }
 
         if (bestNeighbor is null)
         {
-            return "Stayed because no neighboring region was available to evaluate.";
+            return $"Stayed because {consideration.ReasonText}, but no neighboring region was available to evaluate.";
         }
 
         if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, bestNeighbor.Region.Id, StringComparison.Ordinal))
         {
-            return $"Stayed because returning to {bestNeighbor.Region.Name} was penalized by anti-thrashing and did not beat the current region enough.";
+            return $"Stayed because {consideration.ReasonText}, but returning to {bestNeighbor.Region.Name} was penalized by anti-thrashing and did not clear the required move margin {requiredMoveMargin:0.0}.";
         }
 
         if (survivalChange is not null && survivalChange.Shortage > 0)
         {
-            return $"Stayed despite shortage {survivalChange.Shortage} because the best neighbor scored only {bestNeighbor.Score:0.0} versus current {currentScore:0.0}.";
+            return $"Stayed because {consideration.ReasonText}, but the best neighbor scored only {bestNeighbor.Score:0.0} versus current {currentScore:0.0} and did not clear the required move margin {requiredMoveMargin:0.0}.";
         }
 
-        return $"Stayed because no neighboring region was sufficiently better than the current score {currentScore:0.0}.";
+        return $"Stayed because {consideration.ReasonText}, and no neighboring region was sufficiently better than the current score {currentScore:0.0}; required move margin was {requiredMoveMargin:0.0}.";
+    }
+
+    private static float ResolveRequiredMoveMargin(PopulationGroup group, MigrationConsideration consideration)
+    {
+        var requiredMargin = MigrationConstants.MinimumMoveMargin;
+        if (group.MonthsSinceLastMove <= MigrationConstants.RecentMoveCooldownMonths)
+        {
+            requiredMargin += MigrationConstants.RecentMoveMarginPenalty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(group.LastRegionId))
+        {
+            requiredMargin += MigrationConstants.ReturnMoveMarginPenalty;
+        }
+
+        if (consideration.WasEmergencyTrigger)
+        {
+            requiredMargin = Math.Max(MigrationConstants.MinimumMoveMargin - 2.0f, requiredMargin - 4.0f);
+        }
+
+        if (group.Pressures.Migration.EffectiveValue >= MigrationConstants.ExtremeMigrationPressureTrigger)
+        {
+            requiredMargin = Math.Max(MigrationConstants.MinimumMoveMargin - 2.0f, requiredMargin - 2.0f);
+        }
+
+        return requiredMargin;
     }
 
     private static PopulationGroup CloneGroup(PopulationGroup group)
@@ -265,14 +331,7 @@ public sealed class MigrationSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
@@ -284,4 +343,12 @@ public sealed class MigrationSystem
     }
 
     private sealed record CandidateScore(Region Region, float Score);
+
+    private sealed record MigrationConsideration(bool ShouldConsider, string ReasonText)
+    {
+        public bool WasEmergencyTrigger =>
+            ReasonText.Contains("severe-shortage trigger", StringComparison.Ordinal) ||
+            ReasonText.Contains("starvation trigger", StringComparison.Ordinal) ||
+            ReasonText.Contains("low-stores trigger", StringComparison.Ordinal);
+    }
 }

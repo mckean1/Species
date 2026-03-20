@@ -8,6 +8,7 @@ public sealed class ChronicleSystem
 {
     public ChronicleUpdateResult Run(
         World world,
+        IReadOnlyList<GroupPressureChange> pressureChanges,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<BiologicalHistoryChange> biologicalHistoryChanges,
@@ -20,7 +21,7 @@ public sealed class ChronicleSystem
         IReadOnlyList<SettlementChange> settlementChanges,
         IReadOnlyList<MaterialEconomyChange> materialEconomyChanges)
     {
-        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, biologicalHistoryChanges, discoveryChanges, advancementChanges, socialIdentityChanges, interPolityChanges, politicalScaleChanges, lawProposalChanges, settlementChanges, materialEconomyChanges);
+        var recordedEntries = BuildRecordedEntries(world, pressureChanges, survivalChanges, migrationChanges, biologicalHistoryChanges, discoveryChanges, advancementChanges, socialIdentityChanges, interPolityChanges, politicalScaleChanges, lawProposalChanges, settlementChanges, materialEconomyChanges);
         var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
@@ -31,6 +32,7 @@ public sealed class ChronicleSystem
 
     private static IReadOnlyList<ChronicleEntry> BuildRecordedEntries(
         World world,
+        IReadOnlyList<GroupPressureChange> pressureChanges,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<BiologicalHistoryChange> biologicalHistoryChanges,
@@ -46,6 +48,7 @@ public sealed class ChronicleSystem
         var entries = new List<ChronicleEntry>();
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
         var nextRecordSequence = world.Chronicle.NextRecordSequence;
+        var pressureChangesByGroupId = pressureChanges.ToDictionary(change => change.GroupId, StringComparer.Ordinal);
 
         foreach (var change in migrationChanges.Where(change => change.Moved))
         {
@@ -62,7 +65,9 @@ public sealed class ChronicleSystem
 
         foreach (var change in survivalChanges)
         {
-            if (change.Shortage >= ChronicleConstants.MeaningfulShortageThreshold)
+            pressureChangesByGroupId.TryGetValue(change.GroupId, out var pressureChange);
+
+            if (ShouldRecordHardshipEntry(change, pressureChange))
             {
                 AddEntry(entries, seenKeys, BuildEntry(
                     world,
@@ -70,7 +75,7 @@ public sealed class ChronicleSystem
                     change.GroupId,
                     change.GroupName,
                     ChronicleEventCategory.Shortage,
-                    $"{change.GroupName} suffered food shortages.",
+                    BuildHardshipMessage(change, pressureChange),
                     "shortage",
                     change.CurrentRegionId));
             }
@@ -364,4 +369,106 @@ public sealed class ChronicleSystem
             .Select(item => $"{groupName} {verb} {item.ToLowerInvariant()}.")
             .ToArray();
     }
+
+    private static bool ShouldRecordHardshipEntry(GroupSurvivalChange survivalChange, GroupPressureChange? pressureChange)
+    {
+        if (survivalChange.StarvationLoss > 0)
+        {
+            return true;
+        }
+
+        if (survivalChange.Shortage < ChronicleConstants.MeaningfulShortageThreshold)
+        {
+            return false;
+        }
+
+        if (survivalChange.Shortage >= ChronicleConstants.MeaningfulShortageThreshold * 2)
+        {
+            return true;
+        }
+
+        if (pressureChange is null)
+        {
+            return true;
+        }
+
+        var previousTop = ResolveTopPressure(pressureChange, useCurrent: false);
+        var currentTop = ResolveTopPressure(pressureChange, useCurrent: true);
+        if (!string.Equals(previousTop.Category, currentTop.Category, StringComparison.Ordinal) &&
+            currentTop.Display >= ChronicleConstants.PressureTransitionDisplayThreshold)
+        {
+            return true;
+        }
+
+        if (!string.Equals(previousTop.SeverityLabel, currentTop.SeverityLabel, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return HasMeaningfulPressureWorsening(pressureChange.Food, PressureDefinitions.Food) ||
+               HasMeaningfulPressureWorsening(pressureChange.Water, PressureDefinitions.Water) ||
+               HasMeaningfulPressureWorsening(pressureChange.Migration, PressureDefinitions.Migration);
+    }
+
+    private static bool HasMeaningfulPressureWorsening(PressureChangeDetail detail, PressureDefinition definition)
+    {
+        var previousDisplay = PressureMath.ComputeDisplayValue(PressureMath.ComputeEffectiveValue(definition, detail.PriorRaw));
+        var previousSeverity = PressureMath.ComputeSeverityLabel(previousDisplay);
+        return detail.Display >= ChronicleConstants.PressureTransitionDisplayThreshold &&
+               (detail.Display - previousDisplay >= ChronicleConstants.MeaningfulPressureDisplayDelta ||
+                !string.Equals(detail.SeverityLabel, previousSeverity, StringComparison.Ordinal));
+    }
+
+    private static string BuildHardshipMessage(GroupSurvivalChange survivalChange, GroupPressureChange? pressureChange)
+    {
+        if (pressureChange is null)
+        {
+            return $"{survivalChange.GroupName} suffered food shortages.";
+        }
+
+        var currentTop = ResolveTopPressure(pressureChange, useCurrent: true);
+        var previousTop = ResolveTopPressure(pressureChange, useCurrent: false);
+        var severityText = currentTop.SeverityLabel.ToLowerInvariant();
+
+        if (!string.Equals(previousTop.Category, currentTop.Category, StringComparison.Ordinal))
+        {
+            return $"{survivalChange.GroupName} suffered shortages as {currentTop.Category.ToLowerInvariant()} pressure became the dominant strain ({severityText}).";
+        }
+
+        if (!string.Equals(previousTop.SeverityLabel, currentTop.SeverityLabel, StringComparison.Ordinal))
+        {
+            return $"{survivalChange.GroupName} suffered shortages as {currentTop.Category.ToLowerInvariant()} pressure turned {currentTop.SeverityLabel.ToLowerInvariant()}.";
+        }
+
+        return $"{survivalChange.GroupName} suffered shortages under {severityText} {currentTop.Category.ToLowerInvariant()} pressure.";
+    }
+
+    private static PressureStatus ResolveTopPressure(GroupPressureChange pressureChange, bool useCurrent)
+    {
+        var pressures = new[]
+        {
+            BuildPressureStatus("Food", pressureChange.Food, PressureDefinitions.Food, useCurrent),
+            BuildPressureStatus("Water", pressureChange.Water, PressureDefinitions.Water, useCurrent),
+            BuildPressureStatus("Migration", pressureChange.Migration, PressureDefinitions.Migration, useCurrent)
+        };
+
+        return pressures
+            .OrderByDescending(item => item.Display)
+            .ThenBy(item => item.Category, StringComparer.Ordinal)
+            .First();
+    }
+
+    private static PressureStatus BuildPressureStatus(string category, PressureChangeDetail detail, PressureDefinition definition, bool useCurrent)
+    {
+        if (useCurrent)
+        {
+            return new PressureStatus(category, detail.Display, detail.SeverityLabel);
+        }
+
+        var previousEffective = PressureMath.ComputeEffectiveValue(definition, detail.PriorRaw);
+        var previousDisplay = PressureMath.ComputeDisplayValue(previousEffective);
+        return new PressureStatus(category, previousDisplay, PressureMath.ComputeSeverityLabel(previousDisplay));
+    }
+
+    private sealed record PressureStatus(string Category, int Display, string SeverityLabel);
 }

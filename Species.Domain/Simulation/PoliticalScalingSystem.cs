@@ -846,14 +846,7 @@ public sealed class PoliticalScalingSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),

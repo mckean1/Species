@@ -94,7 +94,7 @@ public sealed class SimulationEngine
         var politicalScaleResult = politicalScalingSystem.Run(interPolityResult.World);
         var politicalBlocWorld = politicalBlocSystem.Run(politicalScaleResult.World);
         var lawProposalResult = lawProposalSystem.Run(politicalBlocWorld, PlayerPolityId);
-        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, settlementResult.Changes, materialEconomyResult.Changes);
+        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, settlementResult.Changes, materialEconomyResult.Changes);
         var finalizedWorld = FinalizeTick(chronicleResult.World);
 
         CurrentWorld = finalizedWorld;

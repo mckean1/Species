@@ -53,12 +53,12 @@ public sealed class DiscoverySystem
                     Increment(evidence.SuccessfulHuntingMonthsByRegionId, livedRegionId);
                 }
 
-                if (group.Pressures.FoodPressure >= 55 || survivalChange?.Shortage > 0)
+                if (group.Pressures.Food.EffectiveValue >= 55 || survivalChange?.Shortage > 0)
                 {
                     evidence.RecurringFoodPressureMonths++;
                 }
 
-                if (group.Pressures.ThreatPressure >= 55)
+                if (group.Pressures.Threat.EffectiveValue >= 55)
                 {
                     evidence.RecurringThreatPressureMonths++;
                 }
@@ -486,14 +486,7 @@ public sealed class DiscoverySystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),

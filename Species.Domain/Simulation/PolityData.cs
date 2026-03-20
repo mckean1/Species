@@ -112,11 +112,11 @@ public static class PolityData
             totalMaterialStores,
             new PressureState
             {
-                FoodPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.FoodPressure),
-                WaterPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.WaterPressure),
-                ThreatPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.ThreatPressure),
-                OvercrowdingPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.OvercrowdingPressure),
-                MigrationPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.MigrationPressure)
+                Food = WeightedPressure(memberGroups, group => group.Pressures.Food, PressureDefinitions.Food),
+                Water = WeightedPressure(memberGroups, group => group.Pressures.Water, PressureDefinitions.Water),
+                Threat = WeightedPressure(memberGroups, group => group.Pressures.Threat, PressureDefinitions.Threat),
+                Overcrowding = WeightedPressure(memberGroups, group => group.Pressures.Overcrowding, PressureDefinitions.Overcrowding),
+                Migration = WeightedPressure(memberGroups, group => group.Pressures.Migration, PressureDefinitions.Migration)
             },
             knownRegionIds,
             knownDiscoveryIds,
@@ -156,5 +156,14 @@ public static class PolityData
 
         var weightedTotal = groups.Sum(group => selector(group) * Math.Max(1, group.Population));
         return (int)Math.Round(weightedTotal / (double)groups.Sum(group => Math.Max(1, group.Population)), MidpointRounding.AwayFromZero);
+    }
+
+    private static PressureValue WeightedPressure(
+        IReadOnlyList<PopulationGroup> groups,
+        Func<PopulationGroup, PressureValue> selector,
+        PressureDefinition definition)
+    {
+        var rawAverage = WeightedAverage(groups, Math.Max(1, groups.Sum(group => group.Population)), group => selector(group).RawValue);
+        return PressureMath.CreateValue(definition, rawAverage);
     }
 }

@@ -18,13 +18,23 @@ public sealed class GroupPressureChange
 
     public required PressureState Pressures { get; init; }
 
-    public required string FoodPressureReason { get; init; }
+    public required PressureChangeDetail Food { get; init; }
 
-    public required string WaterPressureReason { get; init; }
+    public required PressureChangeDetail Water { get; init; }
 
-    public required string ThreatPressureReason { get; init; }
+    public required PressureChangeDetail Threat { get; init; }
 
-    public required string OvercrowdingPressureReason { get; init; }
+    public required PressureChangeDetail Overcrowding { get; init; }
 
-    public required string MigrationPressureReason { get; init; }
+    public required PressureChangeDetail Migration { get; init; }
+
+    public string FoodPressureReason => Food.ReasonText;
+
+    public string WaterPressureReason => Water.ReasonText;
+
+    public string ThreatPressureReason => Threat.ReasonText;
+
+    public string OvercrowdingPressureReason => Overcrowding.ReasonText;
+
+    public string MigrationPressureReason => Migration.ReasonText;
 }

@@ -1,14 +1,75 @@
+using Species.Domain.Enums;
+
 namespace Species.Domain.Models;
 
 public sealed class PressureState
 {
-    public int FoodPressure { get; set; }
+    public PressureValue Food { get; set; } = new();
 
-    public int WaterPressure { get; set; }
+    public PressureValue Water { get; set; } = new();
 
-    public int ThreatPressure { get; set; }
+    public PressureValue Threat { get; set; } = new();
 
-    public int OvercrowdingPressure { get; set; }
+    public PressureValue Overcrowding { get; set; } = new();
 
-    public int MigrationPressure { get; set; }
+    public PressureValue Migration { get; set; } = new();
+
+    public int FoodPressure => Food.DisplayValue;
+
+    public int WaterPressure => Water.DisplayValue;
+
+    public int ThreatPressure => Threat.DisplayValue;
+
+    public int OvercrowdingPressure => Overcrowding.DisplayValue;
+
+    public int MigrationPressure => Migration.DisplayValue;
+
+    public PressureValue Get(PressureCategory category)
+    {
+        return category switch
+        {
+            PressureCategory.Food => Food,
+            PressureCategory.Water => Water,
+            PressureCategory.Threat => Threat,
+            PressureCategory.Overcrowding => Overcrowding,
+            PressureCategory.Migration => Migration,
+            _ => throw new ArgumentOutOfRangeException(nameof(category), category, null)
+        };
+    }
+
+    public void Set(PressureCategory category, PressureValue value)
+    {
+        switch (category)
+        {
+            case PressureCategory.Food:
+                Food = value;
+                break;
+            case PressureCategory.Water:
+                Water = value;
+                break;
+            case PressureCategory.Threat:
+                Threat = value;
+                break;
+            case PressureCategory.Overcrowding:
+                Overcrowding = value;
+                break;
+            case PressureCategory.Migration:
+                Migration = value;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(category), category, null);
+        }
+    }
+
+    public PressureState Clone()
+    {
+        return new PressureState
+        {
+            Food = Food.Clone(),
+            Water = Water.Clone(),
+            Threat = Threat.Clone(),
+            Overcrowding = Overcrowding.Clone(),
+            Migration = Migration.Clone()
+        };
+    }
 }

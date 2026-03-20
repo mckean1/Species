@@ -48,9 +48,9 @@ public sealed class SocialIdentitySystem
         var currentPresences = polity.RegionalPresences.Where(presence => presence.IsCurrent).ToArray();
         var frontierPresences = currentPresences.Count(presence => !string.Equals(presence.RegionId, context.CoreRegionId, StringComparison.Ordinal));
         var seasonalUse = currentPresences.Count(presence => presence.Kind == PolityPresenceKind.Seasonal);
-        var hardship = context.Pressures.FoodPressure >= 55 ||
+        var hardship = context.Pressures.Food.EffectiveValue >= 55 ||
                        context.MaterialShortageMonths >= 2 ||
-                       context.Pressures.MigrationPressure >= 60;
+                       context.Pressures.Migration.EffectiveValue >= 60;
         var surplus = context.MaterialSurplusMonths >= 2 &&
                       context.TotalStoredFood > Math.Max(1, context.TotalPopulation / 2);
         var coordinated = context.Governance.Governability >= 60 &&

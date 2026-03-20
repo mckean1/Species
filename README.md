@@ -37,6 +37,9 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Inter-polity relations now emerge from geography, contact, memory, cooperation, raids, and bounded conflict escalation.
 - Political scaling now lets strong polities consolidate into larger realm forms, bind subordinate or federated attachments, and fragment under overreach.
 - Chronicle now supports `Live`, `Archive`, and `Milestones`, with a persistent `Urgent` alert strip across all modes.
+- Group pressure now uses persistent `RawValue` / `EffectiveValue` / `DisplayValue` / `SeverityLabel` state.
+- Gameplay pressure consumers now read `EffectiveValue`; UI and Chronicle summaries now read `DisplayValue` plus `SeverityLabel`.
+- Migration and hardship/Chronicle consumers are retuned for persistent pressure so carryover strain is less noisy and less oscillatory than the old fresh-month model.
 
 ## Canonical Monthly Flow
 

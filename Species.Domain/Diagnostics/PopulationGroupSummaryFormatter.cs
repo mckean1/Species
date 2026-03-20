@@ -30,9 +30,14 @@ public static class PopulationGroupSummaryFormatter
                 : string.Join(", ", group.LearnedAdvancementIds.OrderBy(id => id, StringComparer.Ordinal));
 
             lines.Add(
-                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | LastRegion={group.LastRegionId} ({lastRegionName}) | MonthsSinceLastMove={group.MonthsSinceLastMove} | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{group.Pressures.FoodPressure}, Water:{group.Pressures.WaterPressure}, Threat:{group.Pressures.ThreatPressure}, Overcrowding:{group.Pressures.OvercrowdingPressure}, Migration:{group.Pressures.MigrationPressure}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}] | LearnedAdvancements=[{learnedAdvancements}]");
+                $"{group.Id} | {group.Name} | Species={group.SpeciesId} | CurrentRegion={group.CurrentRegionId} ({currentRegionName}) | OriginRegion={group.OriginRegionId} ({originRegionName}) | LastRegion={group.LastRegionId} ({lastRegionName}) | MonthsSinceLastMove={group.MonthsSinceLastMove} | Population={group.Population} | StoredFood={group.StoredFood} | SubsistenceMode={group.SubsistenceMode} | Pressures=[Food:{Describe(group.Pressures.Food)}, Water:{Describe(group.Pressures.Water)}, Threat:{Describe(group.Pressures.Threat)}, Overcrowding:{Describe(group.Pressures.Overcrowding)}, Migration:{Describe(group.Pressures.Migration)}] | KnownRegions=[{knownRegions}] | KnownDiscoveries=[{knownDiscoveries}] | LearnedAdvancements=[{learnedAdvancements}]");
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string Describe(PressureValue pressure)
+    {
+        return $"raw={pressure.RawValue}, eff={pressure.EffectiveValue}, display={pressure.DisplayValue}, band={pressure.SeverityLabel}";
     }
 }

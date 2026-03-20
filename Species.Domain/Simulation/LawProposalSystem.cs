@@ -64,8 +64,8 @@ public sealed class LawProposalSystem
             GovernmentForms = AllGovernmentForms,
             ConflictingDefinitionIds = [GovernanceLawCatalog.EaseExtractionBurdenId],
             Score = (_, _, context) => ScoreWhen(
-                context.MaterialProduction.DeficitScore >= 30 || context.Pressures.ThreatPressure >= 45,
-                20 + (context.MaterialProduction.DeficitScore / 2) + (context.Pressures.ThreatPressure / 4) +
+                context.MaterialProduction.DeficitScore >= 30 || context.Pressures.Threat.EffectiveValue >= 45,
+                20 + (context.MaterialProduction.DeficitScore / 2) + (context.Pressures.Threat.EffectiveValue / 4) +
                 (context.Governance.Authority / 7) + (context.ScaleState.OverextensionPressure / 12))
         },
         new()
@@ -100,8 +100,8 @@ public sealed class LawProposalSystem
             GovernmentForms = AllGovernmentForms,
             ConflictingDefinitionIds = [GovernanceLawCatalog.OpenMovementId],
             Score = (_, _, context) => ScoreWhen(
-                context.Pressures.MigrationPressure >= 40 || context.Pressures.ThreatPressure >= 45,
-                18 + (context.Pressures.MigrationPressure / 2) + (context.Pressures.ThreatPressure / 4) +
+                context.Pressures.Migration.EffectiveValue >= 40 || context.Pressures.Threat.EffectiveValue >= 45,
+                18 + (context.Pressures.Migration.EffectiveValue / 2) + (context.Pressures.Threat.EffectiveValue / 4) +
                 (context.Governance.Authority / 8) + (context.ScaleState.Centralization / 12))
         },
         new()
@@ -120,7 +120,7 @@ public sealed class LawProposalSystem
             Score = (_, _, context) => ScoreWhen(
                 context.Polity.RegionalPresences.Count(presence => presence.IsCurrent) >= 2,
                 12 + (context.Governance.PeripheralStrain / 2) + ((100 - context.Governance.Legitimacy) / 4) +
-                (context.Pressures.MigrationPressure / 4) + (context.ScaleState.AutonomyTolerance / 12))
+                (context.Pressures.Migration.EffectiveValue / 4) + (context.ScaleState.AutonomyTolerance / 12))
         },
         new()
         {
@@ -136,8 +136,8 @@ public sealed class LawProposalSystem
             GovernmentForms = AllGovernmentForms,
             ConflictingDefinitionIds = [GovernanceLawCatalog.SharedGovernanceId],
             Score = (_, _, context) => ScoreWhen(
-                context.Pressures.ThreatPressure >= 35 || context.Governance.Authority <= 55,
-                16 + (context.Pressures.ThreatPressure / 4) + ((100 - context.Governance.Authority) / 3) +
+                context.Pressures.Threat.EffectiveValue >= 35 || context.Governance.Authority <= 55,
+                16 + (context.Pressures.Threat.EffectiveValue / 4) + ((100 - context.Governance.Authority) / 3) +
                 (context.MaterialShortageMonths >= 2 ? 5 : 0) + (context.ScaleState.Centralization / 10))
         },
         new()
@@ -609,17 +609,17 @@ public sealed class LawProposalSystem
         return source switch
         {
             ProposalBackingSource.Warriors when definitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId
-                => context.Pressures.ThreatPressure / 8 + context.Governance.Authority / 15 + context.ExternalPressure.Threat / 8,
+                => context.Pressures.Threat.EffectiveValue / 8 + context.Governance.Authority / 15 + context.ExternalPressure.Threat / 8,
             ProposalBackingSource.Merchants when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.LocalStoreAutonomyId
-                => context.MaterialProduction.StorageSupport / 12 + context.Pressures.MigrationPressure / 16 + context.ExternalPressure.Cooperation / 10,
+                => context.MaterialProduction.StorageSupport / 12 + context.Pressures.Migration.EffectiveValue / 16 + context.ExternalPressure.Cooperation / 10,
             ProposalBackingSource.Elders when definitionId is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId
                 => (100 - context.Governance.Authority) / 10 + context.Governance.Cohesion / 15,
             ProposalBackingSource.CommonFolk when definitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.SharedGovernanceId
-                => context.Pressures.FoodPressure / 10 + (100 - context.Governance.Legitimacy) / 12 + context.ExternalPressure.RaidPressure / 10,
+                => context.Pressures.Food.EffectiveValue / 10 + (100 - context.Governance.Legitimacy) / 12 + context.ExternalPressure.RaidPressure / 10,
             ProposalBackingSource.FrontierSettlers when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.FrontierIntegrationId or GovernanceLawCatalog.LocalStoreAutonomyId
-                => context.Governance.PeripheralStrain / 8 + context.Pressures.MigrationPressure / 12 + context.ExternalPressure.FrontierFriction / 8,
+                => context.Governance.PeripheralStrain / 8 + context.Pressures.Migration.EffectiveValue / 12 + context.ExternalPressure.FrontierFriction / 8,
             ProposalBackingSource.Priests when definitionId is GovernanceLawCatalog.StrengthenCentralAuthorityId
-                => context.Pressures.ThreatPressure / 20 + context.Governance.Authority / 18,
+                => context.Pressures.Threat.EffectiveValue / 20 + context.Governance.Authority / 18,
             _ => 0
         };
     }
@@ -651,11 +651,11 @@ public sealed class LawProposalSystem
         var shift = source switch
         {
             ProposalBackingSource.Warriors when definitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId
-                => context.Pressures.ThreatPressure >= 45 || context.ExternalPressure.Threat >= 40 ? 7 : 3,
+                => context.Pressures.Threat.EffectiveValue >= 45 || context.ExternalPressure.Threat >= 40 ? 7 : 3,
             ProposalBackingSource.Merchants when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.LocalStoreAutonomyId
-                => context.Pressures.ThreatPressure < 60 && context.ExternalPressure.RaidPressure < 35 ? 6 : 2,
+                => context.Pressures.Threat.EffectiveValue < 60 && context.ExternalPressure.RaidPressure < 35 ? 6 : 2,
             ProposalBackingSource.CommonFolk when definitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.SharedGovernanceId
-                => context.Pressures.FoodPressure >= 45 || context.ExternalPressure.RaidPressure >= 35 ? 6 : 3,
+                => context.Pressures.Food.EffectiveValue >= 45 || context.ExternalPressure.RaidPressure >= 35 ? 6 : 3,
             ProposalBackingSource.Elders when definitionId is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId
                 => context.Governance.Legitimacy <= 55 ? 5 : 2,
             ProposalBackingSource.FrontierSettlers when definitionId is GovernanceLawCatalog.FrontierIntegrationId or GovernanceLawCatalog.OpenMovementId
@@ -730,7 +730,7 @@ public sealed class LawProposalSystem
 
         if (definition.Id is GovernanceLawCatalog.StrengthenCentralAuthorityId or GovernanceLawCatalog.CentralizeStoresId)
         {
-            modifier += context.Pressures.ThreatPressure / 10;
+            modifier += context.Pressures.Threat.EffectiveValue / 10;
         }
 
         if (definition.Id is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId or GovernanceLawCatalog.FrontierIntegrationId)
@@ -761,14 +761,7 @@ public sealed class LawProposalSystem
             Population = context.TotalPopulation,
             StoredFood = context.TotalStoredFood,
             SubsistenceMode = context.LeadGroup?.SubsistenceMode ?? SubsistenceMode.Mixed,
-            Pressures = new PressureState
-            {
-                FoodPressure = context.Pressures.FoodPressure,
-                WaterPressure = context.Pressures.WaterPressure,
-                ThreatPressure = context.Pressures.ThreatPressure,
-                OvercrowdingPressure = context.Pressures.OvercrowdingPressure,
-                MigrationPressure = context.Pressures.MigrationPressure
-            },
+            Pressures = context.Pressures.Clone(),
             LastRegionId = context.LeadGroup?.LastRegionId ?? string.Empty,
             MonthsSinceLastMove = context.LeadGroup?.MonthsSinceLastMove ?? 0,
             KnownRegionIds = new HashSet<string>(context.KnownRegionIds, StringComparer.Ordinal),

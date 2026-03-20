@@ -375,10 +375,10 @@ public sealed class SettlementSystem
     private static SettlementType? ResolveSettlementCandidate(Polity polity, PolityRegionalPresence presence, IReadOnlyList<PopulationGroup> localGroups)
     {
         var localPopulation = localGroups.Sum(group => group.Population);
-        var averageFoodPressure = Average(localGroups, group => group.Pressures.FoodPressure);
-        var averageWaterPressure = Average(localGroups, group => group.Pressures.WaterPressure);
-        var averageThreatPressure = Average(localGroups, group => group.Pressures.ThreatPressure);
-        var averageMigrationPressure = Average(localGroups, group => group.Pressures.MigrationPressure);
+        var averageFoodPressure = Average(localGroups, group => group.Pressures.Food.EffectiveValue);
+        var averageWaterPressure = Average(localGroups, group => group.Pressures.Water.EffectiveValue);
+        var averageThreatPressure = Average(localGroups, group => group.Pressures.Threat.EffectiveValue);
+        var averageMigrationPressure = Average(localGroups, group => group.Pressures.Migration.EffectiveValue);
         var totalStoredFood = localGroups.Sum(group => group.StoredFood);
 
         if (presence.ConsecutiveMonthsPresent >= 18 &&
@@ -543,14 +543,7 @@ public sealed class SettlementSystem
             SubsistenceMode = group.SubsistenceMode,
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),

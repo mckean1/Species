@@ -89,7 +89,7 @@ public static class KnownSpeciesScreenDataBuilder
             .ToArray();
         var avgPressure = speciesGroups.Length == 0
             ? 0
-            : (int)Math.Round(speciesGroups.Average(group => Math.Max(group.Pressures.FoodPressure, group.Pressures.WaterPressure)), MidpointRounding.AwayFromZero);
+            : (int)Math.Round(speciesGroups.Average(group => Math.Max(group.Pressures.Food.DisplayValue, group.Pressures.Water.DisplayValue)), MidpointRounding.AwayFromZero);
 
         return new KnownSpeciesSummary(
             focusGroup.SpeciesId,
@@ -160,7 +160,7 @@ public static class KnownSpeciesScreenDataBuilder
             "Omnivorous subsistence inferred from mixed foraging and hunting systems."
         };
 
-        if (groups.Average(group => group.Pressures.MigrationPressure) >= 45)
+        if (groups.Average(group => group.Pressures.Migration.DisplayValue) >= 45)
         {
             traits.Add("Mobility is moderate to high when pressures rise.");
         }
@@ -183,8 +183,8 @@ public static class KnownSpeciesScreenDataBuilder
         var context = new List<string>
         {
             "This is your own species.",
-            focusGroup.Pressures.WaterPressure >= 40
-                ? "Water access is currently the main species-level concern for your polity."
+            focusGroup.Pressures.Water.DisplayValue >= 40
+                ? $"Water access is currently the main species-level concern for your polity ({focusGroup.Pressures.Water.SeverityLabel.ToLowerInvariant()})."
                 : "No single species-level pressure dominates your polity right now."
         };
 

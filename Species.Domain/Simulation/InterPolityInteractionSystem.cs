@@ -165,14 +165,14 @@ public sealed class InterPolityInteractionSystem
             (Math.Min(polity.ExternalPressure.Threat, other.ExternalPressure.Threat) / 6) +
             (relation.Trust / 5) -
             (contact.ContestedRegions * 10) -
-            (polity.Pressures.FoodPressure / 8),
+            (polity.Pressures.Food.EffectiveValue / 8),
             0,
             100);
         var hostilityTarget = Math.Clamp(
             (contact.ContestedRegions * 18) +
             (contact.SharedRegions * 8) +
             (primaryIsInitiator ? contact.OtherSettlementExposure : contact.PrimarySettlementExposure) * 7 +
-            (polity.Pressures.FoodPressure / 8) +
+            (polity.Pressures.Food.EffectiveValue / 8) +
             (polity.MaterialProduction.DeficitScore / 9) +
             (attached ? -30 : 0) +
             (relation.RaidsSuffered * 4) +
@@ -306,14 +306,9 @@ public sealed class InterPolityInteractionSystem
 
         foreach (var group in affectedGroups)
         {
-            group.Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = Math.Clamp(group.Pressures.ThreatPressure + (likelyOpenConflict ? 18 : 12), 0, 100),
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = Math.Clamp(group.Pressures.MigrationPressure + (likelyOpenConflict ? 12 : 8), 0, 100)
-            };
+            group.Pressures = group.Pressures.Clone();
+            group.Pressures.Threat = PressureMath.ApplyRawAdjustment(PressureDefinitions.Threat, group.Pressures.Threat, likelyOpenConflict ? 18 : 12);
+            group.Pressures.Migration = PressureMath.ApplyRawAdjustment(PressureDefinitions.Migration, group.Pressures.Migration, likelyOpenConflict ? 12 : 8);
         }
 
         aggressorRelation.RaidsInflicted++;
@@ -601,14 +596,7 @@ public sealed class InterPolityInteractionSystem
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
+            Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),

@@ -135,27 +135,27 @@ public static class KnownPolitiesScreenDataBuilder
     {
         var notable = new List<string>();
 
-        if (context.Pressures.FoodPressure >= 60)
+        if (context.Pressures.Food.DisplayValue >= 60)
         {
-            notable.Add("food stress");
+            notable.Add($"food stress ({context.Pressures.Food.SeverityLabel.ToLowerInvariant()})");
         }
 
-        if (context.Pressures.WaterPressure >= 60)
+        if (context.Pressures.Water.DisplayValue >= 60)
         {
-            notable.Add("water strain");
+            notable.Add($"water strain ({context.Pressures.Water.SeverityLabel.ToLowerInvariant()})");
         }
 
-        if (context.Pressures.OvercrowdingPressure >= 60)
+        if (context.Pressures.Overcrowding.DisplayValue >= 60)
         {
             notable.Add("crowding");
         }
 
-        if (context.Pressures.MigrationPressure >= 60)
+        if (context.Pressures.Migration.DisplayValue >= 60)
         {
             notable.Add("migration pressure");
         }
 
-        if (context.Pressures.ThreatPressure >= 60)
+        if (context.Pressures.Threat.DisplayValue >= 60)
         {
             notable.Add("danger");
         }
@@ -194,7 +194,7 @@ public static class KnownPolitiesScreenDataBuilder
             traits.Add("Often seen hunting");
         }
 
-        if (context.Pressures.MigrationPressure >= 60)
+        if (context.Pressures.Migration.DisplayValue >= 60)
         {
             traits.Add("Frequently on the move");
         }
@@ -208,7 +208,7 @@ public static class KnownPolitiesScreenDataBuilder
             traits.Add("Carries visible provisions");
         }
 
-        if (context.Pressures.ThreatPressure < 40)
+        if (context.Pressures.Threat.DisplayValue < 40)
         {
             traits.Add("Moves with some confidence");
         }
@@ -220,22 +220,22 @@ public static class KnownPolitiesScreenDataBuilder
     {
         var risks = new List<string>();
 
-        if (context.Pressures.OvercrowdingPressure >= 60)
+        if (context.Pressures.Overcrowding.DisplayValue >= 60)
         {
             risks.Add("Crowded conditions");
         }
 
-        if (context.Pressures.WaterPressure >= 60)
+        if (context.Pressures.Water.DisplayValue >= 60)
         {
             risks.Add("Limited water sources");
         }
 
-        if (context.Pressures.FoodPressure >= 60)
+        if (context.Pressures.Food.DisplayValue >= 60)
         {
             risks.Add("Food pressure is visible");
         }
 
-        if (context.Pressures.ThreatPressure >= 60)
+        if (context.Pressures.Threat.DisplayValue >= 60)
         {
             risks.Add("Threat pressure is high");
         }

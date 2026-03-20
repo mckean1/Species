@@ -1,3 +1,4 @@
+using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
@@ -64,14 +65,16 @@ public static class ChronicleScreenDataBuilder
                 polity.ActiveLawProposal.Id));
         }
 
-        if (context.Pressures.FoodPressure >= 78 || context.Pressures.WaterPressure >= 78 || context.MaterialShortageMonths >= 3)
+        if (context.Pressures.Food.DisplayValue >= ChronicleConstants.HardshipWarningDisplayThreshold ||
+            context.Pressures.Water.DisplayValue >= ChronicleConstants.HardshipWarningDisplayThreshold ||
+            context.MaterialShortageMonths >= 3)
         {
             items.Add(new ChronicleUrgentItem(
                 "stores-crisis",
                 "Stores are under severe strain and shortfalls are spreading.",
-                context.Pressures.FoodPressure >= context.Pressures.WaterPressure
-                    ? "Food pressure is running ahead of current reserves."
-                    : "Water stress is now threatening stability.",
+                context.Pressures.Food.DisplayValue >= context.Pressures.Water.DisplayValue
+                    ? $"Food pressure is {context.Pressures.Food.SeverityLabel.ToLowerInvariant()} and running ahead of current reserves."
+                    : $"Water pressure is {context.Pressures.Water.SeverityLabel.ToLowerInvariant()} and now threatening stability.",
                 "A prolonged shortage can trigger settlement loss, legitimacy damage, and migration.",
                 PlayerScreen.Polity,
                 null));
@@ -268,12 +271,12 @@ public static class ChronicleScreenDataBuilder
             return "Outside conditions are opening room for steadier coexistence.";
         }
 
-        if (context.MaterialSurplusMonths >= 3 && context.Pressures.FoodPressure < 45)
+        if (context.MaterialSurplusMonths >= 3 && context.Pressures.Food.DisplayValue < ChronicleConstants.StablePressureDisplayThreshold)
         {
             return "Material and food conditions are supporting stability.";
         }
 
-        if (context.Pressures.MigrationPressure >= 60)
+        if (context.Pressures.Migration.DisplayValue >= ChronicleConstants.PressureConcernDisplayThreshold)
         {
             return "Movement pressure is pushing the polity to reposition.";
         }
@@ -283,20 +286,20 @@ public static class ChronicleScreenDataBuilder
 
     private static string SummarizeTopPressure(PolityContext context)
     {
-        var pressures = new (string Label, int Value)[]
+        var pressures = new (string Label, int Value, string SeverityLabel)[]
         {
-            ("Food", context.Pressures.FoodPressure),
-            ("Water", context.Pressures.WaterPressure),
-            ("Threat", context.Pressures.ThreatPressure),
-            ("Crowding", context.Pressures.OvercrowdingPressure),
-            ("Migration", context.Pressures.MigrationPressure)
+            ("Food", context.Pressures.Food.DisplayValue, context.Pressures.Food.SeverityLabel),
+            ("Water", context.Pressures.Water.DisplayValue, context.Pressures.Water.SeverityLabel),
+            ("Threat", context.Pressures.Threat.DisplayValue, context.Pressures.Threat.SeverityLabel),
+            ("Crowding", context.Pressures.Overcrowding.DisplayValue, context.Pressures.Overcrowding.SeverityLabel),
+            ("Migration", context.Pressures.Migration.DisplayValue, context.Pressures.Migration.SeverityLabel)
         };
 
         var strongest = pressures
             .OrderByDescending(item => item.Value)
             .First();
 
-        return $"{strongest.Label} pressure at {strongest.Value}.";
+        return $"{strongest.Label} ({strongest.SeverityLabel})";
     }
 
     private static string DescribeCategory(ChronicleEventCategory category)

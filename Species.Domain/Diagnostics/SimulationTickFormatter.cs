@@ -33,7 +33,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.GroupPressureChanges)
         {
             lines.Add(
-                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Population={change.Population} | StoredFood={change.StoredFood} | Food={change.Pressures.FoodPressure} | Water={change.Pressures.WaterPressure} | Threat={change.Pressures.ThreatPressure} | Overcrowding={change.Pressures.OvercrowdingPressure} | Migration={change.Pressures.MigrationPressure} | FoodReason={change.FoodPressureReason} | ThreatReason={change.ThreatPressureReason} | MigrationReason={change.MigrationPressureReason}");
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Population={change.Population} | StoredFood={change.StoredFood} | Food={Describe(change.Food)} | Water={Describe(change.Water)} | Threat={Describe(change.Threat)} | Overcrowding={Describe(change.Overcrowding)} | Migration={Describe(change.Migration)} | FoodReason={change.FoodPressureReason} | ThreatReason={change.ThreatPressureReason} | MigrationReason={change.MigrationPressureReason}");
         }
 
         lines.Add(string.Empty);
@@ -42,7 +42,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.GroupSurvivalChanges)
         {
             lines.Add(
-                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Mode={change.SubsistenceMode} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Mode={change.SubsistenceMode} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Hardship=FoodEff:{change.FoodPressureEffective}/WaterEff:{change.WaterPressureEffective}/{change.HardshipSeverityLabel} | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
         }
 
         lines.Add(string.Empty);
@@ -51,7 +51,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.MigrationChanges)
         {
             lines.Add(
-                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | MigrationPressure={change.MigrationPressure} | StoredFood={change.StoredFood} | Considered={change.ConsideredMigration} | CurrentScore={change.CurrentRegionScore:0.0} | Neighbors=[{change.NeighborScoresSummary}] | Winner={change.WinningRegionId} ({change.WinningRegionName})={change.WinningRegionScore:0.0} | Moved={change.Moved} | NewRegion={change.NewRegionId} ({change.NewRegionName}) | LastRegionId={change.LastRegionId} | MonthsSinceLastMove={change.MonthsSinceLastMove} | Reason={change.DecisionReason}");
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | MigrationPressure=display:{change.MigrationPressure}/eff:{change.MigrationEffectivePressure}/{change.MigrationSeverityLabel} | StoredFood={change.StoredFood} | Considered={change.ConsideredMigration} | RequiredMargin={change.RequiredMoveMargin:0.0} | CurrentScore={change.CurrentRegionScore:0.0} | Neighbors=[{change.NeighborScoresSummary}] | Winner={change.WinningRegionId} ({change.WinningRegionName})={change.WinningRegionScore:0.0} | Moved={change.Moved} | NewRegion={change.NewRegionId} ({change.NewRegionName}) | LastRegionId={change.LastRegionId} | MonthsSinceLastMove={change.MonthsSinceLastMove} | Reason={change.DecisionReason}");
         }
 
         lines.Add(string.Empty);
@@ -73,5 +73,10 @@ public static class SimulationTickFormatter
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string Describe(PressureChangeDetail detail)
+    {
+        return $"prior={detail.PriorRaw}, +={detail.MonthlyContribution}, decay={detail.DecayApplied}, raw={detail.FinalRaw}, eff={detail.Effective}, display={detail.Display}, band={detail.SeverityLabel}";
     }
 }
