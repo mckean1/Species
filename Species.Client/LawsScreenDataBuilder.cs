@@ -7,6 +7,8 @@ public static class LawsScreenDataBuilder
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var polityName = focusPolity?.Name ?? "Unknown polity";
         var items = BuildItems(focusPolity);
+        var pendingDecisions = items.Where(item => item.Status == Species.Domain.Enums.LawProposalStatus.Active).ToArray();
+        var recentDecisions = items.Where(item => item.Status != Species.Domain.Enums.LawProposalStatus.Active).ToArray();
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
         var selected = items.Count == 0 ? null : items[clampedIndex];
 
@@ -14,15 +16,19 @@ public static class LawsScreenDataBuilder
             polityName,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             items,
+            pendingDecisions,
+            recentDecisions,
             selected,
             clampedIndex,
             focusPolity is not null && focusPolity.ActiveLawProposal is not null,
+            selected?.Status == Species.Domain.Enums.LawProposalStatus.Active,
+            BuildGovernanceSummary(focusPolity),
             BuildEnactedLaws(focusPolity),
             [
-                "Only one active proposal can exist at a time.",
-                "Proposal backing reflects current internal political blocs.",
-                "Passed proposals become enacted laws with ongoing monthly effects.",
-                "Ignored proposals can linger for years before they pass, fail, or fade."
+                "Pending decisions use Pass or Veto once selected.",
+                "Proposal backing reflects blocs, governance strain, and current material or frontier pressures.",
+                "Passed proposals become active laws whose strength can diverge between core and periphery.",
+                "Law status shows whether an enacted order is holding, contested, or failing."
             ],
             items.Count == 0
                 ? ["No law proposal is active right now."]
@@ -58,6 +64,8 @@ public static class LawsScreenDataBuilder
             proposal.Status,
             PolityPresentation.DescribeLawCategory(proposal.Category),
             proposal.Summary,
+            proposal.ReasonSummary,
+            proposal.TradeoffSummary,
             PolityPresentation.DescribeBackingSources(proposal.PrimaryBackingSource, proposal.SecondaryBackingSource),
             proposal.Support,
             proposal.Opposition,
@@ -84,10 +92,33 @@ public static class LawsScreenDataBuilder
                 law.Title,
                 PolityPresentation.DescribeLawCategory(law.Category),
                 law.Summary,
+                law.IntentSummary,
+                law.TradeoffSummary,
+                ResolveActiveLawState(law),
                 law.ImpactScale,
                 PolityPresentation.DescribeLawStrengthBand(law.EnforcementStrength),
-                PolityPresentation.DescribeLawStrengthBand(law.ComplianceLevel)))
+                PolityPresentation.DescribeLawStrengthBand(law.ComplianceLevel),
+                PolityPresentation.DescribeLawStrengthBand(law.CoreEffectiveness),
+                PolityPresentation.DescribeLawStrengthBand(law.PeripheralEffectiveness),
+                PolityPresentation.DescribeLawStrengthBand(law.ResistanceLevel)))
             .ToArray();
+    }
+
+    private static IReadOnlyList<string> BuildGovernanceSummary(Polity? focusPolity)
+    {
+        if (focusPolity is null)
+        {
+            return ["No governance data."];
+        }
+
+        return
+        [
+            $"Legitimacy: {focusPolity.Governance.Legitimacy} [{PolityPresentation.DescribeGovernanceBand(focusPolity.Governance.Legitimacy)}]",
+            $"Cohesion: {focusPolity.Governance.Cohesion} [{PolityPresentation.DescribeGovernanceBand(focusPolity.Governance.Cohesion)}]",
+            $"Authority: {focusPolity.Governance.Authority} [{PolityPresentation.DescribeGovernanceBand(focusPolity.Governance.Authority)}]",
+            $"Governability: {focusPolity.Governance.Governability} [{PolityPresentation.DescribeGovernanceBand(focusPolity.Governance.Governability)}]",
+            $"Peripheral strain: {focusPolity.Governance.PeripheralStrain}"
+        ];
     }
 
     private static string FormatMonthYear(int month, int year)
@@ -111,15 +142,46 @@ public static class LawsScreenDataBuilder
 
         return $"{monthText} {year:D3}";
     }
+
+    private static string ResolveActiveLawState(EnactedLaw law)
+    {
+        if (law.ComplianceLevel < 25 ||
+            law.EnforcementStrength < 25 ||
+            law.PeripheralEffectiveness < 20 ||
+            law.ResistanceLevel >= 75)
+        {
+            return "Failing";
+        }
+
+        if (law.ResistanceLevel >= 50 ||
+            law.ComplianceLevel < 45 ||
+            Math.Abs(law.CoreEffectiveness - law.PeripheralEffectiveness) >= 30)
+        {
+            return "Contested";
+        }
+
+        if (law.ResistanceLevel >= 30 ||
+            law.EnforcementStrength < 60 ||
+            law.ComplianceLevel < 60)
+        {
+            return "Under Pressure";
+        }
+
+        return "Active";
+    }
 }
 
 public sealed record LawsScreenData(
     string PolityName,
     string CurrentDate,
     IReadOnlyList<LawScreenItem> Laws,
+    IReadOnlyList<LawScreenItem> PendingDecisions,
+    IReadOnlyList<LawScreenItem> RecentDecisions,
     LawScreenItem? SelectedLaw,
     int SelectedIndex,
     bool HasActiveProposal,
+    bool HasSelectedPendingDecision,
+    IReadOnlyList<string> GovernanceSummary,
     IReadOnlyList<EnactedLawScreenItem> EnactedLaws,
     IReadOnlyList<string> Notes,
     IReadOnlyList<string> EmptyStateNotes);
@@ -130,6 +192,8 @@ public sealed record LawScreenItem(
     Species.Domain.Enums.LawProposalStatus Status,
     string Category,
     string Summary,
+    string ReasonSummary,
+    string TradeoffSummary,
     string BackedBy,
     int Support,
     int Opposition,
@@ -143,6 +207,12 @@ public sealed record EnactedLawScreenItem(
     string Name,
     string Category,
     string Summary,
+    string IntentSummary,
+    string TradeoffSummary,
+    string State,
     int ImpactScale,
     string Enforcement,
-    string Compliance);
+    string Compliance,
+    string CoreEffectiveness,
+    string PeripheralEffectiveness,
+    string Resistance);

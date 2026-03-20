@@ -5,6 +5,11 @@ namespace Species.Domain.Catalogs;
 
 public sealed class DiscoveryCatalog
 {
+    public const string ClayShapingId = "discovery-clay-shaping";
+    public const string SeasonalTrackingId = "discovery-seasonal-tracking";
+    public const string PreservationCluesId = "discovery-preservation-clues";
+    public const string ShelterMethodsId = "discovery-shelter-methods";
+
     private readonly Dictionary<string, DiscoveryDefinition> definitionsById;
 
     public DiscoveryCatalog(IReadOnlyList<DiscoveryDefinition> definitions)
@@ -42,7 +47,49 @@ public sealed class DiscoveryCatalog
 
     public static DiscoveryCatalog CreateForWorld(World world)
     {
-        var definitions = new List<DiscoveryDefinition>(world.Regions.Count * 4);
+        var definitions = new List<DiscoveryDefinition>(world.Regions.Count * 4 + 4)
+        {
+            new DiscoveryDefinition
+            {
+                Id = ClayShapingId,
+                Name = "Clay Shaping",
+                Description = "Knowledge that clay can be formed into useful storage and support containers.",
+                Category = DiscoveryCategory.Material,
+                DecisionEffectSummary = "Helps the polity recognize clay as a meaningful practical resource.",
+                CausalSummary = "Emerges from repeated clay exposure, use, and settled handling.",
+                ContactSpreadAllowed = true
+            },
+            new DiscoveryDefinition
+            {
+                Id = SeasonalTrackingId,
+                Name = "Seasonal Tracking",
+                Description = "Knowledge of recurring prey and regional movement patterns across seasons and returns.",
+                Category = DiscoveryCategory.Fauna,
+                DecisionEffectSummary = "Improves how the polity interprets repeated hunting and return-pattern opportunities.",
+                CausalSummary = "Emerges from repeated hunting, route use, and seasonal return observation.",
+                ContactSpreadAllowed = true
+            },
+            new DiscoveryDefinition
+            {
+                Id = PreservationCluesId,
+                Name = "Preservation Clues",
+                Description = "Knowledge that stored food can be kept more reliably through better handling and containment.",
+                Category = DiscoveryCategory.Material,
+                DecisionEffectSummary = "Helps the polity connect storage pressure to practical preservation methods.",
+                CausalSummary = "Emerges from repeated surplus, shortage, and storage stress.",
+                ContactSpreadAllowed = true
+            },
+            new DiscoveryDefinition
+            {
+                Id = ShelterMethodsId,
+                Name = "Shelter Methods",
+                Description = "Knowledge of sturdier shelter practices and protective use of local materials.",
+                Category = DiscoveryCategory.Contact,
+                DecisionEffectSummary = "Helps the polity interpret timber, stone, hides, and contact as shelter opportunities.",
+                CausalSummary = "Emerges from material strain, durable settlement practice, or repeated outside contact.",
+                ContactSpreadAllowed = true
+            }
+        };
 
         foreach (var region in world.Regions.OrderBy(region => region.Id, StringComparer.Ordinal))
         {
@@ -52,7 +99,8 @@ public sealed class DiscoveryCatalog
                 Name = $"{region.Name} Flora",
                 Description = $"Knowledge of edible and useful local plants in {region.Name}.",
                 Category = DiscoveryCategory.Flora,
-                DecisionEffectSummary = "Improves how the group recognizes flora opportunity in this region during decision-making."
+                DecisionEffectSummary = "Improves how the group recognizes flora opportunity in this region during decision-making.",
+                CausalSummary = "Emerges from repeated gathering and observation in the region."
             });
             definitions.Add(new DiscoveryDefinition
             {
@@ -60,7 +108,8 @@ public sealed class DiscoveryCatalog
                 Name = $"{region.Name} Fauna",
                 Description = $"Knowledge of prey and dangerous animal patterns in {region.Name}.",
                 Category = DiscoveryCategory.Fauna,
-                DecisionEffectSummary = "Improves how the group recognizes fauna opportunity and danger in this region during decision-making."
+                DecisionEffectSummary = "Improves how the group recognizes fauna opportunity and danger in this region during decision-making.",
+                CausalSummary = "Emerges from repeated hunting and fauna observation in the region."
             });
             definitions.Add(new DiscoveryDefinition
             {
@@ -68,7 +117,8 @@ public sealed class DiscoveryCatalog
                 Name = $"{region.Name} Water Sources",
                 Description = $"Knowledge of where water can be found in {region.Name}.",
                 Category = DiscoveryCategory.Water,
-                DecisionEffectSummary = "Improves how the group values water conditions in this region during decision-making."
+                DecisionEffectSummary = "Improves how the group values water conditions in this region during decision-making.",
+                CausalSummary = "Emerges from repeated water exposure and residence in the region."
             });
             definitions.Add(new DiscoveryDefinition
             {
@@ -76,7 +126,8 @@ public sealed class DiscoveryCatalog
                 Name = $"{region.Name} Conditions",
                 Description = $"Knowledge of the overall living conditions in {region.Name}.",
                 Category = DiscoveryCategory.Region,
-                DecisionEffectSummary = "Improves how the group judges whether staying in or returning to this region is worthwhile."
+                DecisionEffectSummary = "Improves how the group judges whether staying in or returning to this region is worthwhile.",
+                CausalSummary = "Emerges from repeated residence, pressure, and practical use of the region."
             });
         }
 
@@ -101,7 +152,8 @@ public sealed class DiscoveryCatalog
                     Name = $"{region.Name} to {neighborRegion.Name} Route",
                     Description = $"Knowledge of the route between {region.Name} and {neighborRegion.Name}.",
                     Category = DiscoveryCategory.Route,
-                    DecisionEffectSummary = "Reduces uncertainty when evaluating this neighboring move."
+                    DecisionEffectSummary = "Reduces uncertainty when evaluating this neighboring move.",
+                    CausalSummary = "Emerges from repeated traversal of the route."
                 });
             }
         }

@@ -23,17 +23,21 @@ public sealed class FaunaSimulationSystem
             foreach (var faunaEntry in region.Ecosystem.FaunaPopulations.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 var species = faunaCatalog.GetById(faunaEntry.Key);
-                if (species is null)
+                if (species is null || species.IsExtinct)
                 {
                     continue;
                 }
 
+                var profile = region.Ecosystem.FaunaProfiles.GetValueOrDefault(species.Id);
+                var traits = profile?.Traits ?? species.BaselineTraits;
                 var startingPopulation = faunaEntry.Value;
                 var currentPopulation = mutableFauna.TryGetValue(species.Id, out var currentValue)
                     ? currentValue
                     : 0;
-                var habitatSupport = GetHabitatSupport(region, species);
-                var foodNeeded = currentPopulation * species.FoodRequirement;
+                var biologicalFit = ResolveBiologicalFit(region, species, traits);
+                var habitatSupport = GetHabitatSupport(region, species, traits, biologicalFit);
+                var foodRequirement = ResolveFoodRequirement(species, traits);
+                var foodNeeded = currentPopulation * foodRequirement;
                 var consumption = species.DietCategory switch
                 {
                     DietCategory.Herbivore => ConsumeFloraFood(foodNeeded, mutableFlora, floraCatalog),
@@ -44,8 +48,8 @@ public sealed class FaunaSimulationSystem
 
                 var fulfillmentRatio = foodNeeded <= 0.0f
                     ? 1.0f
-                    : MathF.Min(1.0f, consumption.FoodConsumed / foodNeeded);
-                var newPopulation = AdjustPopulation(currentPopulation, fulfillmentRatio, habitatSupport, species.ReproductionRate);
+                    : MathF.Min(1.0f, (consumption.FoodConsumed / foodNeeded) * ResolveForagingBonus(traits));
+                var newPopulation = AdjustPopulation(currentPopulation, fulfillmentRatio, habitatSupport, species.ReproductionRate, traits);
 
                 if (newPopulation > 0)
                 {
@@ -68,6 +72,7 @@ public sealed class FaunaSimulationSystem
                     FoodConsumed = MathF.Round(consumption.FoodConsumed, 2),
                     FulfillmentRatio = MathF.Round(fulfillmentRatio, 2),
                     HabitatSupport = MathF.Round(habitatSupport, 2),
+                    BiologicalFit = MathF.Round(biologicalFit, 2),
                     Outcome = ResolveOutcome(startingPopulation, newPopulation),
                     ConsumedFloraSummary = BuildConsumptionSummary(consumption.ConsumedFloraPopulations),
                     ConsumedFaunaSummary = BuildConsumptionSummary(consumption.ConsumedFaunaPopulations),
@@ -82,7 +87,14 @@ public sealed class FaunaSimulationSystem
                 region.Biome,
                 region.WaterAvailability,
                 region.NeighborIds,
-                new RegionEcosystem(mutableFlora, mutableFauna)));
+                new RegionEcosystem(
+                    mutableFlora,
+                    mutableFauna,
+                    CloneProfiles(region.Ecosystem.FloraProfiles),
+                    CloneProfiles(region.Ecosystem.FaunaProfiles),
+                    region.Ecosystem.FossilRecords.ToArray(),
+                    region.Ecosystem.BiologicalHistoryRecords.ToArray()),
+                region.MaterialProfile.Clone()));
         }
 
         return new FaunaSimulationResult(
@@ -90,16 +102,71 @@ public sealed class FaunaSimulationSystem
             changes);
     }
 
-    private static float GetHabitatSupport(Region region, FaunaSpeciesDefinition species)
+    private static float GetHabitatSupport(Region region, FaunaSpeciesDefinition species, BiologicalTraitProfile traits, float biologicalFit)
     {
         if (!species.SupportedWaterAvailabilities.Contains(region.WaterAvailability))
         {
             return FaunaSimulationConstants.UnsupportedWaterHabitatSupport;
         }
 
-        return species.CoreBiomes.Contains(region.Biome)
+        var habitatSupport = species.CoreBiomes.Contains(region.Biome)
             ? FaunaSimulationConstants.CoreBiomeHabitatSupport
-            : FaunaSimulationConstants.NonCoreBiomeHabitatSupport;
+            : FaunaSimulationConstants.NonCoreBiomeHabitatSupport + (traits.Flexibility / 280.0f) + (traits.Mobility / 320.0f);
+
+        habitatSupport *= biologicalFit;
+        habitatSupport *= 0.92f + (traits.Resilience / 280.0f);
+        return Math.Clamp(habitatSupport, 0.15f, 1.35f);
+    }
+
+    private static float ResolveFoodRequirement(FaunaSpeciesDefinition species, BiologicalTraitProfile traits)
+    {
+        var requirement = species.FoodRequirement;
+        requirement *= 0.92f + (traits.BodySize / 160.0f);
+        requirement *= 0.94f + (traits.Defense / 320.0f);
+        requirement *= 1.02f - (traits.Flexibility / 500.0f);
+        return Math.Max(0.05f, requirement);
+    }
+
+    private static float ResolveForagingBonus(BiologicalTraitProfile traits)
+    {
+        return Math.Clamp(0.90f + (traits.Flexibility / 320.0f) + (traits.Mobility / 450.0f), 0.80f, 1.20f);
+    }
+
+    private static float ResolveBiologicalFit(Region region, FaunaSpeciesDefinition species, BiologicalTraitProfile traits)
+    {
+        var coldDemand = region.Biome switch
+        {
+            Biome.Tundra => 82,
+            Biome.Highlands => 62,
+            _ => 34
+        };
+        var heatDemand = region.Biome switch
+        {
+            Biome.Desert => 84,
+            Biome.Wetlands => 54,
+            Biome.Plains => 50,
+            _ => 34
+        };
+        var droughtDemand = region.WaterAvailability switch
+        {
+            WaterAvailability.Low => 78,
+            WaterAvailability.Medium => 44,
+            _ => 20
+        };
+
+        var coldFit = 1.0f - MathF.Abs(traits.ColdTolerance - coldDemand) / 100.0f;
+        var heatFit = 1.0f - MathF.Abs(traits.HeatTolerance - heatDemand) / 100.0f;
+        var droughtFit = 1.0f - MathF.Abs(traits.DroughtTolerance - droughtDemand) / 100.0f;
+        var mobilityFit = 0.88f + (traits.Mobility / 300.0f);
+        var sizeTradeoff = 1.0f + ((traits.Defense - 50) / 260.0f) - ((traits.BodySize - 50) / 420.0f);
+        var fit = ((coldFit * 0.22f) + (heatFit * 0.22f) + (droughtFit * 0.18f) + (mobilityFit * 0.18f) + (sizeTradeoff * 0.20f));
+
+        if (species.DietCategory == DietCategory.Omnivore)
+        {
+            fit += traits.Flexibility / 420.0f;
+        }
+
+        return Math.Clamp(fit, 0.35f, 1.35f);
     }
 
     private static FoodConsumptionResult ConsumeOmnivoreFood(
@@ -257,16 +324,18 @@ public sealed class FaunaSimulationSystem
         int currentPopulation,
         float fulfillmentRatio,
         float habitatSupport,
-        float reproductionRate)
+        float reproductionRate,
+        BiologicalTraitProfile traits)
     {
+        var reproductionModifier = reproductionRate * (0.85f + (traits.Reproduction / 220.0f)) * (0.92f + (traits.Resilience / 320.0f));
         var targetMultiplier =
             (fulfillmentRatio * FaunaSimulationConstants.FoodFulfillmentWeight) +
             (habitatSupport * FaunaSimulationConstants.HabitatSupportWeight) +
-            (fulfillmentRatio * reproductionRate * FaunaSimulationConstants.ReproductionGrowthWeight);
+            (fulfillmentRatio * reproductionModifier * FaunaSimulationConstants.ReproductionGrowthWeight);
         var targetPopulation = Math.Max(0, (int)MathF.Round(currentPopulation * targetMultiplier, MidpointRounding.AwayFromZero));
         var adjustmentRate = MathF.Max(
             FaunaSimulationConstants.MinimumAdjustmentRate,
-            (reproductionRate * FaunaSimulationConstants.ReproductionAdjustmentWeight) + FaunaSimulationConstants.MinimumAdjustmentRate);
+            (reproductionModifier * FaunaSimulationConstants.ReproductionAdjustmentWeight) + FaunaSimulationConstants.MinimumAdjustmentRate);
         var updatedValue = currentPopulation + ((targetPopulation - currentPopulation) * adjustmentRate);
         var nextPopulation = Math.Max(0, (int)MathF.Round(updatedValue, MidpointRounding.AwayFromZero));
 
@@ -335,6 +404,11 @@ public sealed class FaunaSimulationSystem
             : string.Join(", ", consumed
                 .OrderBy(entry => entry.Key, StringComparer.Ordinal)
                 .Select(entry => $"{entry.Key}:{entry.Value}"));
+    }
+
+    private static Dictionary<string, RegionalBiologicalProfile> CloneProfiles(IReadOnlyDictionary<string, RegionalBiologicalProfile> profiles)
+    {
+        return profiles.ToDictionary(entry => entry.Key, entry => entry.Value.Clone(), StringComparer.Ordinal);
     }
 
     private sealed record FoodSource(string Id, int AvailablePopulation, float FoodPerPopulation);

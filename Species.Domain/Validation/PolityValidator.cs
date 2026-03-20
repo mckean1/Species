@@ -1,16 +1,20 @@
 using Species.Domain.Enums;
 using Species.Domain.Models;
+using Species.Domain.Catalogs;
 
 namespace Species.Domain.Validation;
 
 public static class PolityValidator
 {
+    private static readonly SocialTraditionCatalog SocialTraditionCatalog = new();
+
     public static IReadOnlyList<string> Validate(World world)
     {
         var errors = new List<string>();
         var polityIds = new HashSet<string>(StringComparer.Ordinal);
         var groupIds = world.PopulationGroups.Select(group => group.Id).ToHashSet(StringComparer.Ordinal);
         var regionIds = world.Regions.Select(region => region.Id).ToHashSet(StringComparer.Ordinal);
+        var allPolityIds = world.Polities.Select(polity => polity.Id).ToHashSet(StringComparer.Ordinal);
         var allSources = Enum.GetValues<ProposalBackingSource>().ToHashSet();
 
         foreach (var polity in world.Polities)
@@ -82,6 +86,13 @@ public static class PolityValidator
                     errors.Add($"Polity {polity.Id} has enacted law {enactedLaw.Title} with invalid ComplianceLevel.");
                 }
 
+                if (enactedLaw.CoreEffectiveness is < 0 or > 100 ||
+                    enactedLaw.PeripheralEffectiveness is < 0 or > 100 ||
+                    enactedLaw.ResistanceLevel is < 0 or > 100)
+                {
+                    errors.Add($"Polity {polity.Id} has enacted law {enactedLaw.Title} with invalid effectiveness values.");
+                }
+
                 if (!string.IsNullOrWhiteSpace(enactedLaw.ConflictSlot) &&
                     !activeConflictSlots.Add(enactedLaw.ConflictSlot))
                 {
@@ -144,6 +155,13 @@ public static class PolityValidator
                     errors.Add($"Settlement {settlement.Id} has negative stored food.");
                 }
 
+                ValidateMaterialStockpile(settlement.MaterialStores, $"Settlement {settlement.Id}", errors);
+
+                if (settlement.MaterialSupport is < 0 or > 100)
+                {
+                    errors.Add($"Settlement {settlement.Id} has invalid MaterialSupport.");
+                }
+
                 if (settlement.IsActive && !activeSettlementRegions.Add(settlement.RegionId))
                 {
                     errors.Add($"Polity {polity.Id} has multiple active settlements in region {settlement.RegionId}.");
@@ -178,6 +196,191 @@ public static class PolityValidator
                     settlement.IsPrimary))
             {
                 errors.Add($"Polity {polity.Id} has a primary settlement reference that does not point at the active primary site.");
+            }
+
+            ValidateMaterialStockpile(polity.MaterialStores, $"Polity {polity.Id}", errors);
+
+            if (polity.Governance.Legitimacy is < 0 or > 100 ||
+                polity.Governance.Cohesion is < 0 or > 100 ||
+                polity.Governance.Authority is < 0 or > 100 ||
+                polity.Governance.Governability is < 0 or > 100 ||
+                polity.Governance.PeripheralStrain is < 0 or > 100)
+            {
+                errors.Add($"Polity {polity.Id} has invalid governance state.");
+            }
+
+            if (polity.SocialMemory.SettlementContinuityMonths < 0 ||
+                polity.SocialMemory.SeasonalMobilityMonths < 0 ||
+                polity.SocialMemory.HardshipMonths < 0 ||
+                polity.SocialMemory.SurplusMonths < 0 ||
+                polity.SocialMemory.CoordinatedGovernanceMonths < 0 ||
+                polity.SocialMemory.PeripheralStrainMonths < 0 ||
+                polity.SocialMemory.RiverSettlementMonths < 0 ||
+                polity.SocialMemory.FrontierExposureMonths < 0)
+            {
+                errors.Add($"Polity {polity.Id} has negative social memory counters.");
+            }
+
+            if (polity.SocialIdentity.Rootedness is < 0 or > 100 ||
+                polity.SocialIdentity.Mobility is < 0 or > 100 ||
+                polity.SocialIdentity.Communalism is < 0 or > 100 ||
+                polity.SocialIdentity.AutonomyOrientation is < 0 or > 100 ||
+                polity.SocialIdentity.OrderOrientation is < 0 or > 100 ||
+                polity.SocialIdentity.FrontierDistinctiveness is < 0 or > 100)
+            {
+                errors.Add($"Polity {polity.Id} has invalid social identity scores.");
+            }
+
+            if (polity.SocialIdentity.Rootedness >= 85 && polity.SocialIdentity.Mobility >= 85)
+            {
+                errors.Add($"Polity {polity.Id} is unrealistically both highly rooted and highly mobile.");
+            }
+
+            foreach (var traditionId in polity.SocialIdentity.TraditionIds)
+            {
+                if (SocialTraditionCatalog.GetById(traditionId) is null)
+                {
+                    errors.Add($"Polity {polity.Id} references missing social tradition {traditionId}.");
+                }
+            }
+
+            if (polity.SocialIdentity.TraditionIds.Distinct(StringComparer.Ordinal).Count() != polity.SocialIdentity.TraditionIds.Count)
+            {
+                errors.Add($"Polity {polity.Id} has duplicate social traditions.");
+            }
+
+            if (polity.MaterialProduction.ResilienceBonus is < 0 or > 30 ||
+                polity.MaterialProduction.ShelterSupport is < 0 or > 100 ||
+                polity.MaterialProduction.StorageSupport is < 0 or > 100 ||
+                polity.MaterialProduction.ToolSupport is < 0 or > 100 ||
+                polity.MaterialProduction.TextileSupport is < 0 or > 100 ||
+                polity.MaterialProduction.SurplusScore is < 0 or > 100 ||
+                polity.MaterialProduction.DeficitScore is < 0 or > 100)
+            {
+                errors.Add($"Polity {polity.Id} has invalid material production state.");
+            }
+
+            if (polity.MaterialShortageMonths < 0 || polity.MaterialSurplusMonths < 0)
+            {
+                errors.Add($"Polity {polity.Id} has negative material economy counters.");
+            }
+
+            if (polity.ExternalPressure.Threat is < 0 or > 100 ||
+                polity.ExternalPressure.Cooperation is < 0 or > 100 ||
+                polity.ExternalPressure.FrontierFriction is < 0 or > 100 ||
+                polity.ExternalPressure.RaidPressure is < 0 or > 100 ||
+                polity.ExternalPressure.HostileNeighborCount < 0)
+            {
+                errors.Add($"Polity {polity.Id} has invalid external pressure state.");
+            }
+
+            if (polity.ScaleState.Centralization is < 0 or > 100 ||
+                polity.ScaleState.IntegrationDepth is < 0 or > 100 ||
+                polity.ScaleState.AutonomyTolerance is < 0 or > 100 ||
+                polity.ScaleState.CoordinationStrain is < 0 or > 100 ||
+                polity.ScaleState.DistanceStrain is < 0 or > 100 ||
+                polity.ScaleState.CompositeComplexity is < 0 or > 100 ||
+                polity.ScaleState.OverextensionPressure is < 0 or > 100 ||
+                polity.ScaleState.FragmentationRisk is < 0 or > 100)
+            {
+                errors.Add($"Polity {polity.Id} has invalid political scale state.");
+            }
+
+            if (polity.ScaleState.ExternalSuccessMonths < 0 ||
+                polity.ScaleState.IntegrationSuccessMonths < 0 ||
+                polity.ScaleState.ScaleContinuityMonths < 0)
+            {
+                errors.Add($"Polity {polity.Id} has negative political scale counters.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(polity.ParentPolityId))
+            {
+                if (string.Equals(polity.ParentPolityId, polity.Id, StringComparison.Ordinal))
+                {
+                    errors.Add($"Polity {polity.Id} cannot be its own parent polity.");
+                }
+                else if (!allPolityIds.Contains(polity.ParentPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} references missing parent polity {polity.ParentPolityId}.");
+                }
+            }
+
+            var attachmentTargets = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var attachment in polity.PoliticalAttachments)
+            {
+                if (string.IsNullOrWhiteSpace(attachment.RelatedPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} has a political attachment without a target polity.");
+                    continue;
+                }
+
+                if (!attachmentTargets.Add(attachment.RelatedPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} has duplicate political attachment {attachment.RelatedPolityId}.");
+                }
+
+                if (!allPolityIds.Contains(attachment.RelatedPolityId) && attachment.IsActive)
+                {
+                    errors.Add($"Polity {polity.Id} has active political attachment to missing polity {attachment.RelatedPolityId}.");
+                }
+
+                if (attachment.IntegrationDepth is < 0 or > 100 || attachment.Loyalty is < 0 or > 100)
+                {
+                    errors.Add($"Polity {polity.Id} has invalid political attachment values for {attachment.RelatedPolityId}.");
+                }
+            }
+
+            foreach (var record in polity.PoliticalHistory)
+            {
+                if (record.Year < 1 || record.Month is < 1 or > 12 || string.IsNullOrWhiteSpace(record.Summary))
+                {
+                    errors.Add($"Polity {polity.Id} has invalid political history metadata.");
+                }
+            }
+
+            var relationTargets = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var relation in polity.InterPolityRelations)
+            {
+                if (string.IsNullOrWhiteSpace(relation.OtherPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} has an inter-polity relation without a target polity.");
+                    continue;
+                }
+
+                if (string.Equals(relation.OtherPolityId, polity.Id, StringComparison.Ordinal))
+                {
+                    errors.Add($"Polity {polity.Id} cannot have a self-relation.");
+                }
+
+                if (!relationTargets.Add(relation.OtherPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} has duplicate inter-polity relation {relation.OtherPolityId}.");
+                }
+
+                if (!allPolityIds.Contains(relation.OtherPolityId))
+                {
+                    errors.Add($"Polity {polity.Id} references missing polity {relation.OtherPolityId} in inter-polity relations.");
+                }
+
+                if (relation.ContactIntensity is < 0 or > 100 ||
+                    relation.Trust is < 0 or > 100 ||
+                    relation.Hostility is < 0 or > 100 ||
+                    relation.Cooperation is < 0 or > 100 ||
+                    relation.FrontierFriction is < 0 or > 100 ||
+                    relation.Escalation is < 0 or > 100 ||
+                    relation.RaidPressure is < 0 or > 100)
+                {
+                    errors.Add($"Polity {polity.Id} has invalid inter-polity relation scores for {relation.OtherPolityId}.");
+                }
+
+                if (relation.RaidsInflicted < 0 ||
+                    relation.RaidsSuffered < 0 ||
+                    relation.CooperationMonths < 0 ||
+                    relation.SharedThreatMonths < 0 ||
+                    relation.PeaceMonths < 0)
+                {
+                    errors.Add($"Polity {polity.Id} has negative inter-polity memory counters for {relation.OtherPolityId}.");
+                }
             }
 
             var presenceRegionIds = new HashSet<string>(StringComparer.Ordinal);
@@ -236,6 +439,31 @@ public static class PolityValidator
         }
 
         var knownPolityIds = world.Polities.Select(polity => polity.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var polity in world.Polities)
+        {
+            if (!string.IsNullOrWhiteSpace(polity.ParentPolityId))
+            {
+                var parent = world.Polities.FirstOrDefault(other => string.Equals(other.Id, polity.ParentPolityId, StringComparison.Ordinal));
+                if (parent is not null &&
+                    !parent.PoliticalAttachments.Any(attachment => attachment.IsActive && string.Equals(attachment.RelatedPolityId, polity.Id, StringComparison.Ordinal)))
+                {
+                    errors.Add($"Polity {polity.Id} names {polity.ParentPolityId} as parent without reciprocal active attachment.");
+                }
+            }
+
+            foreach (var relation in polity.InterPolityRelations)
+            {
+                var reciprocal = world.Polities
+                    .FirstOrDefault(other => string.Equals(other.Id, relation.OtherPolityId, StringComparison.Ordinal))
+                    ?.InterPolityRelations
+                    .FirstOrDefault(otherRelation => string.Equals(otherRelation.OtherPolityId, polity.Id, StringComparison.Ordinal));
+                if (reciprocal is null)
+                {
+                    errors.Add($"Polity relation {polity.Id}->{relation.OtherPolityId} is missing a reciprocal record.");
+                }
+            }
+        }
+
         foreach (var group in world.PopulationGroups)
         {
             if (string.IsNullOrWhiteSpace(group.PolityId))
@@ -268,6 +496,16 @@ public static class PolityValidator
         if (string.IsNullOrWhiteSpace(proposal.Summary))
         {
             errors.Add($"Polity {polityId} has law proposal {proposal.Title} without a summary.");
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.ReasonSummary))
+        {
+            errors.Add($"Polity {polityId} has law proposal {proposal.Title} without a reason summary.");
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.TradeoffSummary))
+        {
+            errors.Add($"Polity {polityId} has law proposal {proposal.Title} without a tradeoff summary.");
         }
 
         if (proposal.Support is < 0 or > 100)
@@ -303,6 +541,18 @@ public static class PolityValidator
         if (expectActive && proposal.Status != LawProposalStatus.Active)
         {
             errors.Add($"Polity {polityId} has a non-active active law proposal.");
+        }
+    }
+
+    private static void ValidateMaterialStockpile(MaterialStockpile stockpile, string ownerLabel, ICollection<string> errors)
+    {
+        if (stockpile.Timber < 0 ||
+            stockpile.Stone < 0 ||
+            stockpile.Fiber < 0 ||
+            stockpile.Clay < 0 ||
+            stockpile.Hides < 0)
+        {
+            errors.Add($"{ownerLabel} has negative material stores.");
         }
     }
 }

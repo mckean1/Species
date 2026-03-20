@@ -10,12 +10,17 @@ public sealed class ChronicleSystem
         World world,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
+        IReadOnlyList<BiologicalHistoryChange> biologicalHistoryChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<SocialIdentityChange> socialIdentityChanges,
+        IReadOnlyList<InterPolityChange> interPolityChanges,
+        IReadOnlyList<PoliticalScaleChange> politicalScaleChanges,
         IReadOnlyList<LawProposalChange> lawProposalChanges,
-        IReadOnlyList<SettlementChange> settlementChanges)
+        IReadOnlyList<SettlementChange> settlementChanges,
+        IReadOnlyList<MaterialEconomyChange> materialEconomyChanges)
     {
-        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, discoveryChanges, advancementChanges, lawProposalChanges, settlementChanges);
+        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, biologicalHistoryChanges, discoveryChanges, advancementChanges, socialIdentityChanges, interPolityChanges, politicalScaleChanges, lawProposalChanges, settlementChanges, materialEconomyChanges);
         var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
@@ -28,10 +33,15 @@ public sealed class ChronicleSystem
         World world,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
+        IReadOnlyList<BiologicalHistoryChange> biologicalHistoryChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<SocialIdentityChange> socialIdentityChanges,
+        IReadOnlyList<InterPolityChange> interPolityChanges,
+        IReadOnlyList<PoliticalScaleChange> politicalScaleChanges,
         IReadOnlyList<LawProposalChange> lawProposalChanges,
-        IReadOnlyList<SettlementChange> settlementChanges)
+        IReadOnlyList<SettlementChange> settlementChanges,
+        IReadOnlyList<MaterialEconomyChange> materialEconomyChanges)
     {
         var entries = new List<ChronicleEntry>();
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -92,9 +102,22 @@ public sealed class ChronicleSystem
             }
         }
 
+        foreach (var change in biologicalHistoryChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.SpeciesId,
+                change.SpeciesName,
+                ChronicleEventCategory.Biological,
+                change.Message,
+                "biology",
+                change.RegionId));
+        }
+
         foreach (var change in discoveryChanges.Where(change => !string.Equals(change.UnlockedDiscoveriesSummary, "none", StringComparison.OrdinalIgnoreCase)))
         {
-            foreach (var discoveryName in SplitSummary(change.UnlockedDiscoveriesSummary))
+            foreach (var chronicleLine in SplitChronicleSummary(change.ChronicleLinesSummary, change.UnlockedDiscoveriesSummary, change.GroupName, "discovered"))
             {
                 AddEntry(entries, seenKeys, BuildEntry(
                     world,
@@ -102,14 +125,14 @@ public sealed class ChronicleSystem
                     change.GroupId,
                     change.GroupName,
                     ChronicleEventCategory.Discovery,
-                    $"{change.GroupName} discovered {discoveryName.ToLowerInvariant()}.",
+                    chronicleLine,
                     "discovery"));
             }
         }
 
         foreach (var change in advancementChanges.Where(change => !string.Equals(change.UnlockedAdvancementsSummary, "none", StringComparison.OrdinalIgnoreCase)))
         {
-            foreach (var advancementName in SplitSummary(change.UnlockedAdvancementsSummary))
+            foreach (var chronicleLine in SplitChronicleSummary(change.ChronicleLinesSummary, change.UnlockedAdvancementsSummary, change.GroupName, "learned"))
             {
                 AddEntry(entries, seenKeys, BuildEntry(
                     world,
@@ -117,9 +140,47 @@ public sealed class ChronicleSystem
                     change.GroupId,
                     change.GroupName,
                     ChronicleEventCategory.Advancement,
-                    $"{change.GroupName} learned {advancementName.ToLowerInvariant()}.",
+                    chronicleLine,
                     "advancement"));
             }
+        }
+
+        foreach (var change in socialIdentityChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.PolityId,
+                change.PolityName,
+                ChronicleEventCategory.Social,
+                change.Message,
+                "social"));
+        }
+
+        foreach (var change in interPolityChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.PrimaryPolityId,
+                change.PrimaryPolityName,
+                ChronicleEventCategory.External,
+                change.Message,
+                "external",
+                change.Kind));
+        }
+
+        foreach (var change in politicalScaleChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.PolityId,
+                change.PolityName,
+                ChronicleEventCategory.Political,
+                change.Message,
+                "political",
+                change.Kind));
         }
 
         foreach (var change in lawProposalChanges)
@@ -130,9 +191,11 @@ public sealed class ChronicleSystem
                 change.GroupId,
                 change.GroupName,
                 ChronicleEventCategory.Law,
-                change.Status == Species.Domain.Enums.LawProposalStatus.Passed
-                    ? $"{change.GroupName} passed {change.ProposalTitle}."
-                    : $"{change.GroupName} vetoed {change.ProposalTitle}.",
+                string.IsNullOrWhiteSpace(change.ChronicleLine)
+                    ? (change.Status == Species.Domain.Enums.LawProposalStatus.Passed
+                        ? $"{change.GroupName} passed {change.ProposalTitle}."
+                        : $"{change.GroupName} vetoed {change.ProposalTitle}.")
+                    : change.ChronicleLine,
                 "law"));
         }
 
@@ -149,14 +212,29 @@ public sealed class ChronicleSystem
                 change.RegionId));
         }
 
+        foreach (var change in materialEconomyChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.PolityId,
+                change.PolityName,
+                ChronicleEventCategory.Material,
+                change.Message,
+                "material",
+                change.RegionId));
+        }
+
         return entries;
     }
 
     public World RecordLawDecision(World world, LawProposalChange change)
     {
-        var message = change.Status == Species.Domain.Enums.LawProposalStatus.Passed
-            ? $"{change.GroupName} passed {change.ProposalTitle}."
-            : $"{change.GroupName} vetoed {change.ProposalTitle}.";
+        var message = string.IsNullOrWhiteSpace(change.ChronicleLine)
+            ? (change.Status == Species.Domain.Enums.LawProposalStatus.Passed
+                ? $"{change.GroupName} passed {change.ProposalTitle}."
+                : $"{change.GroupName} vetoed {change.ProposalTitle}.")
+            : change.ChronicleLine;
         var entry = BuildEntry(
             world,
             world.Chronicle.NextRecordSequence,
@@ -269,6 +347,21 @@ public sealed class ChronicleSystem
     {
         return summary
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> SplitChronicleSummary(string chronicleSummary, string fallbackSummary, string groupName, string verb)
+    {
+        if (!string.IsNullOrWhiteSpace(chronicleSummary) &&
+            !string.Equals(chronicleSummary, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return chronicleSummary
+                .Split(";;", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToArray();
+        }
+
+        return SplitSummary(fallbackSummary)
+            .Select(item => $"{groupName} {verb} {item.ToLowerInvariant()}.")
             .ToArray();
     }
 }

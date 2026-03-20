@@ -37,6 +37,13 @@ public sealed class PressureCalculationSystem
             var waterPressure = CalculateWaterPressure(regionKnowledge.WaterSupport);
             var threatPressure = CalculateThreatPressure(regionKnowledge.ThreatPressure);
             var overcrowdingPressure = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
+
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId))
+            {
+                threatPressure = ClampPressure(threatPressure * AdvancementConstants.StrongerShelterThreatMultiplier);
+                overcrowdingPressure = ClampPressure(overcrowdingPressure * AdvancementConstants.StrongerShelterCrowdingMultiplier);
+            }
+
             var migrationPressure = CalculateMigrationPressure(foodPressure, waterPressure, threatPressure, overcrowdingPressure);
 
             var pressures = new PressureState

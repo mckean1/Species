@@ -40,6 +40,19 @@ public static class WorldValidator
             {
                 errors.Add($"Duplicate region ID detected: {region.Id}");
             }
+
+            if (region.MaterialProfile is null)
+            {
+                errors.Add($"Region {region.Id} is missing material profile.");
+            }
+            else if (region.MaterialProfile.Opportunities.Timber < 0 ||
+                     region.MaterialProfile.Opportunities.Stone < 0 ||
+                     region.MaterialProfile.Opportunities.Fiber < 0 ||
+                     region.MaterialProfile.Opportunities.Clay < 0 ||
+                     region.MaterialProfile.Opportunities.Hides < 0)
+            {
+                errors.Add($"Region {region.Id} has invalid material opportunities.");
+            }
         }
 
         foreach (var region in world.Regions)

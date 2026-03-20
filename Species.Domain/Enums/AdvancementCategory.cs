@@ -6,5 +6,6 @@ public enum AdvancementCategory
     Hunting,
     Storage,
     Travel,
-    ResourceUse
+    ResourceUse,
+    Shelter
 }

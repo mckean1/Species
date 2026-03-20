@@ -1,14 +1,11 @@
 using System.Text;
-using Species.Domain.Enums;
 using Species.Domain.Models;
-using Species.Domain.Simulation;
 
 public static class ChronicleScreenRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
     private const string PaneTitle = "\u001b[38;5;222m";
-    private const string White = "\u001b[97m";
     private const string Blue = "\u001b[38;5;111m";
     private const string Cyan = "\u001b[38;5;117m";
     private const string Purple = "\u001b[38;5;141m";
@@ -18,621 +15,303 @@ public static class ChronicleScreenRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    private static readonly string[] MonthNames =
-    [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ];
-
-    public static string Render(World world, string focalPolityId, bool isSimulationRunning, TerminalViewport viewport)
+    public static string Render(World world, PlayerViewState viewState, TerminalViewport viewport)
     {
-        var layout = ChronicleLayout.Create(viewport);
-        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
-        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
-        var recordsLines = BuildRecordsPane(world, focusPolity, focusContext, layout.RecordsContentWidth, layout.BodyHeight);
-        var situationLines = BuildSituationPane(focusPolity, focusContext, layout.SituationContentWidth, layout.BodyHeight, isSimulationRunning);
-        var lines = new List<string>(layout.TotalHeight);
-        lines.AddRange(PlayerScreenShell.BuildHeader("Chronicle", focusPolity?.Name ?? "Unknown polity", FormatMonthYear(world.CurrentMonth, world.CurrentYear), isSimulationRunning, layout.InnerWidth));
-        lines.Add(CombinePaneHeaders(layout.RecordsWidth, layout.SituationWidth));
+        var data = ChronicleScreenDataBuilder.Build(world, viewState.FocalPolityId, viewState);
+        var innerWidth = Math.Max(84, viewport.Width - 4);
+        var headerTitle = $"Chronicle [{DescribeMode(data.Mode)}]";
+        var urgentHeight = Math.Clamp(4 + Math.Max(1, data.UrgentItems.Count), 5, 7);
+        var bodyHeight = Math.Max(10, viewport.Height - 12 - urgentHeight);
+        var leftWidth = Math.Max(38, ((innerWidth - 3) * 11) / 20);
+        var rightWidth = Math.Max(28, innerWidth - leftWidth - 3);
 
-        for (var row = 0; row < layout.BodyHeight; row++)
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader(headerTitle, data.PolityName, data.CurrentDate, viewState.IsSimulationRunning, innerWidth));
+        lines.Add(BorderLine($"{PaneTitle}Urgent{Reset}", innerWidth));
+        lines.AddRange(BuildUrgentSection(data, innerWidth, urgentHeight).Select(line => BorderLine(line, innerWidth)));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(BorderLine($"{FitVisible($"{PaneTitle}{DescribeMode(data.Mode)}{Reset}", leftWidth)} | {FitVisible($"{PaneTitle}Selected / Current State{Reset}", rightWidth)}", innerWidth));
+
+        var leftLines = BuildEntryPane(data, leftWidth, bodyHeight);
+        var rightLines = BuildDetailPane(data, rightWidth, bodyHeight);
+        for (var row = 0; row < bodyHeight; row++)
         {
-            var recordsLine = row < recordsLines.Count ? recordsLines[row] : string.Empty;
-            var situationLine = row < situationLines.Count ? situationLines[row] : string.Empty;
-            lines.Add(CombinePaneBodyRow(recordsLine, situationLine, layout.RecordsWidth, layout.SituationWidth));
+            var left = row < leftLines.Count ? leftLines[row] : string.Empty;
+            var right = row < rightLines.Count ? rightLines[row] : string.Empty;
+            lines.Add(BorderLine($"{FitVisible(left, leftWidth)} | {FitVisible(right, rightWidth)}", innerWidth));
         }
 
-        lines.Add(PlayerScreenShell.HorizontalBorder(layout.InnerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(layout.InnerWidth));
-        lines.Add(PlayerScreenShell.HorizontalBorder(layout.InnerWidth));
-
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Left/Right: Mode", "Space: Pause/Run", "N: Next Tick", "Backspace: Live"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Left/Right: Mode", "Space: Pause/Run"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select"]));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static List<string> BuildRecordsPane(World world, Polity? focusPolity, PolityContext? focusContext, int contentWidth, int availableHeight)
+    private static IReadOnlyList<string> BuildUrgentSection(ChronicleScreenData data, int width, int height)
     {
-        var lines = new List<string>(availableHeight);
-        if (availableHeight <= 0 || contentWidth <= 0)
+        var lines = new List<string>
         {
-            return lines;
+            FitVisible($"{Dim}Current alerts stay visible in every Chronicle mode.{Reset}", width)
+        };
+
+        if (data.UrgentItems.Count == 0)
+        {
+            lines.AddRange(Wrap($"{Dim}No urgent developments need immediate action.{Reset}", width));
         }
-
-        var visibleEntries = world.Chronicle.GetVisibleFeedEntries()
-            .Where(entry =>
-                focusPolity is not null &&
-                (string.Equals(entry.GroupId, focusPolity.Id, StringComparison.Ordinal) ||
-                 (focusContext is not null && focusContext.MemberGroups.Any(group => string.Equals(group.Id, entry.GroupId, StringComparison.Ordinal)))))
-            .ToArray();
-        if (visibleEntries.Length == 0)
+        else
         {
-            AppendWrappedText(lines, availableHeight, contentWidth, "No visible records yet.", Dim);
-            AppendWrappedText(lines, availableHeight, contentWidth, focusPolity is null ? "No focal polity is active yet." : "Advance time to let this polity's history unfold.", Dim);
-            return lines;
-        }
-
-        var isTruncated = false;
-
-        for (var index = 0; index < visibleEntries.Length; index++)
-        {
-            if (index > 0 && visibleEntries[index - 1].EventYear != visibleEntries[index].EventYear)
+            for (var index = 0; index < data.UrgentItems.Count; index++)
             {
-                if (!TryAddLine(lines, PadVisible($"{Dim}{new string('-', contentWidth)}{Reset}", contentWidth), availableHeight))
+                var item = data.UrgentItems[index];
+                var text = $"{(index == 0 ? Red : Yellow)}* {Reset}{item.Text}";
+                if (data.SelectedArea == ChronicleSelectionArea.Urgent &&
+                    data.SelectedUrgent is not null &&
+                    string.Equals(data.SelectedUrgent.Id, item.Id, StringComparison.Ordinal))
                 {
-                    isTruncated = true;
-                    break;
-                }
-            }
-
-            foreach (var line in BuildRecordLines(visibleEntries[index], index == 0, contentWidth))
-            {
-                if (TryAddLine(lines, line, availableHeight))
-                {
+                    text = $"{HighlightBackground}{FitVisible(text, Math.Max(0, width - 2))}{Reset}";
+                    lines.Add(text);
                     continue;
                 }
 
-                isTruncated = true;
-                break;
-            }
-
-            if (isTruncated)
-            {
-                break;
+                lines.AddRange(Wrap(text, width));
             }
         }
 
-        if (isTruncated && lines.Count > 0)
+        while (lines.Count < height)
         {
-            lines[^1] = PadVisible($"{Dim}... older records continue ...{Reset}", contentWidth);
+            lines.Add(string.Empty);
         }
 
-        return lines;
+        return lines.Take(height).ToArray();
     }
 
-    private static IReadOnlyList<string> BuildRecordLines(ChronicleEntry entry, bool isNewest, int contentWidth)
+    private static IReadOnlyList<string> BuildEntryPane(ChronicleScreenData data, int width, int height)
     {
-        var dateText = $"{FormatMonthYear(entry.EventMonth, entry.EventYear)}  ";
-        var firstPrefix = isNewest
-            ? new List<Segment>
-            {
-                new("| ", Green),
-                new("NEW ", Green),
-                new(dateText, Dim)
-            }
-            : new List<Segment>
-            {
-                new("  "),
-                new(dateText, Dim)
-            };
-        var continuationPrefix = new List<Segment>
+        var lines = new List<string>
         {
-            new(new string(' ', GetVisibleLength(firstPrefix)))
+            $"{Dim}{DescribeModeSubtitle(data.Mode)}{Reset}",
+            $"{Dim}{new string('-', Math.Max(0, width))}{Reset}"
         };
 
-        return WrapSegments(
-            BuildMessageSegments(entry),
-            firstPrefix,
-            continuationPrefix,
-            contentWidth,
-            isNewest ? HighlightBackground : null);
-    }
-
-    private static IReadOnlyList<Segment> BuildMessageSegments(ChronicleEntry entry)
-    {
-        return entry.Category switch
+        if (data.Entries.Count == 0)
         {
-            ChronicleEventCategory.Migration => BuildMigrationSegments(entry),
-            ChronicleEventCategory.Discovery => BuildDiscoverySegments(entry, " discovered "),
-            ChronicleEventCategory.Advancement => BuildDiscoverySegments(entry, " learned "),
-            ChronicleEventCategory.Shortage => BuildSimpleSegments(entry.GroupName, " suffered food shortages.", Orange),
-            ChronicleEventCategory.Decline => BuildSimpleSegments(entry.GroupName, " declined after hunger and loss.", Orange),
-            ChronicleEventCategory.Extinction => BuildSimpleSegments(entry.GroupName, " died out.", Orange),
-            ChronicleEventCategory.Settlement => [new Segment(entry.Message, Cyan)],
-            _ => [new Segment(entry.Message)]
-        };
-    }
-
-    private static IReadOnlyList<Segment> BuildMigrationSegments(ChronicleEntry entry)
-    {
-        var prefix = $"{entry.GroupName} migrated to ";
-        var suffix = ".";
-        var regionName = entry.Message.StartsWith(prefix, StringComparison.Ordinal) && entry.Message.EndsWith(suffix, StringComparison.Ordinal)
-            ? entry.Message[prefix.Length..^suffix.Length]
-            : entry.Message;
-
-        return
-        [
-            new Segment(entry.GroupName, Blue),
-            new Segment(" migrated to "),
-            new Segment(regionName, Cyan),
-            new Segment(".")
-        ];
-    }
-
-    private static IReadOnlyList<Segment> BuildDiscoverySegments(ChronicleEntry entry, string connector)
-    {
-        var prefix = entry.GroupName + connector;
-        var suffix = ".";
-        var itemName = entry.Message.StartsWith(prefix, StringComparison.Ordinal) && entry.Message.EndsWith(suffix, StringComparison.Ordinal)
-            ? entry.Message[prefix.Length..^suffix.Length]
-            : entry.Message;
-
-        return
-        [
-            new Segment(entry.GroupName, Blue),
-            new Segment(connector),
-            new Segment(itemName, Purple),
-            new Segment(".")
-        ];
-    }
-
-    private static IReadOnlyList<Segment> BuildSimpleSegments(string groupName, string trailingText, string trailingColor)
-    {
-        return
-        [
-            new Segment(groupName, Blue),
-            new Segment(trailingText, trailingColor)
-        ];
-    }
-
-    private static List<string> BuildSituationPane(
-        Polity? focusPolity,
-        PolityContext? focusContext,
-        int contentWidth,
-        int availableHeight,
-        bool isSimulationRunning)
-    {
-        var lines = new List<string>(availableHeight);
-        if (availableHeight <= 0 || contentWidth <= 0)
-        {
-            return lines;
+            lines.AddRange(Wrap($"{Dim}No visible entries are available in this mode yet.{Reset}", width));
         }
-
-        var stateColor = isSimulationRunning ? Green : Yellow;
-        var stateText = isSimulationRunning ? "Running" : "Paused";
-
-        TryAddLine(lines, PadVisible($"{Dim}Status:{Reset} {stateColor}{stateText}{Reset}", contentWidth), availableHeight);
-
-        if (focusPolity is null || focusContext is null)
+        else
         {
-            TryAddLine(lines, string.Empty, availableHeight);
-            TryAddLine(lines, PadVisible($"{PaneTitle}Pressure State{Reset}", contentWidth), availableHeight);
-            AppendWrappedText(lines, availableHeight, contentWidth, "No polity is active yet.", Dim);
-            TryAddLine(lines, string.Empty, availableHeight);
-            TryAddLine(lines, PadVisible($"{PaneTitle}Top Alerts{Reset}", contentWidth), availableHeight);
-            AppendWrappedText(lines, availableHeight, contentWidth, "No alerts yet.", Dim);
-            return lines;
-        }
+            var selectedIndex = ResolveSelectedEntryIndex(data);
+            var visibleRows = Math.Max(1, height - lines.Count);
+            var startIndex = Math.Clamp(selectedIndex - (visibleRows / 2), 0, Math.Max(0, data.Entries.Count - visibleRows));
+            var endIndex = Math.Min(data.Entries.Count, startIndex + visibleRows);
 
-        TryAddLine(lines, PadVisible($"{Dim}Polity:{Reset} {Blue}{focusPolity.Name}{Reset}", contentWidth), availableHeight);
-        TryAddLine(lines, PadVisible($"{Dim}Anchoring:{Reset} {Cyan}{PolityPresentation.DescribeAnchoringKind(focusContext.AnchoringKind)}{Reset}", contentWidth), availableHeight);
-        if (focusContext.PrimarySettlement is not null)
-        {
-            TryAddLine(lines, PadVisible($"{Dim}Primary Site:{Reset} {Cyan}{focusContext.PrimarySettlement.Name}{Reset}", contentWidth), availableHeight);
-        }
-
-        TryAddLine(lines, string.Empty, availableHeight);
-        TryAddLine(lines, PadVisible($"{PaneTitle}Pressure State{Reset}", contentWidth), availableHeight);
-
-        foreach (var line in BuildPressureLines(focusContext, contentWidth))
-        {
-            if (!TryAddLine(lines, line, availableHeight))
+            for (var index = startIndex; index < endIndex; index++)
             {
-                return lines;
-            }
-        }
-
-        if (TryAddLine(lines, string.Empty, availableHeight))
-        {
-            TryAddLine(lines, PadVisible($"{PaneTitle}Top Alerts{Reset}", contentWidth), availableHeight);
-        }
-
-        foreach (var line in BuildAlertLines(focusContext, contentWidth))
-        {
-            if (!TryAddLine(lines, line, availableHeight))
-            {
-                break;
-            }
-        }
-
-        return lines;
-    }
-
-    private static IReadOnlyList<string> BuildPressureLines(PolityContext focusContext, int contentWidth)
-    {
-        var pressureRows = new (string Label, int Value)[]
-        {
-            ("Food", focusContext.Pressures.FoodPressure),
-            ("Water", focusContext.Pressures.WaterPressure),
-            ("Threat", focusContext.Pressures.ThreatPressure),
-            ("Crowding", focusContext.Pressures.OvercrowdingPressure),
-            ("Migration", focusContext.Pressures.MigrationPressure)
-        };
-        var lines = new List<string>(pressureRows.Length * 2);
-        var labelWidth = Math.Min(9, pressureRows.Max(row => row.Label.Length));
-        var valueWidth = 3;
-        var singleLineBarWidth = contentWidth - labelWidth - valueWidth - 5;
-
-        foreach (var row in pressureRows)
-        {
-            var valueText = row.Value.ToString().PadLeft(valueWidth, ' ');
-            var barColor = GetSeverityColor(row.Value);
-
-            if (singleLineBarWidth >= 10)
-            {
-                var bar = BuildPressureBar(row.Value, singleLineBarWidth, barColor);
-                lines.Add(PadVisible($"{row.Label.PadRight(labelWidth)} [{bar}] {valueText}", contentWidth));
-                continue;
-            }
-
-            var compactBarWidth = Math.Max(6, contentWidth - valueWidth - 3);
-            lines.Add(PadVisible($"{row.Label} {valueText}", contentWidth));
-            lines.Add(PadVisible($"[{BuildPressureBar(row.Value, compactBarWidth, barColor)}]", contentWidth));
-        }
-
-        return lines;
-    }
-
-    private static IReadOnlyList<string> BuildAlertLines(PolityContext focusContext, int contentWidth)
-    {
-        var alerts = BuildAlerts(focusContext).Take(3).ToArray();
-        if (alerts.Length == 0)
-        {
-            return [PadVisible($"{Dim}No urgent developments.{Reset}", contentWidth)];
-        }
-
-        var lines = new List<string>();
-        foreach (var alert in alerts)
-        {
-            lines.AddRange(WrapPlainText(alert.Text, alert.Color, contentWidth, "* ", "  "));
-        }
-
-        return lines;
-    }
-
-    private static IReadOnlyList<(string Text, string Color)> BuildAlerts(PolityContext focusContext)
-    {
-        var alertCandidates = new List<(string Text, string Color, int Severity)>
-        {
-            BuildAlert("Food strain is worsening", focusContext.Pressures.FoodPressure),
-            BuildAlert("Water access is under pressure", focusContext.Pressures.WaterPressure),
-            BuildAlert("Threats near the polity are rising", focusContext.Pressures.ThreatPressure),
-            BuildAlert("Crowding is tightening around the core", focusContext.Pressures.OvercrowdingPressure),
-            BuildAlert("Movement toward safer ground is increasing", focusContext.Pressures.MigrationPressure)
-        };
-
-        return alertCandidates
-            .Where(alert => alert.Severity >= 40)
-            .OrderByDescending(alert => alert.Severity)
-            .Select(alert => (alert.Text, alert.Color))
-            .ToArray();
-    }
-
-    private static (string Text, string Color, int Severity) BuildAlert(string text, int severity)
-    {
-        return (text, GetSeverityColor(severity), severity);
-    }
-
-    private static string CombinePaneHeaders(int recordsWidth, int situationWidth)
-    {
-        var left = PadVisible($"{PaneTitle}Records{Reset}", Math.Max(0, recordsWidth - 2));
-        var right = PadVisible($"{PaneTitle}Situation{Reset}", Math.Max(0, situationWidth - 2));
-        return $"| {left} | {right} |";
-    }
-
-    private static string CombinePaneBodyRow(string recordsLine, string situationLine, int recordsWidth, int situationWidth)
-    {
-        return $"| {PadVisible(recordsLine, Math.Max(0, recordsWidth - 2))} | {PadVisible(situationLine, Math.Max(0, situationWidth - 2))} |";
-    }
-
-    private static IReadOnlyList<string> WrapSegments(
-        IReadOnlyList<Segment> segments,
-        IReadOnlyList<Segment> firstPrefix,
-        IReadOnlyList<Segment> continuationPrefix,
-        int contentWidth,
-        string? background)
-    {
-        var tokens = TokenizeSegments(segments);
-        var lines = new List<string>();
-        var prefix = firstPrefix;
-        var tokenIndex = 0;
-
-        while (tokenIndex < tokens.Count)
-        {
-            var prefixWidth = GetVisibleLength(prefix);
-            var remainingWidth = Math.Max(1, contentWidth - prefixWidth);
-            var lineSegments = new List<Segment>(prefix);
-            var hasContent = false;
-
-            while (tokenIndex < tokens.Count)
-            {
-                var token = tokens[tokenIndex];
-                if (string.IsNullOrWhiteSpace(token.Text))
+                var entry = data.Entries[index];
+                var prefix = index == selectedIndex && data.SelectedArea == ChronicleSelectionArea.Entries
+                    ? $"{HighlightBackground}{Blue}> {Reset}{HighlightBackground}"
+                    : "  ";
+                var milestoneBadge = entry.IsMilestone ? $"{Orange}[!]{Reset} " : string.Empty;
+                var row = $"{milestoneBadge}{Dim}{entry.DateText}{Reset} {entry.Headline}";
+                if (index == selectedIndex && data.SelectedArea == ChronicleSelectionArea.Entries)
                 {
-                    if (!hasContent)
-                    {
-                        tokenIndex++;
-                        continue;
-                    }
-
-                    if (remainingWidth < 1)
-                    {
-                        break;
-                    }
-
-                    lineSegments.Add(new Segment(" ", token.Color));
-                    remainingWidth--;
-                    tokenIndex++;
-                    continue;
+                    lines.Add($"{prefix}{FitVisible(row, Math.Max(0, width - 2))}{Reset}");
                 }
-
-                if (token.Text.Length <= remainingWidth)
+                else
                 {
-                    lineSegments.Add(token);
-                    remainingWidth -= token.Text.Length;
-                    hasContent = true;
-                    tokenIndex++;
-                    continue;
+                    lines.Add(FitVisible($"{prefix}{row}", width));
                 }
-
-                if (hasContent)
-                {
-                    break;
-                }
-
-                var splitLength = Math.Max(1, remainingWidth);
-                lineSegments.Add(new Segment(token.Text[..splitLength], token.Color));
-                tokens[tokenIndex] = new Segment(token.Text[splitLength..], token.Color);
-                remainingWidth = 0;
-                hasContent = true;
-                break;
-            }
-
-            var styled = RenderSegments(lineSegments, background, contentWidth);
-            lines.Add(background is not null
-                ? PadHighlighted(styled, contentWidth)
-                : PadVisible(styled, contentWidth));
-            prefix = continuationPrefix;
-        }
-
-        if (lines.Count == 0)
-        {
-            var styled = RenderSegments(firstPrefix, background, contentWidth);
-            lines.Add(background is not null
-                ? PadHighlighted(styled, contentWidth)
-                : PadVisible(styled, contentWidth));
-        }
-
-        return lines;
-    }
-
-    private static List<Segment> TokenizeSegments(IReadOnlyList<Segment> segments)
-    {
-        var tokens = new List<Segment>();
-
-        foreach (var segment in segments)
-        {
-            var start = 0;
-            while (start < segment.Text.Length)
-            {
-                var isWhitespace = char.IsWhiteSpace(segment.Text[start]);
-                var end = start + 1;
-
-                while (end < segment.Text.Length && char.IsWhiteSpace(segment.Text[end]) == isWhitespace)
-                {
-                    end++;
-                }
-
-                tokens.Add(new Segment(segment.Text[start..end], segment.Color));
-                start = end;
             }
         }
 
-        return tokens;
+        while (lines.Count < height)
+        {
+            lines.Add(string.Empty);
+        }
+
+        return lines.Take(height).ToArray();
     }
 
-    private static IReadOnlyList<string> WrapPlainText(string text, string color, int contentWidth, string firstPrefix, string continuationPrefix)
+    private static IReadOnlyList<string> BuildDetailPane(ChronicleScreenData data, int width, int height)
     {
         var lines = new List<string>();
+
+        if (data.SelectedArea == ChronicleSelectionArea.Urgent && data.SelectedUrgent is not null)
+        {
+            lines.Add($"{PaneTitle}Selected Urgent Item{Reset}");
+            lines.AddRange(Wrap($"{Red}{data.SelectedUrgent.Text}{Reset}", width));
+            if (!string.IsNullOrWhiteSpace(data.SelectedUrgent.Cause))
+            {
+                lines.Add($"{Dim}{new string('-', width)}{Reset}");
+                lines.AddRange(Wrap($"Cause: {data.SelectedUrgent.Cause}", width));
+            }
+
+            if (!string.IsNullOrWhiteSpace(data.SelectedUrgent.Impact))
+            {
+                lines.AddRange(Wrap($"Why it matters: {data.SelectedUrgent.Impact}", width));
+            }
+
+            if (data.SelectedUrgent.TargetScreen == PlayerScreen.Laws)
+            {
+                lines.Add($"{Dim}{new string('-', width)}{Reset}");
+                lines.AddRange(Wrap($"Enter opens Laws and selects the pending decision.", width));
+            }
+        }
+        else if (data.SelectedEntry is not null)
+        {
+            lines.Add($"{PaneTitle}Selected Entry{Reset}");
+            lines.AddRange(Wrap($"{Blue}{data.SelectedEntry.Headline}{Reset}", width));
+            lines.AddRange(Wrap($"{Dim}{data.SelectedEntry.DateText}{Reset}  {Purple}{data.SelectedEntry.Category}{Reset}", width));
+            lines.Add($"{Dim}{new string('-', width)}{Reset}");
+            lines.AddRange(Wrap(data.SelectedEntry.Impact, width));
+        }
+        else
+        {
+            lines.Add($"{PaneTitle}Selected Entry{Reset}");
+            lines.AddRange(Wrap($"{Dim}Nothing is selected yet.{Reset}", width));
+        }
+
+        lines.Add($"{Dim}{new string('-', width)}{Reset}");
+        lines.Add($"{PaneTitle}Current State{Reset}");
+        foreach (var line in data.ConditionSummary)
+        {
+            lines.AddRange(Wrap($"{Yellow}* {Reset}{line}", width));
+        }
+
+        lines.Add($"{Dim}{new string('-', width)}{Reset}");
+        lines.Add($"{PaneTitle}Mode Notes{Reset}");
+        foreach (var line in data.ModeNotes)
+        {
+            lines.AddRange(Wrap($"{Dim}* {line}{Reset}", width));
+        }
+
+        while (lines.Count < height)
+        {
+            lines.Add(string.Empty);
+        }
+
+        return lines.Take(height).ToArray();
+    }
+
+    private static int ResolveSelectedEntryIndex(ChronicleScreenData data)
+    {
+        if (data.SelectedEntry is null)
+        {
+            return 0;
+        }
+
+        for (var index = 0; index < data.Entries.Count; index++)
+        {
+            if (string.Equals(data.Entries[index].Id, data.SelectedEntry.Id, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return 0;
+    }
+
+    private static IReadOnlyList<string> Wrap(string text, int width)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [string.Empty];
+        }
+
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var currentPrefix = firstPrefix;
-        var currentText = string.Empty;
+        var lines = new List<string>();
+        var current = string.Empty;
 
         foreach (var word in words)
         {
-            var remainingWord = word;
-
-            while (remainingWord.Length > 0)
+            var candidate = string.IsNullOrEmpty(current) ? word : $"{current} {word}";
+            if (VisibleLength(candidate) <= width)
             {
-                var availableWidth = Math.Max(1, contentWidth - currentPrefix.Length);
-                var candidate = string.IsNullOrEmpty(currentText) ? remainingWord : $"{currentText} {remainingWord}";
-                if (candidate.Length <= availableWidth)
-                {
-                    currentText = candidate;
-                    break;
-                }
-
-                if (!string.IsNullOrEmpty(currentText))
-                {
-                    lines.Add(PadVisible($"{color}{currentPrefix}{currentText}{Reset}", contentWidth));
-                    currentPrefix = continuationPrefix;
-                    currentText = string.Empty;
-                    continue;
-                }
-
-                lines.Add(PadVisible($"{color}{currentPrefix}{remainingWord[..availableWidth]}{Reset}", contentWidth));
-                currentPrefix = continuationPrefix;
-                remainingWord = remainingWord[availableWidth..];
+                current = candidate;
+                continue;
             }
+
+            lines.Add(FitVisible(current, width));
+            current = word;
         }
 
-        if (!string.IsNullOrEmpty(currentText) || lines.Count == 0)
+        if (!string.IsNullOrEmpty(current))
         {
-            lines.Add(PadVisible($"{color}{currentPrefix}{currentText}{Reset}", contentWidth));
+            lines.Add(FitVisible(current, width));
         }
 
         return lines;
     }
 
-    private static void AppendWrappedText(List<string> lines, int maxHeight, int contentWidth, string text, string color)
+    private static string DescribeMode(ChronicleMode mode)
     {
-        foreach (var line in WrapPlainText(text, color, contentWidth, string.Empty, string.Empty))
+        return mode switch
         {
-            if (!TryAddLine(lines, line, maxHeight))
-            {
-                return;
-            }
-        }
+            ChronicleMode.Live => "Live",
+            ChronicleMode.Archive => "Archive",
+            _ => "Milestones"
+        };
     }
 
-    private static bool TryAddLine(List<string> lines, string line, int maxHeight)
+    private static string DescribeModeSubtitle(ChronicleMode mode)
     {
-        if (lines.Count >= maxHeight)
+        return mode switch
         {
-            return false;
+            ChronicleMode.Live => "Newest important developments first.",
+            ChronicleMode.Archive => "Browse older visible entries without snapping back.",
+            _ => "Only higher-value turning points are shown here."
+        };
+    }
+
+    private static string FitVisible(string text, int width)
+    {
+        if (width <= 0)
+        {
+            return string.Empty;
         }
 
-        lines.Add(line);
-        return true;
-    }
-
-    private static string BuildPressureBar(int value, int width, string barColor)
-    {
-        var filledCount = (int)Math.Round(width * (value / 100.0), MidpointRounding.AwayFromZero);
-        var clampedFilledCount = Math.Clamp(filledCount, 0, width);
-        var filled = new string('=', clampedFilledCount);
-        var empty = new string('-', Math.Max(0, width - clampedFilledCount));
-        return $"{barColor}{filled}{Dim}{empty}{Reset}";
-    }
-
-    private static string RenderSegments(IReadOnlyList<Segment> segments, string? background, int maxWidth)
-    {
-        var trimmed = TrimSegments(segments, maxWidth);
         var builder = new StringBuilder();
+        var visibleLength = 0;
+        var index = 0;
 
-        if (!string.IsNullOrEmpty(background))
+        while (index < text.Length && visibleLength < width)
         {
-            builder.Append(background);
-        }
-
-        foreach (var segment in trimmed)
-        {
-            if (!string.IsNullOrEmpty(segment.Color))
+            if (text[index] == '\u001b')
             {
-                builder.Append(segment.Color);
+                var start = index;
+                while (index < text.Length && text[index] != 'm')
+                {
+                    index++;
+                }
+
+                if (index < text.Length)
+                {
+                    index++;
+                }
+
+                builder.Append(text[start..index]);
+                continue;
             }
 
-            builder.Append(segment.Text);
+            builder.Append(text[index]);
+            index++;
+            visibleLength++;
         }
 
-        if (!string.IsNullOrEmpty(background) || trimmed.Any(segment => !string.IsNullOrEmpty(segment.Color)))
+        if (visibleLength < width)
         {
-            builder.Append(Reset);
+            builder.Append(' ', width - visibleLength);
         }
 
         return builder.ToString();
     }
 
-    private static IReadOnlyList<Segment> TrimSegments(IReadOnlyList<Segment> segments, int maxWidth)
-    {
-        var totalLength = segments.Sum(segment => segment.Text.Length);
-        if (totalLength <= maxWidth)
-        {
-            return segments;
-        }
-
-        var targetWidth = Math.Max(3, maxWidth - 3);
-        var visibleCount = 0;
-        var trimmed = new List<Segment>();
-
-        foreach (var segment in segments)
-        {
-            if (visibleCount >= targetWidth)
-            {
-                break;
-            }
-
-            var available = targetWidth - visibleCount;
-            if (segment.Text.Length <= available)
-            {
-                trimmed.Add(segment);
-                visibleCount += segment.Text.Length;
-                continue;
-            }
-
-            trimmed.Add(new Segment(segment.Text[..available], segment.Color));
-            visibleCount += available;
-            break;
-        }
-
-        if (trimmed.Count == 0)
-        {
-            return [new Segment("...")];
-        }
-
-        var last = trimmed[^1];
-        trimmed[^1] = new Segment(last.Text + "...", last.Color);
-        return trimmed;
-    }
-
-    private static string PadVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var visibleLength = VisibleLength(text);
-        if (visibleLength >= width)
-        {
-            return text;
-        }
-
-        return text + new string(' ', width - visibleLength);
-    }
-
-    private static string PadHighlighted(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var visibleLength = VisibleLength(text);
-        if (visibleLength >= width)
-        {
-            return text;
-        }
-
-        var padding = new string(' ', width - visibleLength);
-        return text.EndsWith(Reset, StringComparison.Ordinal)
-            ? text[..^Reset.Length] + padding + Reset
-            : text + padding;
-    }
-
     private static int VisibleLength(string text)
     {
         var length = 0;
-
         for (var index = 0; index < text.Length; index++)
         {
             if (text[index] == '\u001b')
@@ -651,65 +330,8 @@ public static class ChronicleScreenRenderer
         return length;
     }
 
-    private static int GetVisibleLength(IReadOnlyList<Segment> segments)
+    private static string BorderLine(string content, int innerWidth)
     {
-        return segments.Sum(segment => segment.Text.Length);
-    }
-
-    private static string GetSeverityColor(int value)
-    {
-        return value switch
-        {
-            >= 80 => Red,
-            >= 60 => Orange,
-            >= 40 => Yellow,
-            _ => Green
-        };
-    }
-
-    private static string FormatMonthYear(int month, int year)
-    {
-        var monthIndex = Math.Clamp(month, 1, 12) - 1;
-        return $"{MonthNames[monthIndex]} {year:D3}";
-    }
-
-    private readonly record struct Segment(string Text, string? Color = null);
-
-    private readonly record struct ChronicleLayout(
-        int InnerWidth,
-        int RecordsWidth,
-        int SituationWidth,
-        int RecordsContentWidth,
-        int SituationContentWidth,
-        int BodyHeight,
-        int TotalHeight)
-    {
-        public static ChronicleLayout Create(TerminalViewport viewport)
-        {
-            var innerWidth = Math.Max(1, viewport.Width - 4);
-            var totalHeight = Math.Max(8, viewport.Height);
-            var bodyHeight = Math.Max(1, totalHeight - 10);
-            var availablePaneWidth = Math.Max(2, innerWidth - 3);
-            var minimumRecordsWidth = Math.Min(availablePaneWidth, Math.Max(18, (int)Math.Ceiling(availablePaneWidth * 0.55)));
-            var preferredSituationWidth = Math.Clamp((int)Math.Round(availablePaneWidth * 0.31), 22, 42);
-            var situationWidth = Math.Min(preferredSituationWidth, Math.Max(1, availablePaneWidth - minimumRecordsWidth));
-            var recordsWidth = Math.Max(1, availablePaneWidth - situationWidth);
-
-            if (recordsWidth <= situationWidth && availablePaneWidth >= 3)
-            {
-                recordsWidth = Math.Max(availablePaneWidth / 2 + 1, recordsWidth);
-                recordsWidth = Math.Min(recordsWidth, availablePaneWidth - 1);
-                situationWidth = Math.Max(1, availablePaneWidth - recordsWidth);
-            }
-
-            return new ChronicleLayout(
-                innerWidth,
-                recordsWidth,
-                situationWidth,
-                Math.Max(0, recordsWidth - 2),
-                Math.Max(0, situationWidth - 2),
-                bodyHeight,
-                totalHeight);
-        }
+        return $"| {FitVisible(content, innerWidth)} |";
     }
 }

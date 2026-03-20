@@ -26,6 +26,38 @@ public static class AdvancementStateValidator
                     errors.Add($"Population group {group.Id} references invalid advancement ID {advancementId}.");
                 }
             }
+
+            if (group.AdvancementEvidence.SuccessfulGatheringWithKnowledgeMonths < 0 ||
+                group.AdvancementEvidence.SuccessfulHuntingWithKnowledgeMonths < 0 ||
+                group.AdvancementEvidence.SurplusStoredFoodMonths < 0 ||
+                group.AdvancementEvidence.KnownRouteTravelMonths < 0 ||
+                group.AdvancementEvidence.SuccessfulResidenceWithRegionKnowledgeMonths < 0 ||
+                group.AdvancementEvidence.MaterialPracticeMonths < 0 ||
+                group.AdvancementEvidence.StoragePressureMonths < 0 ||
+                group.AdvancementEvidence.ShelterReadinessMonths < 0 ||
+                group.AdvancementEvidence.StabilityMonths < 0 ||
+                group.AdvancementEvidence.ContactLearningMonths < 0)
+            {
+                errors.Add($"Population group {group.Id} has negative advancement evidence.");
+            }
+
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedHuntingId) &&
+                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId))
+            {
+                errors.Add($"Population group {group.Id} has Improved Hunting without Seasonal Tracking.");
+            }
+
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId) &&
+                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId))
+            {
+                errors.Add($"Population group {group.Id} has Food Storage without Preservation Clues.");
+            }
+
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId) &&
+                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId))
+            {
+                errors.Add($"Population group {group.Id} has Stronger Shelter without Shelter Methods.");
+            }
         }
 
         foreach (var change in tickResult.AdvancementChanges)

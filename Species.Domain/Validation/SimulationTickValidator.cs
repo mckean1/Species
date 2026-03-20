@@ -75,6 +75,69 @@ public static class SimulationTickValidator
             }
         }
 
+        foreach (var change in tickResult.MaterialEconomyChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.PolityId) || string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Material economy update reported an incomplete change.");
+            }
+
+            if (change.Extracted.Timber < 0 ||
+                change.Extracted.Stone < 0 ||
+                change.Extracted.Fiber < 0 ||
+                change.Extracted.Clay < 0 ||
+                change.Extracted.Hides < 0)
+            {
+                errors.Add($"Material economy change for {change.PolityId} reported negative extraction.");
+            }
+        }
+
+        foreach (var change in tickResult.BiologicalHistoryChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.RegionId) ||
+                string.IsNullOrWhiteSpace(change.SpeciesId) ||
+                string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Biological evolution update reported an incomplete change.");
+            }
+        }
+
+        foreach (var change in tickResult.SocialIdentityChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.PolityId) ||
+                string.IsNullOrWhiteSpace(change.TraditionId) ||
+                string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Social identity update reported an incomplete change.");
+            }
+        }
+
+        foreach (var change in tickResult.InterPolityChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.PrimaryPolityId) ||
+                string.IsNullOrWhiteSpace(change.OtherPolityId) ||
+                string.IsNullOrWhiteSpace(change.Kind) ||
+                string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Inter-polity interaction update reported an incomplete change.");
+            }
+
+            if (string.Equals(change.PrimaryPolityId, change.OtherPolityId, StringComparison.Ordinal))
+            {
+                errors.Add("Inter-polity interaction update reported a self-targeting change.");
+            }
+        }
+
+        foreach (var change in tickResult.PoliticalScaleChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.PolityId) ||
+                string.IsNullOrWhiteSpace(change.Kind) ||
+                string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Political scaling update reported an incomplete change.");
+            }
+        }
+
         if (tickResult.LawProposalChanges.Any(change => change.Status is not (LawProposalStatus.Passed or LawProposalStatus.Vetoed)))
         {
             errors.Add("Simulation tick reported a law proposal change that was not passed or vetoed.");
@@ -84,6 +147,18 @@ public static class SimulationTickValidator
         if (recordedLawEntries != tickResult.LawProposalChanges.Count)
         {
             errors.Add("Recorded Chronicle law entries do not match resolved law proposal changes for the tick.");
+        }
+
+        var recordedExternalEntries = tickResult.RecordedChronicleEntries.Count(entry => entry.Category == ChronicleEventCategory.External);
+        if (recordedExternalEntries != tickResult.InterPolityChanges.Count)
+        {
+            errors.Add("Recorded Chronicle external entries do not match inter-polity changes for the tick.");
+        }
+
+        var recordedPoliticalEntries = tickResult.RecordedChronicleEntries.Count(entry => entry.Category == ChronicleEventCategory.Political);
+        if (recordedPoliticalEntries != tickResult.PoliticalScaleChanges.Count)
+        {
+            errors.Add("Recorded Chronicle political entries do not match political scaling changes for the tick.");
         }
 
         return errors;

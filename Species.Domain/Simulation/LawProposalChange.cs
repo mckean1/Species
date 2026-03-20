@@ -10,5 +10,7 @@ public sealed class LawProposalChange
 
     public required string ProposalTitle { get; init; }
 
+    public string ChronicleLine { get; init; } = string.Empty;
+
     public required LawProposalStatus Status { get; init; }
 }

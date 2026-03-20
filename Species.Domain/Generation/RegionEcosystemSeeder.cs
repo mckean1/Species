@@ -15,8 +15,30 @@ public static class RegionEcosystemSeeder
     {
         var floraPopulations = SeedFlora(region, floraCatalog, random);
         var faunaPopulations = SeedFauna(region, floraPopulations, faunaCatalog, random);
+        var floraProfiles = floraPopulations.Keys.ToDictionary(
+            speciesId => speciesId,
+            speciesId => new RegionalBiologicalProfile
+            {
+                SpeciesId = speciesId,
+                RegionId = region.Id,
+                Traits = floraCatalog.GetById(speciesId)?.BaselineTraits.Clone() ?? new BiologicalTraitProfile(),
+                LastPopulation = floraPopulations[speciesId],
+                ViabilityScore = 50
+            },
+            StringComparer.Ordinal);
+        var faunaProfiles = faunaPopulations.Keys.ToDictionary(
+            speciesId => speciesId,
+            speciesId => new RegionalBiologicalProfile
+            {
+                SpeciesId = speciesId,
+                RegionId = region.Id,
+                Traits = faunaCatalog.GetById(speciesId)?.BaselineTraits.Clone() ?? new BiologicalTraitProfile(),
+                LastPopulation = faunaPopulations[speciesId],
+                ViabilityScore = 50
+            },
+            StringComparer.Ordinal);
 
-        return new RegionEcosystem(floraPopulations, faunaPopulations);
+        return new RegionEcosystem(floraPopulations, faunaPopulations, floraProfiles, faunaProfiles);
     }
 
     private static IReadOnlyDictionary<string, int> SeedFlora(

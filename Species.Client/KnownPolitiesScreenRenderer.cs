@@ -44,7 +44,11 @@ public static class KnownPolitiesScreenRenderer
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select polity"));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run", "N: Next Tick"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select"]));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
@@ -175,10 +179,10 @@ public static class KnownPolitiesScreenRenderer
     {
         var color = relationship switch
         {
-            "Shared homeland" => Green,
-            "Known contact" => Yellow,
-            "Cautious" => Orange,
-            "Competing nearby" => Red,
+            "Cooperative" or "Shared homeland" => Green,
+            "Neutral contact" or "Known contact" => Yellow,
+            "Wary" or "Cautious" or "Uneasy peace" => Orange,
+            "Rival" or "Competing nearby" or "Hostile" or "Raiding conflict" or "Open conflict" => Red,
             _ => Dim
         };
 

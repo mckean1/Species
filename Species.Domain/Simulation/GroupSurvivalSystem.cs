@@ -486,7 +486,14 @@ public sealed class GroupSurvivalSystem
                 Region.Biome,
                 Region.WaterAvailability,
                 Region.NeighborIds,
-                new RegionEcosystem(FloraPopulations, FaunaPopulations));
+                new RegionEcosystem(
+                    FloraPopulations,
+                    FaunaPopulations,
+                    Region.Ecosystem.FloraProfiles.ToDictionary(entry => entry.Key, entry => entry.Value.Clone(), StringComparer.Ordinal),
+                    Region.Ecosystem.FaunaProfiles.ToDictionary(entry => entry.Key, entry => entry.Value.Clone(), StringComparer.Ordinal),
+                    Region.Ecosystem.FossilRecords.ToArray(),
+                    Region.Ecosystem.BiologicalHistoryRecords.ToArray()),
+                Region.MaterialProfile.Clone());
         }
     }
 

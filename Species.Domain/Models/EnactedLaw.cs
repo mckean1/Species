@@ -10,6 +10,10 @@ public sealed class EnactedLaw
 
     public string Summary { get; init; } = string.Empty;
 
+    public string IntentSummary { get; init; } = string.Empty;
+
+    public string TradeoffSummary { get; init; } = string.Empty;
+
     public LawProposalCategory Category { get; init; }
 
     public LawConflictGroup ConflictGroup { get; init; }
@@ -26,6 +30,12 @@ public sealed class EnactedLaw
 
     public int ComplianceLevel { get; set; } = 50;
 
+    public int CoreEffectiveness { get; set; } = 50;
+
+    public int PeripheralEffectiveness { get; set; } = 50;
+
+    public int ResistanceLevel { get; set; } = 0;
+
     public bool IsActive { get; set; } = true;
 
     public EnactedLaw Clone()
@@ -35,6 +45,8 @@ public sealed class EnactedLaw
             DefinitionId = DefinitionId,
             Title = Title,
             Summary = Summary,
+            IntentSummary = IntentSummary,
+            TradeoffSummary = TradeoffSummary,
             Category = Category,
             ConflictGroup = ConflictGroup,
             ConflictSlot = ConflictSlot,
@@ -43,6 +55,9 @@ public sealed class EnactedLaw
             EnactedOnMonth = EnactedOnMonth,
             EnforcementStrength = EnforcementStrength,
             ComplianceLevel = ComplianceLevel,
+            CoreEffectiveness = CoreEffectiveness,
+            PeripheralEffectiveness = PeripheralEffectiveness,
+            ResistanceLevel = ResistanceLevel,
             IsActive = IsActive
         };
     }

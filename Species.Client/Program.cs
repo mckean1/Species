@@ -71,13 +71,20 @@ while (true)
             viewState.SetScreen(hotkeyScreen);
             shouldRender = true;
         }
+        else if (key.Key == ConsoleKey.Backspace && viewState.CurrentScreen == PlayerScreen.Chronicle)
+        {
+            var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+            viewState.ReturnChronicleToLive(chronicleData.UrgentItems.Count);
+            shouldRender = true;
+        }
         else if (key.Key == ConsoleKey.Spacebar)
         {
             viewState.ToggleSimulation();
+            viewState.CloseLawActionMenu();
             elapsedSinceLastTick.Restart();
             shouldRender = true;
         }
-        else if (key.Key == ConsoleKey.Enter && !viewState.IsSimulationRunning)
+        else if (key.Key == ConsoleKey.N && !viewState.IsSimulationRunning)
         {
             if (!AdvanceOneMonth())
             {
@@ -92,20 +99,60 @@ while (true)
             viewState.CycleScreen();
             shouldRender = true;
         }
+        else if (viewState.CurrentScreen == PlayerScreen.Chronicle)
+        {
+            switch (key.Key)
+            {
+                case ConsoleKey.LeftArrow:
+                    viewState.MoveToPreviousChronicleMode();
+                    shouldRender = true;
+                    break;
+                case ConsoleKey.RightArrow:
+                    viewState.MoveToNextChronicleMode();
+                    shouldRender = true;
+                    break;
+                case ConsoleKey.UpArrow:
+                    {
+                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        viewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, -1);
+                        shouldRender = true;
+                        break;
+                    }
+                case ConsoleKey.DownArrow:
+                    {
+                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        viewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, 1);
+                        shouldRender = true;
+                        break;
+                    }
+                case ConsoleKey.Enter:
+                    {
+                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        if (chronicleData.SelectedUrgent is not null)
+                        {
+                            viewState.SetScreen(chronicleData.SelectedUrgent.TargetScreen);
+                            if (chronicleData.SelectedUrgent.TargetScreen == PlayerScreen.Laws)
+                            {
+                                viewState.SetLawSelection(0);
+                            }
+
+                            shouldRender = true;
+                        }
+
+                        break;
+                    }
+            }
+        }
         else if (viewState.CurrentScreen == PlayerScreen.Regions)
         {
             switch (key.Key)
             {
-                case ConsoleKey.RightArrow:
-                case ConsoleKey.D:
-                case ConsoleKey.N:
-                    viewState.MoveToNextRegion(simulationEngine.CurrentWorld.Regions.Count);
+                case ConsoleKey.UpArrow:
+                    viewState.MoveRegionSelection(simulationEngine.CurrentWorld.Regions.Count, -1);
                     shouldRender = true;
                     break;
-                case ConsoleKey.LeftArrow:
-                case ConsoleKey.A:
-                case ConsoleKey.P:
-                    viewState.MoveToPreviousRegion(simulationEngine.CurrentWorld.Regions.Count);
+                case ConsoleKey.DownArrow:
+                    viewState.MoveRegionSelection(simulationEngine.CurrentWorld.Regions.Count, 1);
                     shouldRender = true;
                     break;
             }
@@ -115,21 +162,17 @@ while (true)
             var polityCount = KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
             switch (key.Key)
             {
-                case ConsoleKey.RightArrow:
-                case ConsoleKey.D:
-                case ConsoleKey.N:
+                case ConsoleKey.UpArrow:
                     if (polityCount > 0)
                     {
-                        viewState.MoveToNextKnownPolity(polityCount);
+                        viewState.MoveKnownPolitySelection(polityCount, -1);
                         shouldRender = true;
                     }
                     break;
-                case ConsoleKey.LeftArrow:
-                case ConsoleKey.A:
-                case ConsoleKey.P:
+                case ConsoleKey.DownArrow:
                     if (polityCount > 0)
                     {
-                        viewState.MoveToPreviousKnownPolity(polityCount);
+                        viewState.MoveKnownPolitySelection(polityCount, 1);
                         shouldRender = true;
                     }
                     break;
@@ -140,21 +183,17 @@ while (true)
             var advancementCount = AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
             switch (key.Key)
             {
-                case ConsoleKey.RightArrow:
-                case ConsoleKey.D:
-                case ConsoleKey.N:
+                case ConsoleKey.UpArrow:
                     if (advancementCount > 0)
                     {
-                        viewState.MoveToNextAdvancement(advancementCount);
+                        viewState.MoveAdvancementSelection(advancementCount, -1);
                         shouldRender = true;
                     }
                     break;
-                case ConsoleKey.LeftArrow:
-                case ConsoleKey.A:
-                case ConsoleKey.P:
+                case ConsoleKey.DownArrow:
                     if (advancementCount > 0)
                     {
-                        viewState.MoveToPreviousAdvancement(advancementCount);
+                        viewState.MoveAdvancementSelection(advancementCount, 1);
                         shouldRender = true;
                     }
                     break;
@@ -162,35 +201,59 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.Laws)
         {
-            var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count;
+            var lawsData = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex);
+            var lawCount = lawsData.Laws.Count;
             switch (key.Key)
             {
-                case ConsoleKey.P:
-                    if (!viewState.IsSimulationRunning && simulationEngine.PassActiveLawProposal())
+                case ConsoleKey.UpArrow:
+                    if (viewState.IsLawActionMenuOpen)
                     {
+                        viewState.MoveLawActionSelection(-1);
+                        shouldRender = true;
+                    }
+                    else if (lawCount > 0)
+                    {
+                        viewState.MoveLawSelection(lawCount, -1);
                         shouldRender = true;
                     }
                     break;
-                case ConsoleKey.V:
-                    if (!viewState.IsSimulationRunning && simulationEngine.VetoActiveLawProposal())
+                case ConsoleKey.DownArrow:
+                    if (viewState.IsLawActionMenuOpen)
                     {
+                        viewState.MoveLawActionSelection(1);
+                        shouldRender = true;
+                    }
+                    else if (lawCount > 0)
+                    {
+                        viewState.MoveLawSelection(lawCount, 1);
                         shouldRender = true;
                     }
                     break;
-                case ConsoleKey.RightArrow:
-                case ConsoleKey.D:
-                case ConsoleKey.N:
-                    if (lawCount > 0)
+                case ConsoleKey.Enter:
+                    if (!viewState.IsSimulationRunning && lawsData.HasSelectedPendingDecision)
                     {
-                        viewState.MoveToNextLaw(lawCount);
-                        shouldRender = true;
+                        if (!viewState.IsLawActionMenuOpen)
+                        {
+                            viewState.OpenLawActionMenu();
+                            shouldRender = true;
+                        }
+                        else
+                        {
+                            var actionApplied = viewState.GetSelectedLawAction() == LawDecisionAction.Pass
+                                ? simulationEngine.PassActiveLawProposal()
+                                : simulationEngine.VetoActiveLawProposal();
+                            if (actionApplied)
+                            {
+                                viewState.CloseLawActionMenu();
+                                shouldRender = true;
+                            }
+                        }
                     }
                     break;
-                case ConsoleKey.LeftArrow:
-                case ConsoleKey.A:
-                    if (lawCount > 0)
+                case ConsoleKey.Backspace:
+                    if (viewState.IsLawActionMenuOpen)
                     {
-                        viewState.MoveToPreviousLaw(lawCount);
+                        viewState.CloseLawActionMenu();
                         shouldRender = true;
                     }
                     break;
@@ -201,21 +264,17 @@ while (true)
             var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
             switch (key.Key)
             {
-                case ConsoleKey.RightArrow:
-                case ConsoleKey.D:
-                case ConsoleKey.N:
+                case ConsoleKey.UpArrow:
                     if (speciesCount > 0)
                     {
-                        viewState.MoveToNextKnownSpecies(speciesCount);
+                        viewState.MoveKnownSpeciesSelection(speciesCount, -1);
                         shouldRender = true;
                     }
                     break;
-                case ConsoleKey.LeftArrow:
-                case ConsoleKey.A:
-                case ConsoleKey.P:
+                case ConsoleKey.DownArrow:
                     if (speciesCount > 0)
                     {
-                        viewState.MoveToPreviousKnownSpecies(speciesCount);
+                        viewState.MoveKnownSpeciesSelection(speciesCount, 1);
                         shouldRender = true;
                     }
                     break;
@@ -242,6 +301,8 @@ while (true)
     viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
     viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count);
     viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count);
+    var currentChronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+    viewState.ClampChronicleSelection(currentChronicleData.UrgentItems.Count, currentChronicleData.Entries.Count);
 
     if (shouldRender)
     {

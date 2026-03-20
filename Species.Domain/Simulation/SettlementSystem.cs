@@ -1,3 +1,5 @@
+using Species.Domain.Catalogs;
+using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
@@ -413,12 +415,17 @@ public sealed class SettlementSystem
     private static void DepositSettlementStores(Settlement settlement, IReadOnlyList<PopulationGroup> localGroups, IDictionary<string, PopulationGroup> groupsById)
     {
         var localPopulation = localGroups.Sum(group => group.Population);
+        var hasFoodStorage = localGroups.Any(group => group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId));
         var targetReserve = settlement.Type switch
         {
             SettlementType.Village => Math.Max(40, localPopulation),
             SettlementType.CampHub => Math.Max(25, (int)Math.Round(localPopulation * 0.75, MidpointRounding.AwayFromZero)),
             _ => Math.Max(20, localPopulation / 2)
         };
+        if (hasFoodStorage)
+        {
+            targetReserve = (int)Math.Round(targetReserve * AdvancementConstants.FoodStorageSettlementReserveMultiplier, MidpointRounding.AwayFromZero);
+        }
         var availableCapacity = Math.Max(0, targetReserve - settlement.StoredFood);
         if (availableCapacity == 0)
         {

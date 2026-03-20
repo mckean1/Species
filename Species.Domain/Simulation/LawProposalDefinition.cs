@@ -11,6 +11,10 @@ public sealed class LawProposalDefinition
 
     public required string Summary { get; init; }
 
+    public required string IntentSummary { get; init; }
+
+    public required string TradeoffSummary { get; init; }
+
     public required LawProposalCategory Category { get; init; }
 
     public required LawConflictGroup ConflictGroup { get; init; }
@@ -19,7 +23,7 @@ public sealed class LawProposalDefinition
 
     public required int ImpactScale { get; init; }
 
-    public required GovernmentForm GovernmentForm { get; init; }
+    public IReadOnlySet<GovernmentForm> GovernmentForms { get; init; } = new HashSet<GovernmentForm>();
 
     public IReadOnlyList<string> ConflictingDefinitionIds { get; init; } = Array.Empty<string>();
 
@@ -29,5 +33,5 @@ public sealed class LawProposalDefinition
 
     public IReadOnlyDictionary<string, int> RelatedLawScoreModifiers { get; init; } = new Dictionary<string, int>(StringComparer.Ordinal);
 
-    public required Func<PopulationGroup, Region, int> Score { get; init; }
+    public required Func<PopulationGroup, Region, PolityContext, int> Score { get; init; }
 }

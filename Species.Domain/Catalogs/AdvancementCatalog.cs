@@ -10,6 +10,7 @@ public sealed class AdvancementCatalog
     public const string FoodStorageId = "advancement-food-storage";
     public const string OrganizedTravelId = "advancement-organized-travel";
     public const string LocalResourceUseId = "advancement-local-resource-use";
+    public const string StrongerShelterId = "advancement-stronger-shelter";
 
     private readonly Dictionary<string, AdvancementDefinition> definitionsById;
 
@@ -36,7 +37,8 @@ public sealed class AdvancementCatalog
                 Name = "Improved Gathering",
                 Description = "Practical methods that make gathering more productive.",
                 Category = AdvancementCategory.Gathering,
-                PracticalEffectSummary = "Directly increases food gained when gathering."
+                PracticalEffectSummary = "Directly increases food gained when gathering.",
+                PrerequisiteSummary = "Requires flora knowledge, repeated use, and continuing need."
             },
             new AdvancementDefinition
             {
@@ -44,7 +46,8 @@ public sealed class AdvancementCatalog
                 Name = "Improved Hunting",
                 Description = "Practical methods that make hunting more productive.",
                 Category = AdvancementCategory.Hunting,
-                PracticalEffectSummary = "Directly increases food gained when hunting."
+                PracticalEffectSummary = "Directly increases food gained when hunting.",
+                PrerequisiteSummary = "Requires fauna knowledge, repeated tracking, and sustained need."
             },
             new AdvancementDefinition
             {
@@ -52,7 +55,8 @@ public sealed class AdvancementCatalog
                 Name = "Food Storage",
                 Description = "Practical storage habits that preserve more carried food value.",
                 Category = AdvancementCategory.Storage,
-                PracticalEffectSummary = "Directly improves the effective value of StoredFood when it is used."
+                PracticalEffectSummary = "Directly improves the effective value of StoredFood when it is used.",
+                PrerequisiteSummary = "Requires preservation knowledge plus settled or durable storage conditions."
             },
             new AdvancementDefinition
             {
@@ -60,7 +64,8 @@ public sealed class AdvancementCatalog
                 Name = "Organized Travel",
                 Description = "Practical travel organization that makes route use more reliable.",
                 Category = AdvancementCategory.Travel,
-                PracticalEffectSummary = "Directly improves migration execution on known routes."
+                PracticalEffectSummary = "Directly improves migration execution on known routes.",
+                PrerequisiteSummary = "Requires known-route use and repeated continuity across travel."
             },
             new AdvancementDefinition
             {
@@ -68,7 +73,17 @@ public sealed class AdvancementCatalog
                 Name = "Local Resource Use",
                 Description = "Practical use of familiar regional resources.",
                 Category = AdvancementCategory.ResourceUse,
-                PracticalEffectSummary = "Directly improves gathering and hunting in regions the group understands well."
+                PracticalEffectSummary = "Directly improves gathering, hunting, and extraction in regions the group understands well.",
+                PrerequisiteSummary = "Requires local region knowledge plus material practice and continuity."
+            },
+            new AdvancementDefinition
+            {
+                Id = StrongerShelterId,
+                Name = "Stronger Shelter",
+                Description = "Practical shelter methods that make settled life and protection more durable.",
+                Category = AdvancementCategory.Shelter,
+                PracticalEffectSummary = "Directly reduces threat and crowding strain where shelter practice is established.",
+                PrerequisiteSummary = "Requires shelter-method knowledge, material support, and settled readiness."
             }
         ]);
     }

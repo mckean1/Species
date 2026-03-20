@@ -24,6 +24,11 @@ public static class DiscoveryCatalogValidator
             {
                 errors.Add($"Discovery definition {definition.Id} is missing a name.");
             }
+
+            if (string.IsNullOrWhiteSpace(definition.CausalSummary))
+            {
+                errors.Add($"Discovery definition {definition.Id} is missing a causal summary.");
+            }
         }
 
         return errors;

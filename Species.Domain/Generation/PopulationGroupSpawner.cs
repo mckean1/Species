@@ -82,7 +82,16 @@ public static class PopulationGroupSpawner
                 EnactedLaws = [],
                 PoliticalBlocs = PoliticalBlocCatalog.CreateInitialBlocs(governmentForm).ToList(),
                 Settlements = [],
-                RegionalPresences = []
+                RegionalPresences = [],
+                InterPolityRelations = [],
+                ParentPolityId = string.Empty,
+                PoliticalAttachments = [],
+                PoliticalHistory = [],
+                Governance = new GovernanceState(),
+                ExternalPressure = new ExternalPressureState(),
+                ScaleState = new PoliticalScaleState(),
+                SocialMemory = new SocialMemoryState(),
+                SocialIdentity = new SocialIdentityState()
             });
         }
 

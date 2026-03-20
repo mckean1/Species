@@ -15,6 +15,10 @@ public sealed class AdvancementSystem
     {
         var survivalByGroupId = survivalChanges.ToDictionary(change => change.GroupId, StringComparer.Ordinal);
         var migrationByGroupId = migrationChanges.ToDictionary(change => change.GroupId, StringComparer.Ordinal);
+        var polityContextById = world.Polities
+            .Select(polity => PolityData.BuildContext(world, polity))
+            .Where(context => context is not null)
+            .ToDictionary(context => context!.Polity.Id, context => context!, StringComparer.Ordinal);
         var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
         var changes = new List<AdvancementChange>(world.PopulationGroups.Count);
 
@@ -24,6 +28,7 @@ public sealed class AdvancementSystem
             var evidence = updatedGroup.AdvancementEvidence;
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
             migrationByGroupId.TryGetValue(group.Id, out var migrationChange);
+            polityContextById.TryGetValue(group.PolityId, out var polityContext);
 
             var livedRegionId = survivalChange?.CurrentRegionId ?? updatedGroup.CurrentRegionId;
             var localFloraDiscoveryId = discoveryCatalog.GetLocalFloraDiscoveryId(livedRegionId);
@@ -44,7 +49,7 @@ public sealed class AdvancementSystem
                 evidence.SuccessfulHuntingWithKnowledgeMonths++;
             }
 
-            if (updatedGroup.StoredFood > 0)
+            if (updatedGroup.StoredFood > 0 && polityContext is not null && polityContext.MaterialProduction.StorageSupport >= 20)
             {
                 evidence.SurplusStoredFoodMonths++;
             }
@@ -61,6 +66,40 @@ public sealed class AdvancementSystem
                 evidence.SuccessfulResidenceWithRegionKnowledgeMonths++;
             }
 
+            if (polityContext is not null &&
+                polityContext.MaterialProduction.ToolSupport >= 20 &&
+                polityContext.MaterialProduction.SurplusScore >= 20)
+            {
+                evidence.MaterialPracticeMonths++;
+            }
+
+            if (updatedGroup.StoredFood > 0 &&
+                (survivalChange?.Shortage > 0 || (polityContext is not null && polityContext.MaterialProduction.StorageSupport < 35)))
+            {
+                evidence.StoragePressureMonths++;
+            }
+
+            if (polityContext is not null &&
+                polityContext.PrimarySettlement is not null &&
+                polityContext.MaterialProduction.ShelterSupport >= 25 &&
+                (updatedGroup.Pressures.ThreatPressure >= 45 || polityContext.MaterialShortageMonths > 0))
+            {
+                evidence.ShelterReadinessMonths++;
+            }
+
+            if (polityContext is not null &&
+                polityContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile &&
+                polityContext.Pressures.MigrationPressure < 60 &&
+                polityContext.MaterialProduction.DeficitScore < 60)
+            {
+                evidence.StabilityMonths++;
+            }
+
+            if (updatedGroup.DiscoveryEvidence.SharedExposureMonthsByDiscoveryId.Count > 0)
+            {
+                evidence.ContactLearningMonths++;
+            }
+
             var unlockedThisMonth = new List<AdvancementDefinition>();
             var checks = new List<string>();
 
@@ -68,10 +107,11 @@ public sealed class AdvancementSystem
                 updatedGroup,
                 advancementCatalog,
                 AdvancementCatalog.ImprovedGatheringId,
-                updatedGroup.KnownDiscoveryIds.Contains(localFloraDiscoveryId),
+                updatedGroup.KnownDiscoveryIds.Contains(localFloraDiscoveryId) &&
+                updatedGroup.DiscoveryEvidence.RecurringFoodPressureMonths > 0,
                 evidence.SuccessfulGatheringWithKnowledgeMonths,
-                AdvancementConstants.ImprovedGatheringMonthsRequired,
-                "local flora knowledge",
+                AdvancementConstants.ImprovedGatheringMonthsRequired + 1,
+                "flora knowledge plus sustained need",
                 unlockedThisMonth,
                 checks);
 
@@ -79,10 +119,12 @@ public sealed class AdvancementSystem
                 updatedGroup,
                 advancementCatalog,
                 AdvancementCatalog.ImprovedHuntingId,
-                updatedGroup.KnownDiscoveryIds.Contains(localFaunaDiscoveryId),
+                updatedGroup.KnownDiscoveryIds.Contains(localFaunaDiscoveryId) &&
+                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId) &&
+                (updatedGroup.DiscoveryEvidence.RecurringFoodPressureMonths > 0 || updatedGroup.DiscoveryEvidence.RecurringThreatPressureMonths > 0),
                 evidence.SuccessfulHuntingWithKnowledgeMonths,
-                AdvancementConstants.ImprovedHuntingMonthsRequired,
-                "local fauna knowledge",
+                AdvancementConstants.ImprovedHuntingMonthsRequired + 1,
+                "fauna knowledge, tracking, and sustained need",
                 unlockedThisMonth,
                 checks);
 
@@ -90,10 +132,13 @@ public sealed class AdvancementSystem
                 updatedGroup,
                 advancementCatalog,
                 AdvancementCatalog.FoodStorageId,
-                true,
-                evidence.SurplusStoredFoodMonths,
+                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId) &&
+                (updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.ClayShapingId) || (polityContext?.MaterialProduction.StorageSupport ?? 0) >= 20) &&
+                polityContext is not null &&
+                polityContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile,
+                Math.Min(evidence.SurplusStoredFoodMonths, evidence.StoragePressureMonths),
                 AdvancementConstants.FoodStorageSurplusMonthsRequired,
-                "repeated food surplus",
+                "preservation knowledge plus durable storage conditions",
                 unlockedThisMonth,
                 checks);
 
@@ -101,10 +146,11 @@ public sealed class AdvancementSystem
                 updatedGroup,
                 advancementCatalog,
                 AdvancementCatalog.OrganizedTravelId,
-                evidence.KnownRouteTravelMonths > 0,
+                evidence.KnownRouteTravelMonths > 0 &&
+                evidence.StabilityMonths > 0,
                 evidence.KnownRouteTravelMonths,
                 AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired,
-                "known route use",
+                "known route use plus continuity",
                 unlockedThisMonth,
                 checks);
 
@@ -112,10 +158,27 @@ public sealed class AdvancementSystem
                 updatedGroup,
                 advancementCatalog,
                 AdvancementCatalog.LocalResourceUseId,
-                updatedGroup.KnownDiscoveryIds.Contains(localRegionDiscoveryId),
-                evidence.SuccessfulResidenceWithRegionKnowledgeMonths,
+                updatedGroup.KnownDiscoveryIds.Contains(localRegionDiscoveryId) &&
+                polityContext is not null &&
+                polityContext.MaterialProduction.ToolSupport >= 20 &&
+                evidence.StabilityMonths > 0,
+                Math.Min(evidence.MaterialPracticeMonths, evidence.SuccessfulResidenceWithRegionKnowledgeMonths),
                 AdvancementConstants.LocalResourceUseMonthsRequired,
-                "local region knowledge",
+                "local region knowledge plus material practice",
+                unlockedThisMonth,
+                checks);
+
+            EvaluateAdvancement(
+                updatedGroup,
+                advancementCatalog,
+                AdvancementCatalog.StrongerShelterId,
+                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId) &&
+                polityContext is not null &&
+                polityContext.PrimarySettlement is not null &&
+                polityContext.MaterialProduction.ShelterSupport >= 25,
+                evidence.ShelterReadinessMonths,
+                AdvancementConstants.StrongerShelterMonthsRequired,
+                "shelter-method knowledge plus settled material readiness",
                 unlockedThisMonth,
                 checks);
 
@@ -133,7 +196,10 @@ public sealed class AdvancementSystem
                     : string.Join(", ", unlockedThisMonth.Select(definition => definition.Name)),
                 PracticalEffectSummary = unlockedThisMonth.Count == 0
                     ? "No new advancement effect this month."
-                    : string.Join(" ", unlockedThisMonth.Select(definition => definition.PracticalEffectSummary))
+                    : string.Join(" ", unlockedThisMonth.Select(definition => definition.PracticalEffectSummary)),
+                ChronicleLinesSummary = unlockedThisMonth.Count == 0
+                    ? "none"
+                    : string.Join(";;", unlockedThisMonth.Select(definition => BuildChronicleLine(updatedGroup.Name, definition)))
             });
         }
 
@@ -189,7 +255,11 @@ public sealed class AdvancementSystem
             discoveryCatalog.GetLocalFloraDiscoveryId(regionId),
             discoveryCatalog.GetLocalFaunaDiscoveryId(regionId),
             discoveryCatalog.GetLocalWaterSourcesDiscoveryId(regionId),
-            discoveryCatalog.GetLocalRegionConditionsDiscoveryId(regionId)
+            discoveryCatalog.GetLocalRegionConditionsDiscoveryId(regionId),
+            DiscoveryCatalog.ClayShapingId,
+            DiscoveryCatalog.SeasonalTrackingId,
+            DiscoveryCatalog.PreservationCluesId,
+            DiscoveryCatalog.ShelterMethodsId
         };
 
         var names = relevantIds
@@ -214,9 +284,21 @@ public sealed class AdvancementSystem
                 .Select(id => advancementCatalog.GetById(id)?.Name ?? id));
     }
 
+    private static string BuildChronicleLine(string groupName, AdvancementDefinition definition)
+    {
+        return definition.Id switch
+        {
+            var id when id == AdvancementCatalog.FoodStorageId => $"{groupName} adopted improved storage after repeated spoilage pressure.",
+            var id when id == AdvancementCatalog.StrongerShelterId => $"{groupName} adopted stronger shelter from settled material practice.",
+            var id when id == AdvancementCatalog.ImprovedHuntingId => $"{groupName} improved hunting practice through repeated tracking.",
+            var id when id == AdvancementCatalog.ImprovedGatheringId => $"{groupName} improved gathering practice through repeated local use.",
+            _ => $"{groupName} learned {definition.Name.ToLowerInvariant()}."
+        };
+    }
+
     private static string BuildEvidenceSummary(AdvancementEvidenceState evidence)
     {
-        return $"GatherUse={evidence.SuccessfulGatheringWithKnowledgeMonths} | HuntUse={evidence.SuccessfulHuntingWithKnowledgeMonths} | StorageUse={evidence.SurplusStoredFoodMonths} | RouteUse={evidence.KnownRouteTravelMonths} | LocalUse={evidence.SuccessfulResidenceWithRegionKnowledgeMonths}";
+        return $"GatherUse={evidence.SuccessfulGatheringWithKnowledgeMonths} | HuntUse={evidence.SuccessfulHuntingWithKnowledgeMonths} | StorageUse={evidence.SurplusStoredFoodMonths}/{evidence.StoragePressureMonths} | RouteUse={evidence.KnownRouteTravelMonths} | LocalUse={evidence.SuccessfulResidenceWithRegionKnowledgeMonths}/{evidence.MaterialPracticeMonths} | Shelter={evidence.ShelterReadinessMonths} | Stability={evidence.StabilityMonths}";
     }
 
     private static PopulationGroup CloneGroup(PopulationGroup group)

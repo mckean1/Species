@@ -44,7 +44,11 @@ public static class AdvancementsScreenRenderer
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select advancement"));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run", "N: Next Tick"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select"]));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);

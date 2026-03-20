@@ -13,4 +13,6 @@ public sealed class AdvancementDefinition
     public AdvancementCategory Category { get; init; }
 
     public string PracticalEffectSummary { get; init; } = string.Empty;
+
+    public string PrerequisiteSummary { get; init; } = string.Empty;
 }

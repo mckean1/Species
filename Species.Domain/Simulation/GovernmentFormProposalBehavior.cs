@@ -14,7 +14,12 @@ public sealed record GovernmentFormProposalBehavior(
     int IndecisionPenaltyStrength,
     int EnforcementTendency,
     int ComplianceTendency,
-    int ExtremityAllowance)
+    int ExtremityAllowance,
+    int LegitimacyBaseline,
+    int CohesionBaseline,
+    int AuthorityBaseline,
+    int CentralizationBias,
+    int SharedGovernanceBias)
 {
     public int GetCategoryWeight(LawProposalCategory category)
     {

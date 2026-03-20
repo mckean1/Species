@@ -7,6 +7,12 @@ public static class DiscoveryConstants
     public const int LocalRegionResidenceMonthsRequired = 2;
     public const int LocalWaterExposureMonthsRequired = 2;
     public const int RouteTraversalCountRequired = 2;
+    public const int ClayShapingExposureMonthsRequired = 3;
+    public const int SeasonalTrackingMonthsRequired = 3;
+    public const int PreservationCluesMonthsRequired = 2;
+    public const int ShelterMethodsMonthsRequired = 3;
+    public const int InternalKnowledgeSpreadMonthsRequired = 2;
+    public const int ContactKnowledgeSpreadMonthsRequired = 3;
     public const float KnownLocalFloraConfidence = 1.00f;
     public const float UnknownLocalFloraConfidence = 0.75f;
     public const float KnownLocalFaunaConfidence = 1.00f;

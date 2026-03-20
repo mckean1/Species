@@ -12,6 +12,16 @@ public sealed class AdvancementEvidenceState
 
     public int SuccessfulResidenceWithRegionKnowledgeMonths { get; set; }
 
+    public int MaterialPracticeMonths { get; set; }
+
+    public int StoragePressureMonths { get; set; }
+
+    public int ShelterReadinessMonths { get; set; }
+
+    public int StabilityMonths { get; set; }
+
+    public int ContactLearningMonths { get; set; }
+
     public AdvancementEvidenceState Clone()
     {
         return new AdvancementEvidenceState
@@ -20,7 +30,12 @@ public sealed class AdvancementEvidenceState
             SuccessfulHuntingWithKnowledgeMonths = SuccessfulHuntingWithKnowledgeMonths,
             SurplusStoredFoodMonths = SurplusStoredFoodMonths,
             KnownRouteTravelMonths = KnownRouteTravelMonths,
-            SuccessfulResidenceWithRegionKnowledgeMonths = SuccessfulResidenceWithRegionKnowledgeMonths
+            SuccessfulResidenceWithRegionKnowledgeMonths = SuccessfulResidenceWithRegionKnowledgeMonths,
+            MaterialPracticeMonths = MaterialPracticeMonths,
+            StoragePressureMonths = StoragePressureMonths,
+            ShelterReadinessMonths = ShelterReadinessMonths,
+            StabilityMonths = StabilityMonths,
+            ContactLearningMonths = ContactLearningMonths
         };
     }
 }

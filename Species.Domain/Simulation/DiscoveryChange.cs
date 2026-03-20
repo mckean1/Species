@@ -15,4 +15,6 @@ public sealed class DiscoveryChange
     public required string UnlockedDiscoveriesSummary { get; init; }
 
     public required string DecisionEffectSummary { get; init; }
+
+    public required string ChronicleLinesSummary { get; init; }
 }

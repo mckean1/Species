@@ -72,6 +72,17 @@ public static class PolityPresentation
         };
     }
 
+    public static string DescribeGovernanceBand(int value)
+    {
+        return value switch
+        {
+            >= 75 => "Strong",
+            >= 55 => "Steady",
+            >= 35 => "Strained",
+            _ => "Weak"
+        };
+    }
+
     public static string DescribeAnchoringKind(PolityAnchoringKind anchoringKind)
     {
         return anchoringKind switch
@@ -103,6 +114,33 @@ public static class PolityPresentation
             SettlementType.CampHub => "Camp Hub",
             SettlementType.SeasonalBase => "Seasonal Base",
             SettlementType.Village => "Village",
+            _ => "Unknown"
+        };
+    }
+
+    public static string DescribePoliticalScaleForm(PoliticalScaleForm form)
+    {
+        return form switch
+        {
+            PoliticalScaleForm.LocalPolity => "Local Polity",
+            PoliticalScaleForm.RegionalState => "Regional State",
+            PoliticalScaleForm.KingdomRealm => "Kingdom-Like Realm",
+            PoliticalScaleForm.CompositeRealm => "Composite Realm",
+            PoliticalScaleForm.EmpireLike => "Empire-Like State",
+            PoliticalScaleForm.Fragmenting => "Fragmenting Realm",
+            _ => "Unknown"
+        };
+    }
+
+    public static string DescribePoliticalAttachmentKind(PoliticalAttachmentKind kind)
+    {
+        return kind switch
+        {
+            PoliticalAttachmentKind.DirectIntegration => "Direct Integration",
+            PoliticalAttachmentKind.LooseAttachment => "Loose Attachment",
+            PoliticalAttachmentKind.Subordinate => "Subordinate",
+            PoliticalAttachmentKind.FederatedAttachment => "Federated Attachment",
+            PoliticalAttachmentKind.BreakawaySuccessor => "Breakaway Successor",
             _ => "Unknown"
         };
     }

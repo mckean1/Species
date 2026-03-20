@@ -24,6 +24,14 @@ public sealed class Settlement
 
     public int StoredFood { get; set; }
 
+    public MaterialStockpile MaterialStores { get; set; } = new();
+
+    public int MaterialSupport { get; set; }
+
+    public int MaterialShortageMonths { get; set; }
+
+    public int MaterialSurplusMonths { get; set; }
+
     public Settlement Clone()
     {
         return new Settlement
@@ -37,7 +45,11 @@ public sealed class Settlement
             FoundedMonth = FoundedMonth,
             IsActive = IsActive,
             IsPrimary = IsPrimary,
-            StoredFood = StoredFood
+            StoredFood = StoredFood,
+            MaterialStores = MaterialStores.Clone(),
+            MaterialSupport = MaterialSupport,
+            MaterialShortageMonths = MaterialShortageMonths,
+            MaterialSurplusMonths = MaterialSurplusMonths
         };
     }
 }

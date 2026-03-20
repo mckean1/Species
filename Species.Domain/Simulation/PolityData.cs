@@ -9,6 +9,7 @@ public sealed record PolityContext(
     IReadOnlyList<PopulationGroup> MemberGroups,
     int TotalPopulation,
     int TotalStoredFood,
+    MaterialStockpile TotalMaterialStores,
     PressureState Pressures,
     IReadOnlySet<string> KnownRegionIds,
     IReadOnlySet<string> KnownDiscoveryIds,
@@ -19,7 +20,16 @@ public sealed record PolityContext(
     string CurrentRegionId,
     string OriginRegionId,
     string SpeciesId,
-    PolityAnchoringKind AnchoringKind);
+    PolityAnchoringKind AnchoringKind,
+    string ParentPolityId,
+    GovernanceState Governance,
+    ExternalPressureState ExternalPressure,
+    PoliticalScaleState ScaleState,
+    SocialMemoryState SocialMemory,
+    SocialIdentityState SocialIdentity,
+    MaterialProductionState MaterialProduction,
+    int MaterialShortageMonths,
+    int MaterialSurplusMonths);
 
 public static class PolityData
 {
@@ -72,6 +82,15 @@ public static class PolityData
         var leadGroup = memberGroups[0];
         var totalPopulation = memberGroups.Sum(group => group.Population);
         var totalStoredFood = memberGroups.Sum(group => group.StoredFood);
+        var totalMaterialStores = polity.MaterialStores.Clone();
+        foreach (var settlement in polity.Settlements.Where(settlement => settlement.IsActive))
+        {
+            totalMaterialStores.Timber += settlement.MaterialStores.Timber;
+            totalMaterialStores.Stone += settlement.MaterialStores.Stone;
+            totalMaterialStores.Fiber += settlement.MaterialStores.Fiber;
+            totalMaterialStores.Clay += settlement.MaterialStores.Clay;
+            totalMaterialStores.Hides += settlement.MaterialStores.Hides;
+        }
         var pressureWeight = Math.Max(1, totalPopulation);
 
         var knownRegionIds = memberGroups
@@ -90,6 +109,7 @@ public static class PolityData
             memberGroups,
             totalPopulation,
             totalStoredFood,
+            totalMaterialStores,
             new PressureState
             {
                 FoodPressure = WeightedAverage(memberGroups, pressureWeight, group => group.Pressures.FoodPressure),
@@ -107,7 +127,16 @@ public static class PolityData
             leadGroup.CurrentRegionId,
             leadGroup.OriginRegionId,
             leadGroup.SpeciesId,
-            polity.AnchoringKind);
+            polity.AnchoringKind,
+            polity.ParentPolityId,
+            polity.Governance.Clone(),
+            polity.ExternalPressure.Clone(),
+            polity.ScaleState.Clone(),
+            polity.SocialMemory.Clone(),
+            polity.SocialIdentity.Clone(),
+            polity.MaterialProduction.Clone(),
+            polity.MaterialShortageMonths,
+            polity.MaterialSurplusMonths);
     }
 
     private static int WeightedAverage(

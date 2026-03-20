@@ -24,5 +24,7 @@ public sealed class FloraPopulationChange
 
     public required float FertilityFit { get; init; }
 
+    public required float BiologicalFit { get; init; }
+
     public required string PrimaryCause { get; init; }
 }

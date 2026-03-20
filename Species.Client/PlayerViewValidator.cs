@@ -21,6 +21,16 @@ public static class PlayerViewValidator
             errors.Add("Current player screen is invalid.");
         }
 
+        if (!Enum.IsDefined(viewState.CurrentChronicleMode))
+        {
+            errors.Add("Current Chronicle mode is invalid.");
+        }
+
+        if (!Enum.IsDefined(viewState.CurrentChronicleSelectionArea))
+        {
+            errors.Add("Current Chronicle selection area is invalid.");
+        }
+
         if (viewState.CurrentScreen != PlayerScreen.Chronicle &&
             viewState.CurrentScreen != PlayerScreen.Polity &&
             viewState.CurrentScreen != PlayerScreen.Advancements &&
@@ -75,6 +85,42 @@ public static class PlayerViewValidator
             (knownSpeciesCount > 0 && viewState.CurrentKnownSpeciesIndex >= knownSpeciesCount))
         {
             errors.Add("Known Species points at an invalid species.");
+        }
+
+        var chronicleData = ChronicleScreenDataBuilder.Build(world, focalPolityId, viewState);
+        if (viewState.CurrentChronicleUrgentIndex < 0 ||
+            (chronicleData.UrgentItems.Count > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleData.UrgentItems.Count))
+        {
+            errors.Add("Chronicle urgent selection points at an invalid item.");
+        }
+
+        var chronicleEntryIndex = viewState.CurrentChronicleMode switch
+        {
+            ChronicleMode.Live => viewState.CurrentChronicleLiveIndex,
+            ChronicleMode.Archive => viewState.CurrentChronicleArchiveIndex,
+            _ => viewState.CurrentChronicleMilestoneIndex
+        };
+        if (chronicleEntryIndex < 0 ||
+            (chronicleData.Entries.Count > 0 && chronicleEntryIndex >= chronicleData.Entries.Count))
+        {
+            errors.Add("Chronicle entry selection points at an invalid item.");
+        }
+
+        if (viewState.IsLawActionMenuOpen &&
+            (viewState.CurrentScreen != PlayerScreen.Laws || viewState.CurrentLawActionIndex < 0 || viewState.CurrentLawActionIndex > 1))
+        {
+            errors.Add("Law action selection is invalid.");
+        }
+
+        foreach (var urgent in chronicleData.UrgentItems)
+        {
+            if (urgent.TargetScreen == PlayerScreen.Laws &&
+                focalPolity?.ActiveLawProposal is not null &&
+                !string.IsNullOrWhiteSpace(urgent.TargetId) &&
+                !string.Equals(urgent.TargetId, focalPolity.ActiveLawProposal.Id, StringComparison.Ordinal))
+            {
+                errors.Add("Chronicle urgent law reference does not match the active proposal.");
+            }
         }
 
         if (focalPolity is not null && focalContext is null)

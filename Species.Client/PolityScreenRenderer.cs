@@ -45,7 +45,11 @@ public static class PolityScreenRenderer
 
         lines.AddRange(bodyLines.Select(line => BorderLine(FitVisible(line, innerWidth), innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            ["Tab: Screens", "Space: Pause/Run", "N: Next Tick"],
+            ["Tab: Screens", "Space: Pause/Run"],
+            ["Tab: Screens"]));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
@@ -64,6 +68,7 @@ public static class PolityScreenRenderer
         lines.Add($"Core Region: {data.CoreRegion}");
         lines.Add($"Primary Site: {data.PrimarySite}");
         lines.Add($"Population: {data.Population}");
+        lines.Add($"Materials: {data.MaterialStores}");
         lines.Add($"Runtime: {runningText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
 
@@ -80,6 +85,49 @@ public static class PolityScreenRenderer
         lines.AddRange(CombinePaneRows(strengthsProblems, progressLines, leftWidth, rightWidth));
 
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Governance Condition{Reset}");
+        foreach (var governanceNote in BuildBulletLines(data.GovernanceNotes, leftWidth + rightWidth + 3, Blue))
+        {
+            lines.Add(governanceNote);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Political Scale{Reset}");
+        foreach (var scaleNote in BuildBulletLines(data.ScaleNotes, leftWidth + rightWidth + 3, Yellow))
+        {
+            lines.Add(scaleNote);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Outside Relations{Reset}");
+        foreach (var externalNote in BuildBulletLines(data.ExternalNotes, leftWidth + rightWidth + 3, Orange))
+        {
+            lines.Add(externalNote);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add(CombinePaneRow($"{PaneTitle}Social Character{Reset}", $"{PaneTitle}Traditions{Reset}", leftWidth, rightWidth));
+        lines.AddRange(CombinePaneRows(
+            BuildBulletLines(data.SocialIdentityNotes, leftWidth, Purple),
+            BuildBulletLines(data.Traditions, rightWidth, Yellow),
+            leftWidth,
+            rightWidth));
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Regional Identity{Reset}");
+        foreach (var regionalNote in BuildBulletLines(data.RegionalIdentityNotes, leftWidth + rightWidth + 3, Purple))
+        {
+            lines.Add(regionalNote);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Material Condition{Reset}");
+        foreach (var materialNote in BuildBulletLines(data.MaterialNotes, leftWidth + rightWidth + 3, Yellow))
+        {
+            lines.Add(materialNote);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
         lines.Add($"{PaneTitle}Active Laws{Reset}");
         foreach (var law in BuildBulletLines(data.ActiveLaws, leftWidth + rightWidth + 3, Dim))
         {
@@ -91,6 +139,13 @@ public static class PolityScreenRenderer
         foreach (var presence in BuildBulletLines(data.RegionalPresence, leftWidth + rightWidth + 3, Purple))
         {
             lines.Add(presence);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Political History{Reset}");
+        foreach (var record in BuildBulletLines(data.PoliticalHistory, leftWidth + rightWidth + 3, Dim))
+        {
+            lines.Add(record);
         }
 
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");

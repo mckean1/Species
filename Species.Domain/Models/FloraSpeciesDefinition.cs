@@ -19,4 +19,16 @@ public sealed class FloraSpeciesDefinition
     public float GrowthRate { get; init; }
 
     public float FoodValue { get; init; }
+
+    public BiologicalTraitProfile BaselineTraits { get; init; } = new();
+
+    public string ParentSpeciesId { get; init; } = string.Empty;
+
+    public string OriginRegionId { get; init; } = string.Empty;
+
+    public bool IsExtinct { get; init; }
+
+    public int? ExtinctOnYear { get; init; }
+
+    public int? ExtinctOnMonth { get; init; }
 }

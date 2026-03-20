@@ -46,7 +46,11 @@ public static class RegionViewerRenderer
         var lowerRows = BuildLowerRows(data.SelectedRegion, leftWidth, rightWidth, lowerHeight);
         lines.AddRange(lowerRows.Select(line => BorderLine(line, innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select region"));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run", "N: Next Tick"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run"],
+            ["Tab: Screens", "Up/Down: Navigate", "Enter: Select"]));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
@@ -146,6 +150,8 @@ public static class RegionViewerRenderer
 
         lines.AddRange(BuildBulletLines(selectedRegion.Flora.Select(item => $"Flora: {item}"), width, Green));
         lines.AddRange(BuildBulletLines(selectedRegion.Fauna.Select(item => $"Fauna: {item}"), width, Cyan));
+        lines.AddRange(BuildBulletLines(selectedRegion.Materials.Select(item => $"Material: {item}"), width, Yellow));
+        lines.AddRange(BuildBulletLines(selectedRegion.Biology.Select(item => $"Biology: {item}"), width, Purple));
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Knowledge{Reset}");
         lines.AddRange(BuildBulletLines(selectedRegion.Knowledge, width, Purple));
@@ -177,6 +183,9 @@ public static class RegionViewerRenderer
         lines.Add($"{PaneTitle}Opportunity / Risk{Reset}");
         lines.AddRange(BuildBulletLines(selectedRegion.Opportunities, width, Green));
         lines.AddRange(BuildBulletLines(selectedRegion.Risks, width, Orange));
+        lines.Add($"{Dim}{new string('-', width)}{Reset}");
+        lines.Add($"{PaneTitle}Fossils / Deep History{Reset}");
+        lines.AddRange(BuildBulletLines(selectedRegion.Fossils, width, Cyan));
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Groups Here{Reset}");
         lines.AddRange(BuildBulletLines(selectedRegion.GroupPresence.Count > 0 ? selectedRegion.GroupPresence : ["No notable presence"], width, Blue));

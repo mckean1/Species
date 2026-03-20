@@ -27,9 +27,14 @@ public static class PlayerScreenShell
         ];
     }
 
-    public static string BuildFooter(int innerWidth, string? selectionLabel = null)
+    public static string BuildFooter(
+        int innerWidth,
+        IReadOnlyList<string> fullControls,
+        IReadOnlyList<string>? mediumControls = null,
+        IReadOnlyList<string>? smallControls = null)
     {
-        return BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, selectionLabel), innerWidth);
+        var rendered = RenderFooter(innerWidth, fullControls, mediumControls ?? fullControls, smallControls ?? mediumControls ?? fullControls);
+        return BorderLine(rendered, innerWidth);
     }
 
     public static string ResolvePolityName(World world, string focalPolityId)
@@ -96,5 +101,46 @@ public static class PlayerScreenShell
         }
 
         return length;
+    }
+
+    private static string RenderFooter(
+        int innerWidth,
+        IReadOnlyList<string> fullControls,
+        IReadOnlyList<string> mediumControls,
+        IReadOnlyList<string> smallControls)
+    {
+        var full = string.Join("   ", fullControls);
+        if (VisibleLength(full) <= innerWidth)
+        {
+            return full;
+        }
+
+        var medium = string.Join("   ", mediumControls);
+        if (VisibleLength(medium) <= innerWidth)
+        {
+            return medium;
+        }
+
+        var small = string.Join("   ", smallControls);
+        if (VisibleLength(small) <= innerWidth)
+        {
+            return small;
+        }
+
+        var fallback = new List<string>();
+        foreach (var control in smallControls)
+        {
+            var candidate = fallback.Count == 0
+                ? control
+                : $"{string.Join("   ", fallback)}   {control}";
+            if (VisibleLength(candidate) > innerWidth)
+            {
+                break;
+            }
+
+            fallback.Add(control);
+        }
+
+        return fallback.Count > 0 ? string.Join("   ", fallback) : string.Empty;
     }
 }

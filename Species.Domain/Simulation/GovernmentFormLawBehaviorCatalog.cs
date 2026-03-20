@@ -27,7 +27,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Priests] = 4,
                     [ProposalBackingSource.Merchants] = 2
                 },
-                7, 5, 2, 1, 1, 2, 52, 58, 3),
+                7, 5, 2, 1, 1, 2, 52, 58, 3, 58, 62, 46, 35, 70),
             [GovernmentForm.Confederation] = new(
                 GovernmentForm.Confederation,
                 new Dictionary<LawProposalCategory, int>
@@ -47,7 +47,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Merchants] = 3,
                     [ProposalBackingSource.Priests] = 2
                 },
-                4, 9, 5, 1, 1, 1, 42, 60, 2),
+                4, 9, 5, 1, 1, 1, 42, 60, 2, 54, 58, 40, 28, 78),
             [GovernmentForm.CouncilRule] = new(
                 GovernmentForm.CouncilRule,
                 new Dictionary<LawProposalCategory, int>
@@ -67,7 +67,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Warriors] = 3,
                     [ProposalBackingSource.Priests] = 2
                 },
-                5, 8, 4, 1, 1, 1, 48, 52, 3),
+                5, 8, 4, 1, 1, 1, 48, 52, 3, 56, 55, 48, 45, 65),
             [GovernmentForm.MerchantRule] = new(
                 GovernmentForm.MerchantRule,
                 new Dictionary<LawProposalCategory, int>
@@ -87,7 +87,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Warriors] = 3,
                     [ProposalBackingSource.Priests] = 1
                 },
-                6, 7, 3, 2, 1, 1, 54, 50, 4),
+                6, 7, 3, 2, 1, 1, 54, 50, 4, 52, 48, 56, 54, 52),
             [GovernmentForm.FeudalRule] = new(
                 GovernmentForm.FeudalRule,
                 new Dictionary<LawProposalCategory, int>
@@ -107,7 +107,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Merchants] = 2,
                     [ProposalBackingSource.Priests] = 2
                 },
-                8, 5, 2, 2, 1, 2, 60, 46, 5),
+                8, 5, 2, 2, 1, 2, 60, 46, 5, 49, 45, 66, 68, 34),
             [GovernmentForm.ImperialBureaucracy] = new(
                 GovernmentForm.ImperialBureaucracy,
                 new Dictionary<LawProposalCategory, int>
@@ -127,7 +127,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.FrontierSettlers] = 3,
                     [ProposalBackingSource.Priests] = 2
                 },
-                8, 6, 2, 2, 1, 2, 70, 56, 4),
+                8, 6, 2, 2, 1, 2, 70, 56, 4, 57, 60, 68, 72, 38),
             [GovernmentForm.Republic] = new(
                 GovernmentForm.Republic,
                 new Dictionary<LawProposalCategory, int>
@@ -147,7 +147,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.FrontierSettlers] = 3,
                     [ProposalBackingSource.Priests] = 2
                 },
-                6, 7, 4, 1, 1, 2, 52, 60, 3),
+                6, 7, 4, 1, 1, 2, 52, 60, 3, 63, 61, 47, 42, 76),
             [GovernmentForm.AbsoluteRule] = new(
                 GovernmentForm.AbsoluteRule,
                 new Dictionary<LawProposalCategory, int>
@@ -166,7 +166,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Merchants] = 3,
                     [ProposalBackingSource.Priests] = 2
                 },
-                10, 3, 1, 3, 1, 3, 72, 44, 6),
+                10, 3, 1, 3, 1, 3, 72, 44, 6, 45, 42, 78, 82, 22),
             [GovernmentForm.DespoticRule] = new(
                 GovernmentForm.DespoticRule,
                 new Dictionary<LawProposalCategory, int>
@@ -186,7 +186,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.Merchants] = 2,
                     [ProposalBackingSource.Priests] = 1
                 },
-                11, 2, 1, 4, 1, 3, 78, 38, 7),
+                11, 2, 1, 4, 1, 3, 78, 38, 7, 36, 34, 84, 88, 16),
             [GovernmentForm.Theocracy] = new(
                 GovernmentForm.Theocracy,
                 new Dictionary<LawProposalCategory, int>
@@ -206,7 +206,7 @@ public static class GovernmentFormLawBehaviorCatalog
                     [ProposalBackingSource.FrontierSettlers] = 3,
                     [ProposalBackingSource.Merchants] = 2
                 },
-                8, 4, 2, 2, 1, 2, 66, 54, 5)
+                8, 4, 2, 2, 1, 2, 66, 54, 5, 60, 58, 64, 58, 44)
         };
 
     public static GovernmentFormProposalBehavior Get(GovernmentForm governmentForm)

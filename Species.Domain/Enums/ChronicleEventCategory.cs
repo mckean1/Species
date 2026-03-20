@@ -9,5 +9,10 @@ public enum ChronicleEventCategory
     Discovery,
     Advancement,
     Law,
-    Settlement
+    Settlement,
+    Material,
+    Social,
+    Biological,
+    External,
+    Political
 }

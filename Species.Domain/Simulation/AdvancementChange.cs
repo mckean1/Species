@@ -17,4 +17,6 @@ public sealed class AdvancementChange
     public required string UnlockedAdvancementsSummary { get; init; }
 
     public required string PracticalEffectSummary { get; init; }
+
+    public required string ChronicleLinesSummary { get; init; }
 }

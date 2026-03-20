@@ -194,6 +194,8 @@ public static class RegionsScreenDataBuilder
             opportunities.Add(KnowledgePresentation.DescribeFoodSigns(snapshot.FloraKnowledge, "Local flora cataloged", "Useful plants observed", "Rumors of forage", "Flora not yet observed"));
         }
 
+        opportunities.Add(DescribeMaterials(region, snapshot));
+
         var risks = new List<string>();
         if (snapshot is not null)
         {
@@ -230,10 +232,13 @@ public static class RegionsScreenDataBuilder
             BuildGroupPresence(groupsHere, exactPresenceVisible),
             topFlora.Length > 0 ? topFlora : ["None known"],
             topFauna.Length > 0 ? topFauna : ["None known"],
+            BuildMaterialLines(region, snapshot),
             knowledge,
             context.Count > 0 ? context.ToArray() : ["No special connection noted"],
             opportunities.Count > 0 ? opportunities.ToArray() : ["No standout opportunities"],
             risks.Count > 0 ? risks.ToArray() : ["No major risks detected"],
+            BuildBiology(region, snapshot, floraCatalog, faunaCatalog),
+            BuildFossils(region, snapshot),
             threatText,
             threatScore);
     }
@@ -273,6 +278,97 @@ public static class RegionsScreenDataBuilder
         }
 
         return knowledge.Count > 0 ? knowledge : ["Not yet discovered"];
+    }
+
+    private static IReadOnlyList<string> BuildMaterialLines(Region region, RegionKnowledgeSnapshot? snapshot)
+    {
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsCurrentRegion == true)
+        {
+            var stores = region.MaterialProfile.Opportunities;
+            return
+            [
+                $"Timber {stores.Timber}",
+                $"Stone {stores.Stone}",
+                $"Fiber {stores.Fiber}",
+                $"Clay {stores.Clay}",
+                $"Hides {stores.Hides}"
+            ];
+        }
+
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial)
+        {
+            return ["Material strengths are only partly known"];
+        }
+
+        return ["Material potential not yet known"];
+    }
+
+    private static IReadOnlyList<string> BuildBiology(Region region, RegionKnowledgeSnapshot? snapshot, FloraSpeciesCatalog floraCatalog, FaunaSpeciesCatalog faunaCatalog)
+    {
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.FaunaKnowledge == KnowledgeLevel.Known || snapshot?.FloraKnowledge == KnowledgeLevel.Known))
+        {
+            return ["Biological differences are not yet understood"];
+        }
+
+        var lines = new List<string>();
+        lines.AddRange(region.Ecosystem.FaunaProfiles.Values
+            .Where(profile => !profile.IsExtinct && profile.DivergenceScore >= 40)
+            .OrderByDescending(profile => profile.DivergenceScore)
+            .Take(2)
+            .Select(profile =>
+            {
+                var definition = faunaCatalog.GetById(profile.SpeciesId);
+                var name = definition?.Name ?? profile.SpeciesId;
+                return $"{name}: {profile.DivergenceStage} [{profile.Traits.ToSummary()}]";
+            }));
+        lines.AddRange(region.Ecosystem.FloraProfiles.Values
+            .Where(profile => !profile.IsExtinct && profile.DivergenceScore >= 40)
+            .OrderByDescending(profile => profile.DivergenceScore)
+            .Take(2)
+            .Select(profile =>
+            {
+                var definition = floraCatalog.GetById(profile.SpeciesId);
+                var name = definition?.Name ?? profile.SpeciesId;
+                return $"{name}: {profile.DivergenceStage} [{profile.Traits.ToSummary()}]";
+            }));
+
+        return lines.Count > 0 ? lines : ["No major regional divergence is evident"];
+    }
+
+    private static IReadOnlyList<string> BuildFossils(Region region, RegionKnowledgeSnapshot? snapshot)
+    {
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known))
+        {
+            return ["Deep history is unknown here"];
+        }
+
+        return region.Ecosystem.FossilRecords
+            .OrderByDescending(record => record.RecordedYear)
+            .ThenByDescending(record => record.RecordedMonth)
+            .Take(2)
+            .Select(record => $"{record.FormName}: {record.TraitSummary}")
+            .DefaultIfEmpty("No notable fossils known")
+            .ToArray();
+    }
+
+    private static string DescribeMaterials(Region region, RegionKnowledgeSnapshot? snapshot)
+    {
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsCurrentRegion == true)
+        {
+            var top = region.MaterialProfile.Opportunities.AsDictionary()
+                .OrderByDescending(entry => entry.Value)
+                .ThenBy(entry => entry.Key)
+                .Take(2)
+                .Select(entry => $"{entry.Key.ToString().ToLowerInvariant()} {entry.Value}")
+                .ToArray();
+            return top.Length == 0
+                ? "Material opportunities look thin"
+                : $"Material strengths: {string.Join(", ", top)}";
+        }
+
+        return snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial
+            ? "Material opportunities are only partly known"
+            : "Material opportunities not yet known";
     }
 
     private static IReadOnlyList<string> BuildGroupPresence(IReadOnlyList<PopulationGroup> groupsHere, bool exactPresenceVisible)
@@ -348,9 +444,12 @@ public sealed record RegionSummary(
     IReadOnlyList<string> GroupPresence,
     IReadOnlyList<string> Flora,
     IReadOnlyList<string> Fauna,
+    IReadOnlyList<string> Materials,
     IReadOnlyList<string> Knowledge,
     IReadOnlyList<string> Context,
     IReadOnlyList<string> Opportunities,
     IReadOnlyList<string> Risks,
+    IReadOnlyList<string> Biology,
+    IReadOnlyList<string> Fossils,
     string ThreatText,
     int ThreatScore);

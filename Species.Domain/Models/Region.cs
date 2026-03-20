@@ -11,6 +11,7 @@ public sealed class Region
     public WaterAvailability WaterAvailability { get; }
     public IReadOnlyList<string> NeighborIds { get; }
     public RegionEcosystem Ecosystem { get; }
+    public RegionMaterialProfile MaterialProfile { get; }
 
     public Region(
         string id,
@@ -19,7 +20,8 @@ public sealed class Region
         Biome biome,
         WaterAvailability waterAvailability,
         IReadOnlyList<string> neighborIds,
-        RegionEcosystem? ecosystem = null)
+        RegionEcosystem? ecosystem = null,
+        RegionMaterialProfile? materialProfile = null)
     {
         Id = id;
         Name = name;
@@ -28,5 +30,6 @@ public sealed class Region
         WaterAvailability = waterAvailability;
         NeighborIds = neighborIds;
         Ecosystem = ecosystem ?? new RegionEcosystem();
+        MaterialProfile = materialProfile ?? new RegionMaterialProfile();
     }
 }

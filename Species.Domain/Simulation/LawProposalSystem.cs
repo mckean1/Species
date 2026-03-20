@@ -1,558 +1,245 @@
+using Species.Domain.Catalogs;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
 
-// MVP law proposals stay intentionally narrow: one active proposal, one rules table,
-// and a compact proposal pool driven by current pressures plus government form.
 public sealed class LawProposalSystem
 {
     private static readonly IReadOnlyDictionary<GovernmentForm, GovernmentFormProposalBehavior> Behaviors =
         GovernmentFormLawBehaviorCatalog.Behaviors;
 
+    private static readonly IReadOnlySet<GovernmentForm> AllGovernmentForms =
+        Enum.GetValues<GovernmentForm>().ToHashSet();
+
     private static readonly IReadOnlyList<LawProposalDefinition> Definitions =
     [
         new()
         {
-            Id = "ban-hunting",
-            Title = "Ban Hunting",
-            Summary = "The polity would halt hunting for a time to preserve nearby game.",
+            Id = GovernanceLawCatalog.CentralizeStoresId,
+            Title = "Centralize Stores",
+            Summary = "Core authority would direct shared food and material stores from the main sites.",
+            IntentSummary = "Shared stores would be gathered under central direction.",
+            TradeoffSummary = "Improves emergency coordination, but raises local resentment and frontier strain.",
             Category = LawProposalCategory.Food,
             ConflictGroup = LawConflictGroup.Food,
-            ConflictSlot = "hunting-access",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.TribalClanRule,
-            Score = (group, _) => ScoreWhen(
-                group.StoredFood > group.Population &&
-                group.Pressures.ThreatPressure < 45,
-                35 + group.Pressures.FoodPressure / 2 + group.Pressures.MigrationPressure / 3)
-        },
-        new()
-        {
-            Id = "require-warrior-oaths",
-            Title = "Require Warrior Oaths",
-            Summary = "Warriors would be bound to formal oath-taking before any campaign or feud.",
-            Category = LawProposalCategory.Military,
-            ConflictGroup = LawConflictGroup.Military,
-            ConflictSlot = "warrior-discipline",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.TribalClanRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 45,
-                30 + group.Pressures.ThreatPressure / 2 + group.Pressures.MigrationPressure / 5)
-        },
-        new()
-        {
-            Id = "forbid-blood-feuds",
-            Title = "Forbid Blood Feuds",
-            Summary = "Clan vengeance would be curbed to reduce spiraling retaliation.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "blood-feud-policy",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.TribalClanRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 35 || group.Pressures.OvercrowdingPressure >= 45,
-                25 + group.Pressures.ThreatPressure / 3 + group.Pressures.OvercrowdingPressure / 2)
-        },
-        new()
-        {
-            Id = "reserve-sacred-grounds",
-            Title = "Reserve Sacred Grounds",
-            Summary = "A protected sacred place would be set aside from ordinary use.",
-            Category = LawProposalCategory.Faith,
-            ConflictGroup = LawConflictGroup.Faith,
-            ConflictSlot = "sacred-grounds-policy",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.TribalClanRule,
-            Score = (group, region) => ScoreWhen(
-                region.WaterAvailability == WaterAvailability.High || group.Pressures.MigrationPressure >= 45,
-                20 + group.Pressures.MigrationPressure / 2 + group.Pressures.OvercrowdingPressure / 4)
-        },
-        new()
-        {
-            Id = "grant-market-rights",
-            Title = "Grant Market Rights",
-            Summary = "Regular market exchange would be formally recognized and protected.",
-            Category = LawProposalCategory.Trade,
-            ConflictGroup = LawConflictGroup.Trade,
-            ConflictSlot = "market-rights",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.CouncilRule,
-            ConflictingDefinitionIds = ["close-city-gates"],
-            Score = (group, _) => ScoreWhen(
-                group.StoredFood > group.Population &&
-                group.Pressures.ThreatPressure < 55,
-                25 + group.Pressures.OvercrowdingPressure / 3 + group.Pressures.MigrationPressure / 4)
-        },
-        new()
-        {
-            Id = "open-grain-stores",
-            Title = "Open Grain Stores",
-            Summary = "Stored food would be released to ease local scarcity.",
-            Category = LawProposalCategory.Food,
-            ConflictGroup = LawConflictGroup.Food,
-            ConflictSlot = "grain-release",
+            ConflictSlot = "store-control",
             ImpactScale = 3,
-            GovernmentForm = GovernmentForm.CouncilRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.FoodPressure >= 45 && group.StoredFood > Math.Max(1, group.Population / 3),
-                35 + group.Pressures.FoodPressure / 2)
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.LocalStoreAutonomyId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Polity.Settlements.Count(settlement => settlement.IsActive) >= 2,
+                18 + (context.MaterialShortageMonths * 12) + (context.MaterialProduction.DeficitScore / 2) +
+                (context.Governance.Authority / 6) + (context.ScaleState.Centralization / 10) + (context.TotalStoredFood <= Math.Max(1, context.TotalPopulation / 2) ? 12 : 0))
         },
         new()
         {
-            Id = "bind-common-defense",
-            Title = "Bind Common Defense",
-            Summary = "Member communities would be bound to answer common defense calls.",
-            Category = LawProposalCategory.Military,
-            ConflictGroup = LawConflictGroup.Military,
-            ConflictSlot = "common-defense-pact",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.Confederation,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 40 || group.Pressures.MigrationPressure >= 45,
-                28 + group.Pressures.ThreatPressure / 2 + group.Pressures.MigrationPressure / 4)
-        },
-        new()
-        {
-            Id = "affirm-local-autonomy",
-            Title = "Affirm Local Autonomy",
-            Summary = "Local communities would keep broad control over their own obligations.",
-            Category = LawProposalCategory.Custom,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "local-autonomy",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.Confederation,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.OvercrowdingPressure >= 35 || group.Pressures.MigrationPressure >= 35,
-                24 + group.Pressures.OvercrowdingPressure / 3 + group.Pressures.MigrationPressure / 3)
-        },
-        new()
-        {
-            Id = "restrict-private-retainers",
-            Title = "Restrict Private Retainers",
-            Summary = "Private armed followers would be limited to reduce elite coercion.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "private-retainers",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.CouncilRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 35 || group.Pressures.OvercrowdingPressure >= 40,
-                25 + group.Pressures.ThreatPressure / 3 + group.Pressures.OvercrowdingPressure / 3)
-        },
-        new()
-        {
-            Id = "expand-council-seats",
-            Title = "Expand Council Seats",
-            Summary = "More seats would be added so rising voices can enter deliberation.",
-            Category = LawProposalCategory.Custom,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "council-size",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.CouncilRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.MigrationPressure >= 35 || group.Pressures.OvercrowdingPressure >= 35,
-                20 + group.Pressures.MigrationPressure / 3 + group.Pressures.OvercrowdingPressure / 3)
-        },
-        new()
-        {
-            Id = "standardize-weights",
-            Title = "Standardize Weights",
-            Summary = "Trade measures would be standardized to steady exchange and pricing.",
-            Category = LawProposalCategory.Trade,
-            ConflictGroup = LawConflictGroup.Trade,
-            ConflictSlot = "trade-standards",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.MerchantRule,
-            Score = (group, _) => ScoreWhen(
-                group.StoredFood > Math.Max(1, group.Population / 2) || group.Pressures.MigrationPressure >= 35,
-                26 + group.Pressures.MigrationPressure / 3 + Math.Max(0, 50 - group.Pressures.ThreatPressure) / 4)
-        },
-        new()
-        {
-            Id = "protect-caravan-routes",
-            Title = "Protect Caravan Routes",
-            Summary = "Routes would be guarded to keep trade and movement flowing.",
-            Category = LawProposalCategory.Movement,
-            ConflictGroup = LawConflictGroup.Movement,
-            ConflictSlot = "route-protection",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.MerchantRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.MigrationPressure >= 40 || group.Pressures.ThreatPressure >= 35,
-                24 + group.Pressures.MigrationPressure / 3 + group.Pressures.ThreatPressure / 4)
-        },
-        new()
-        {
-            Id = "call-feudal-levy",
-            Title = "Call Feudal Levy",
-            Summary = "Local lords would be required to furnish armed service and retainers.",
-            Category = LawProposalCategory.Military,
-            ConflictGroup = LawConflictGroup.Military,
-            ConflictSlot = "feudal-levy",
-            ImpactScale = 3,
-            GovernmentForm = GovernmentForm.FeudalRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 45,
-                30 + group.Pressures.ThreatPressure / 2 + group.Pressures.OvercrowdingPressure / 4)
-        },
-        new()
-        {
-            Id = "reaffirm-lordly-privilege",
-            Title = "Reaffirm Lordly Privilege",
-            Summary = "Old privileges over land, duty, and rank would be formally reaffirmed.",
-            Category = LawProposalCategory.Custom,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "lordly-privilege",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.FeudalRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.OvercrowdingPressure >= 35 || group.Pressures.ThreatPressure >= 35,
-                22 + group.Pressures.OvercrowdingPressure / 3 + group.Pressures.ThreatPressure / 4)
-        },
-        new()
-        {
-            Id = "conduct-census",
-            Title = "Conduct Census",
-            Summary = "Households and obligations would be counted for clearer administration.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "population-census",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.ImperialBureaucracy,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.OvercrowdingPressure >= 35 || group.Pressures.MigrationPressure >= 35,
-                26 + group.Pressures.OvercrowdingPressure / 3 + group.Pressures.MigrationPressure / 3)
-        },
-        new()
-        {
-            Id = "standardize-tax-rolls",
-            Title = "Standardize Tax Rolls",
-            Summary = "Dues and records would be standardized across the polity.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "tax-rolls",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.ImperialBureaucracy,
-            Score = (group, _) => ScoreWhen(
-                group.StoredFood > Math.Max(1, group.Population / 2) || group.Pressures.OvercrowdingPressure >= 40,
-                25 + group.Pressures.OvercrowdingPressure / 3 + Math.Max(0, 50 - group.Pressures.FoodPressure) / 4)
-        },
-        new()
-        {
-            Id = "expand-civic-assembly",
-            Title = "Expand Civic Assembly",
-            Summary = "More civic voices would be admitted into formal deliberation.",
-            Category = LawProposalCategory.Custom,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "civic-assembly",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.Republic,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.OvercrowdingPressure >= 35 || group.Pressures.MigrationPressure >= 35,
-                24 + group.Pressures.OvercrowdingPressure / 3 + group.Pressures.MigrationPressure / 3)
-        },
-        new()
-        {
-            Id = "limit-emergency-decrees",
-            Title = "Limit Emergency Decrees",
-            Summary = "Emergency orders would face tighter limits and shorter duration.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "emergency-decrees",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.Republic,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure < 55 && group.Pressures.MigrationPressure >= 30,
-                22 + group.Pressures.MigrationPressure / 3 + (100 - group.Pressures.ThreatPressure) / 5)
-        },
-        new()
-        {
-            Id = "initiate-curfew",
-            Title = "Initiate Curfew",
-            Summary = "Movement after dark would be restricted to tighten local order.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "curfew-policy",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            RelatedLawScoreModifiers = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["close-city-gates"] = 10
-            },
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 45 || group.Pressures.OvercrowdingPressure >= 45,
-                30 + group.Pressures.ThreatPressure / 2 + group.Pressures.OvercrowdingPressure / 4)
-        },
-        new()
-        {
-            Id = "authorize-secret-arrests",
-            Title = "Authorize Secret Arrests",
-            Summary = "Suspected enemies could be seized quietly without public process.",
-            Category = LawProposalCategory.Punishment,
-            ConflictGroup = LawConflictGroup.Punishment,
-            ConflictSlot = "secret-arrests",
-            ImpactScale = 3,
-            GovernmentForm = GovernmentForm.DespoticRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 50 || group.Pressures.MigrationPressure >= 50,
-                32 + group.Pressures.ThreatPressure / 2 + group.Pressures.MigrationPressure / 4)
-        },
-        new()
-        {
-            Id = "impose-emergency-rule",
-            Title = "Impose Emergency Rule",
-            Summary = "Normal restraints would be suspended to force immediate order.",
-            Category = LawProposalCategory.Order,
-            ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "emergency-rule",
-            ImpactScale = 3,
-            GovernmentForm = GovernmentForm.DespoticRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 55 || group.Pressures.OvercrowdingPressure >= 55,
-                34 + group.Pressures.ThreatPressure / 2 + group.Pressures.OvercrowdingPressure / 3)
-        },
-        new()
-        {
-            Id = "raise-war-levy",
-            Title = "Raise War Levy",
-            Summary = "More people and goods would be claimed for defense or war.",
-            Category = LawProposalCategory.Military,
-            ConflictGroup = LawConflictGroup.Military,
-            ConflictSlot = "war-levy",
-            ImpactScale = 3,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 55,
-                35 + group.Pressures.ThreatPressure / 2 + group.Pressures.MigrationPressure / 5)
-        },
-        new()
-        {
-            Id = "establish-public-executions",
-            Title = "Establish Public Executions",
-            Summary = "Punishment would be made public to harden deterrence.",
-            Category = LawProposalCategory.Punishment,
-            ConflictGroup = LawConflictGroup.Punishment,
-            ConflictSlot = "execution-policy",
-            ImpactScale = 3,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure >= 60 || group.Pressures.OvercrowdingPressure >= 60,
-                20 + group.Pressures.ThreatPressure / 2 + group.Pressures.OvercrowdingPressure / 3)
-        },
-        new()
-        {
-            Id = "close-city-gates",
-            Title = "Close City Gates",
-            Summary = "Entry and exit would be narrowed to control danger and movement.",
-            Category = LawProposalCategory.Movement,
-            ConflictGroup = LawConflictGroup.Movement,
-            ConflictSlot = "gate-access",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            ConflictingDefinitionIds = ["grant-market-rights"],
-            RelatedLawScoreModifiers = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["initiate-curfew"] = 8
-            },
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.MigrationPressure >= 45 || group.Pressures.ThreatPressure >= 45,
-                30 + group.Pressures.MigrationPressure / 2 + group.Pressures.ThreatPressure / 4)
-        },
-        new()
-        {
-            Id = "forbid-foreign-worship",
-            Title = "Forbid Foreign Worship",
-            Summary = "Foreign rites would be barred to defend the local sacred order.",
-            Category = LawProposalCategory.Faith,
-            ConflictGroup = LawConflictGroup.Faith,
-            ConflictSlot = "foreign-worship",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.Theocracy,
-            RelatedLawScoreModifiers = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["mandate-holy-rites"] = 8,
-                ["burn-heretical-texts"] = 6
-            },
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.MigrationPressure >= 40 || group.Pressures.OvercrowdingPressure >= 40,
-                25 + group.Pressures.MigrationPressure / 2 + group.Pressures.OvercrowdingPressure / 4)
-        },
-        new()
-        {
-            Id = "mandate-holy-rites",
-            Title = "Mandate Holy Rites",
-            Summary = "Common rites would be made compulsory in public life.",
-            Category = LawProposalCategory.Faith,
-            ConflictGroup = LawConflictGroup.Faith,
-            ConflictSlot = "holy-rites",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.Theocracy,
-            RelatedLawScoreModifiers = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["forbid-foreign-worship"] = 10
-            },
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.WaterPressure >= 35 || group.Pressures.FoodPressure >= 35,
-                20 + group.Pressures.WaterPressure / 3 + group.Pressures.FoodPressure / 3)
-        },
-        new()
-        {
-            Id = "burn-heretical-texts",
-            Title = "Burn Heretical Texts",
-            Summary = "Texts judged dangerous to doctrine would be destroyed.",
-            Category = LawProposalCategory.Punishment,
-            ConflictGroup = LawConflictGroup.Punishment,
-            ConflictSlot = "heresy-texts",
-            ImpactScale = 2,
-            GovernmentForm = GovernmentForm.Theocracy,
-            RelatedLawScoreModifiers = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["forbid-foreign-worship"] = 8
-            },
-            Score = (group, _) => ScoreWhen(
-                group.KnownDiscoveryIds.Count + group.LearnedAdvancementIds.Count >= 2 &&
-                (group.Pressures.ThreatPressure >= 35 || group.Pressures.MigrationPressure >= 35),
-                15 + group.Pressures.ThreatPressure / 3 + group.Pressures.MigrationPressure / 3)
-        },
-        new()
-        {
-            Id = "ban-funeral-excess",
-            Title = "Ban Funeral Excess",
-            Summary = "Funeral spending and display would be limited during strain.",
+            Id = GovernanceLawCatalog.LocalStoreAutonomyId,
+            Title = "Affirm Local Store Autonomy",
+            Summary = "Settlements would retain broader control over their own stores and distribution.",
+            IntentSummary = "Local sites would keep wider authority over stores and relief.",
+            TradeoffSummary = "Eases frontier resentment and can lift legitimacy, but weakens central coordination.",
             Category = LawProposalCategory.Custom,
             ConflictGroup = LawConflictGroup.Food,
-            ConflictSlot = "funeral-excess",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.Theocracy,
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.FoodPressure >= 45 || group.StoredFood < Math.Max(1, group.Population / 2),
-                25 + group.Pressures.FoodPressure / 2)
+            ConflictSlot = "store-control",
+            ImpactScale = 2,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.CentralizeStoresId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Polity.Settlements.Count(settlement => settlement.IsActive) >= 2,
+                14 + (context.Governance.PeripheralStrain / 2) + ((100 - context.Governance.Legitimacy) / 3) +
+                ((100 - context.Governance.Cohesion) / 4) + (context.ScaleState.AutonomyTolerance / 10))
         },
         new()
         {
-            Id = "end-curfew",
-            Title = "End Curfew",
-            Summary = "The curfew would be lifted as the polity eases direct control.",
+            Id = GovernanceLawCatalog.ExtractionObligationId,
+            Title = "Impose Extraction Obligation",
+            Summary = "Settlements and camps would be pressed to contribute more labor and material output.",
+            IntentSummary = "Regional extraction would be pushed harder to reinforce the polity.",
+            TradeoffSummary = "Strengthens stores and tools when capacity exists, but can erode legitimacy and compliance.",
             Category = LawProposalCategory.Order,
             ConflictGroup = LawConflictGroup.Order,
-            ConflictSlot = "curfew-policy",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            RequiredActiveDefinitionIds = ["initiate-curfew"],
-            RepealsDefinitionIds = ["initiate-curfew"],
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure < 45 || group.Pressures.MigrationPressure >= 55,
-                20 + (100 - group.Pressures.ThreatPressure) / 3 + group.Pressures.MigrationPressure / 3)
+            ConflictSlot = "extraction-burden",
+            ImpactScale = 3,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.EaseExtractionBurdenId],
+            Score = (_, _, context) => ScoreWhen(
+                context.MaterialProduction.DeficitScore >= 30 || context.Pressures.ThreatPressure >= 45,
+                20 + (context.MaterialProduction.DeficitScore / 2) + (context.Pressures.ThreatPressure / 4) +
+                (context.Governance.Authority / 7) + (context.ScaleState.OverextensionPressure / 12))
         },
         new()
         {
-            Id = "reopen-city-gates",
-            Title = "Reopen City Gates",
-            Summary = "Gate controls would be relaxed so passage can resume.",
+            Id = GovernanceLawCatalog.EaseExtractionBurdenId,
+            Title = "Ease Extraction Burden",
+            Summary = "Extraction obligations would be lightened to reduce strain on local communities.",
+            IntentSummary = "Local extraction demands would be relaxed for stability.",
+            TradeoffSummary = "Reduces resistance and improves cohesion, but slows stockpile recovery.",
+            Category = LawProposalCategory.Custom,
+            ConflictGroup = LawConflictGroup.Order,
+            ConflictSlot = "extraction-burden",
+            ImpactScale = 2,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.ExtractionObligationId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Governance.Legitimacy <= 55 || context.Governance.PeripheralStrain >= 35,
+                14 + ((100 - context.Governance.Legitimacy) / 3) + (context.Governance.PeripheralStrain / 2) +
+                (context.MaterialShortageMonths >= 2 ? 6 : 0) + (context.ScaleState.FragmentationRisk / 12))
+        },
+        new()
+        {
+            Id = GovernanceLawCatalog.CrisisMovementRestrictionId,
+            Title = "Restrict Crisis Movement",
+            Summary = "Movement would be curtailed during instability so the core can hold people and stores together.",
+            IntentSummary = "Movement would be tightened to preserve order in crisis.",
+            TradeoffSummary = "Can reduce immediate disorder, but harms legitimacy and frontier compliance.",
             Category = LawProposalCategory.Movement,
             ConflictGroup = LawConflictGroup.Movement,
-            ConflictSlot = "gate-access",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            RequiredActiveDefinitionIds = ["close-city-gates"],
-            RepealsDefinitionIds = ["close-city-gates"],
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.FoodPressure >= 45 || group.Pressures.ThreatPressure < 45,
-                20 + group.Pressures.FoodPressure / 3 + (100 - group.Pressures.ThreatPressure) / 4)
+            ConflictSlot = "mobility-order",
+            ImpactScale = 3,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.OpenMovementId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Pressures.MigrationPressure >= 40 || context.Pressures.ThreatPressure >= 45,
+                18 + (context.Pressures.MigrationPressure / 2) + (context.Pressures.ThreatPressure / 4) +
+                (context.Governance.Authority / 8) + (context.ScaleState.Centralization / 12))
         },
         new()
         {
-            Id = "permit-foreign-worship",
-            Title = "Permit Foreign Worship",
-            Summary = "Foreign rites would be tolerated again to ease outside tension.",
-            Category = LawProposalCategory.Faith,
-            ConflictGroup = LawConflictGroup.Faith,
-            ConflictSlot = "foreign-worship",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.Theocracy,
-            RequiredActiveDefinitionIds = ["forbid-foreign-worship"],
-            RepealsDefinitionIds = ["forbid-foreign-worship"],
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.MigrationPressure >= 55 || group.Pressures.ThreatPressure < 45,
-                20 + group.Pressures.MigrationPressure / 3 + (100 - group.Pressures.ThreatPressure) / 4)
+            Id = GovernanceLawCatalog.OpenMovementId,
+            Title = "Protect Open Movement",
+            Summary = "Routes would remain open and movement restrictions would be narrowed even under strain.",
+            IntentSummary = "Movement and route access would be preserved across the polity.",
+            TradeoffSummary = "Supports frontier life and legitimacy, but limits tight crisis control.",
+            Category = LawProposalCategory.Movement,
+            ConflictGroup = LawConflictGroup.Movement,
+            ConflictSlot = "mobility-order",
+            ImpactScale = 2,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.CrisisMovementRestrictionId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Polity.RegionalPresences.Count(presence => presence.IsCurrent) >= 2,
+                12 + (context.Governance.PeripheralStrain / 2) + ((100 - context.Governance.Legitimacy) / 4) +
+                (context.Pressures.MigrationPressure / 4) + (context.ScaleState.AutonomyTolerance / 12))
         },
         new()
         {
-            Id = "end-public-executions",
-            Title = "End Public Executions",
-            Summary = "Execution would no longer be used as a public spectacle.",
-            Category = LawProposalCategory.Punishment,
-            ConflictGroup = LawConflictGroup.Punishment,
-            ConflictSlot = "execution-policy",
-            ImpactScale = 1,
-            GovernmentForm = GovernmentForm.AbsoluteRule,
-            RequiredActiveDefinitionIds = ["establish-public-executions"],
-            RepealsDefinitionIds = ["establish-public-executions"],
-            Score = (group, _) => ScoreWhen(
-                group.Pressures.ThreatPressure < 50 || group.Pressures.OvercrowdingPressure >= 55,
-                18 + (100 - group.Pressures.ThreatPressure) / 4 + group.Pressures.OvercrowdingPressure / 3)
+            Id = GovernanceLawCatalog.StrengthenCentralAuthorityId,
+            Title = "Strengthen Central Authority",
+            Summary = "Authority would be concentrated more tightly around the core leadership.",
+            IntentSummary = "Decision-making would be concentrated so orders land more clearly.",
+            TradeoffSummary = "Raises authority and enforcement, but risks bloc resentment and legitimacy loss.",
+            Category = LawProposalCategory.Order,
+            ConflictGroup = LawConflictGroup.Order,
+            ConflictSlot = "authority-structure",
+            ImpactScale = 3,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.SharedGovernanceId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Pressures.ThreatPressure >= 35 || context.Governance.Authority <= 55,
+                16 + (context.Pressures.ThreatPressure / 4) + ((100 - context.Governance.Authority) / 3) +
+                (context.MaterialShortageMonths >= 2 ? 5 : 0) + (context.ScaleState.Centralization / 10))
+        },
+        new()
+        {
+            Id = GovernanceLawCatalog.SharedGovernanceId,
+            Title = "Affirm Shared Governance",
+            Summary = "Councils and local voices would gain a stronger hand in law and coordination.",
+            IntentSummary = "Authority would be shared more broadly across the polity.",
+            TradeoffSummary = "Raises legitimacy and cohesion, but lowers central command and slows harsh measures.",
+            Category = LawProposalCategory.Custom,
+            ConflictGroup = LawConflictGroup.Order,
+            ConflictSlot = "authority-structure",
+            ImpactScale = 2,
+            GovernmentForms = AllGovernmentForms,
+            ConflictingDefinitionIds = [GovernanceLawCatalog.StrengthenCentralAuthorityId],
+            Score = (_, _, context) => ScoreWhen(
+                context.Governance.Legitimacy <= 60 || context.Governance.Cohesion <= 60,
+                16 + ((100 - context.Governance.Legitimacy) / 3) + ((100 - context.Governance.Cohesion) / 3) + (context.ScaleState.FragmentationRisk / 14))
+        },
+        new()
+        {
+            Id = GovernanceLawCatalog.FrontierIntegrationId,
+            Title = "Adopt Frontier Integration Charter",
+            Summary = "Peripheral settlements would be tied in more deliberately through obligations and recognition.",
+            IntentSummary = "Core and frontier ties would be formalized to steady the wider polity.",
+            TradeoffSummary = "Can improve cohesion and reduce frontier drift, but costs central stores and attention.",
+            Category = LawProposalCategory.Custom,
+            ConflictGroup = LawConflictGroup.Order,
+            ConflictSlot = "frontier-relationship",
+            ImpactScale = 2,
+            GovernmentForms = AllGovernmentForms,
+            Score = (_, _, context) => ScoreWhen(
+                context.Polity.Settlements.Count(settlement => settlement.IsActive) >= 2 ||
+                context.Polity.RegionalPresences.Count(presence => presence.IsCurrent) >= 3,
+                15 + (context.Governance.PeripheralStrain / 2) + ((100 - context.Governance.Cohesion) / 4) +
+                (context.Polity.Settlements.Count(settlement => settlement.IsActive) * 3) + (context.ScaleState.CompositeComplexity / 10))
         }
     ];
 
     public (World World, IReadOnlyList<LawProposalChange> Changes) Run(World world, string playerPolityId)
     {
-        if (string.IsNullOrWhiteSpace(playerPolityId))
+        if (world.Polities.Count == 0)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var focusPolity = PolityData.Resolve(world, playerPolityId);
-        var context = focusPolity is null ? null : PolityData.BuildContext(world, focusPolity);
-        if (focusPolity is null || context?.LeadGroup is null)
+        var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, playerPolityId, StringComparison.Ordinal));
+        if (focusPolity is null)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
-        if (!regionsById.TryGetValue(context.CurrentRegionId, out var region))
+        var updatedPolity = focusPolity.Clone();
+        var context = PolityData.BuildContext(world, updatedPolity);
+        if (context is null)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        PoliticalBlocSystem.EnsureBlocs(focusPolity);
         var aggregateGroup = BuildAggregateGroup(context);
-
-        if (focusPolity.ActiveLawProposal is null)
+        var region = ResolveRegion(world, context);
+        if (region is null)
         {
-            var generated = TryGenerateProposal(focusPolity, aggregateGroup, region);
-            if (generated is not null)
+            return (world, Array.Empty<LawProposalChange>());
+        }
+
+        if (updatedPolity.ActiveLawProposal is null)
+        {
+            var generated = GenerateProposal(updatedPolity, context, aggregateGroup, region);
+            if (generated is null)
             {
-                focusPolity.ActiveLawProposal = generated;
+                return (world, Array.Empty<LawProposalChange>());
             }
 
-            return (world, Array.Empty<LawProposalChange>());
+            updatedPolity.ActiveLawProposal = generated;
+            return (ReplacePolity(world, updatedPolity), Array.Empty<LawProposalChange>());
         }
 
-        var activeProposal = focusPolity.ActiveLawProposal.Clone();
+        var activeProposal = updatedPolity.ActiveLawProposal.Clone();
         activeProposal.AgeInMonths++;
         activeProposal.IgnoredMonths++;
 
         var definition = Definitions.FirstOrDefault(item => string.Equals(item.Id, activeProposal.DefinitionId, StringComparison.Ordinal));
         if (definition is null)
         {
-            focusPolity.ActiveLawProposal = activeProposal;
-            return (world, Array.Empty<LawProposalChange>());
+            updatedPolity.ActiveLawProposal = null;
+            return (ReplacePolity(world, updatedPolity), Array.Empty<LawProposalChange>());
         }
 
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusPolity.GovernmentForm);
-        var relevance = definition.Score(aggregateGroup, region);
-        UpdateMomentum(activeProposal, behavior, relevance);
+        var behavior = Behaviors[updatedPolity.GovernmentForm];
+        var relevance = definition.Score(aggregateGroup, region, context);
+        UpdateMomentum(activeProposal, behavior, context, relevance);
 
-        var naturalStatus = ResolveIgnoredProposal(activeProposal, behavior, relevance);
-        if (naturalStatus is null)
+        var ignoredResolution = ResolveIgnoredProposal(activeProposal, behavior, context, relevance);
+        if (ignoredResolution is not null)
         {
-            focusPolity.ActiveLawProposal = activeProposal;
-            return (world, Array.Empty<LawProposalChange>());
+            var changes = FinalizeProposal(world, updatedPolity, activeProposal, ignoredResolution.Value);
+            return (ReplacePolity(world, updatedPolity), changes);
         }
 
-        return (world, FinalizeProposal(world, focusPolity, activeProposal, naturalStatus.Value));
+        updatedPolity.ActiveLawProposal = activeProposal;
+        return (ReplacePolity(world, updatedPolity), Array.Empty<LawProposalChange>());
     }
 
     public (World World, IReadOnlyList<LawProposalChange> Changes) ResolvePlayerDecision(
@@ -560,35 +247,38 @@ public sealed class LawProposalSystem
         string playerPolityId,
         LawProposalStatus status)
     {
-        var focusPolity = PolityData.Resolve(world, playerPolityId);
+        var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, playerPolityId, StringComparison.Ordinal));
         if (focusPolity?.ActiveLawProposal is null)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var resolvedProposal = focusPolity.ActiveLawProposal.Clone();
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusPolity.GovernmentForm);
-
-        if (status == LawProposalStatus.Passed)
+        var updatedPolity = focusPolity.Clone();
+        var activeProposal = updatedPolity.ActiveLawProposal;
+        if (activeProposal is null)
         {
-            resolvedProposal.Support = Math.Clamp(resolvedProposal.Support + (behavior.PlayerDecisionStrength * 4), 0, 100);
-        }
-        else if (status == LawProposalStatus.Vetoed)
-        {
-            resolvedProposal.Opposition = Math.Clamp(resolvedProposal.Opposition + (behavior.PlayerDecisionStrength * 4), 0, 100);
+            return (world, Array.Empty<LawProposalChange>());
         }
 
-        return (world, FinalizeProposal(world, focusPolity, resolvedProposal, status));
+        var resolvedProposal = activeProposal.Clone();
+        var changes = FinalizeProposal(world, updatedPolity, resolvedProposal, status);
+        return (ReplacePolity(world, updatedPolity), changes);
     }
 
-    private static LawProposal? TryGenerateProposal(Polity polity, PopulationGroup aggregateGroup, Region region)
+    private static Region? ResolveRegion(World world, PolityContext context)
     {
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
+        return world.Regions.FirstOrDefault(region => string.Equals(region.Id, context.CoreRegionId, StringComparison.Ordinal)) ??
+               world.Regions.FirstOrDefault(region => string.Equals(region.Id, context.CurrentRegionId, StringComparison.Ordinal));
+    }
+
+    private static LawProposal? GenerateProposal(Polity polity, PolityContext context, PopulationGroup aggregateGroup, Region region)
+    {
+        var behavior = Behaviors[polity.GovernmentForm];
         var candidate = Definitions
-            .Where(definition => definition.GovernmentForm == polity.GovernmentForm)
+            .Where(definition => definition.GovernmentForms.Contains(polity.GovernmentForm))
             .Select(definition =>
             {
-                var relevance = definition.Score(aggregateGroup, region);
+                var relevance = definition.Score(aggregateGroup, region, context);
                 if (relevance == 0 || !IsEligibleByLawState(polity, definition) || IsBlockedByEnactedLaw(polity, definition))
                 {
                     return new { Definition = definition, Relevance = 0, WeightedScore = 0 };
@@ -597,14 +287,17 @@ public sealed class LawProposalSystem
                 var weightedScore = relevance +
                     (behavior.GetCategoryWeight(definition.Category) * 3) +
                     ResolveEnactedLawModifier(polity, definition) +
-                    ResolveBlocProposalModifier(polity, aggregateGroup, definition) +
+                    ResolveBlocProposalModifier(polity, context, definition) +
+                    ResolveSocialIdentityModifier(context, definition.Id) +
+                    ResolveExternalPressureModifier(context, definition.Id) +
+                    ResolveGovernmentBias(behavior, definition.Id) +
                     ((definition.ImpactScale - 1) * behavior.ExtremityAllowance * 2);
                 return new { Definition = definition, Relevance = relevance, WeightedScore = weightedScore };
             })
-            .Where(candidate => candidate.Relevance >= 25)
-            .OrderByDescending(candidate => candidate.WeightedScore)
-            .ThenByDescending(candidate => candidate.Relevance)
-            .ThenBy(candidate => candidate.Definition.Title, StringComparer.Ordinal)
+            .Where(item => item.Relevance >= 35)
+            .OrderByDescending(item => item.WeightedScore)
+            .ThenByDescending(item => item.Relevance)
+            .ThenBy(item => item.Definition.Title, StringComparer.Ordinal)
             .FirstOrDefault();
 
         if (candidate is null)
@@ -612,17 +305,17 @@ public sealed class LawProposalSystem
             return null;
         }
 
-        var support = Math.Clamp(
-            30 + (candidate.Relevance / 2) + (behavior.AutoPassBias * 6) - (candidate.Definition.ImpactScale * 4),
-            10,
-            90);
-        var opposition = Math.Clamp(
-            20 + ((100 - candidate.Relevance) / 4) + (candidate.Definition.ImpactScale * 8) + (behavior.AutoVetoBias * 5),
-            5,
-            90);
-        var backing = ResolveBackingSources(polity, aggregateGroup, behavior, candidate.Definition);
-        var backingSupportShift = ResolveBackingSupportShift(polity, aggregateGroup, candidate.Definition, backing.Primary, backing.Secondary);
-        var blocOppositionShift = ResolveBlocOppositionShift(polity, candidate.Definition, backing.Primary, backing.Secondary);
+        var backing = ResolveBackingSources(polity, context, behavior, candidate.Definition);
+        var supportBase = 32 + (candidate.Relevance / 2) + (behavior.PlayerDecisionStrength * 2) - (candidate.Definition.ImpactScale * 5);
+        supportBase += ResolveBackingSupportShift(polity, context, candidate.Definition, backing.Primary, backing.Secondary);
+        supportBase += Math.Clamp((context.Governance.Legitimacy - 50) / 5, -6, 6);
+        supportBase += ResolveProposalSupportIdentityShift(context, candidate.Definition.Id);
+
+        var oppositionBase = 22 + ((100 - candidate.Relevance) / 4) + (candidate.Definition.ImpactScale * 8);
+        oppositionBase += ResolveBlocOppositionShift(polity, context, candidate.Definition, backing.Primary, backing.Secondary);
+        oppositionBase += Math.Clamp((context.Governance.PeripheralStrain - 25) / 6, 0, 10);
+        oppositionBase += ResolveProposalOppositionIdentityShift(context, candidate.Definition.Id);
+
         var urgency = Math.Clamp(
             candidate.Relevance + (candidate.Definition.ImpactScale * 10) + (behavior.GetCategoryWeight(candidate.Definition.Category) * 2),
             10,
@@ -634,10 +327,12 @@ public sealed class LawProposalSystem
             DefinitionId = candidate.Definition.Id,
             Title = candidate.Definition.Title,
             Summary = candidate.Definition.Summary,
+            ReasonSummary = BuildReasonSummary(candidate.Definition.Id, context),
+            TradeoffSummary = candidate.Definition.TradeoffSummary,
             Category = candidate.Definition.Category,
             Status = LawProposalStatus.Active,
-            Support = Math.Clamp(support + backingSupportShift, 0, 100),
-            Opposition = Math.Clamp(opposition - Math.Max(0, backingSupportShift / 2) + blocOppositionShift, 0, 100),
+            Support = Math.Clamp(supportBase, 5, 95),
+            Opposition = Math.Clamp(oppositionBase, 5, 95),
             Urgency = urgency,
             AgeInMonths = 0,
             IgnoredMonths = 0,
@@ -648,54 +343,46 @@ public sealed class LawProposalSystem
         };
     }
 
-    private static void UpdateMomentum(LawProposal proposal, GovernmentFormProposalBehavior behavior, int relevance)
+    private static void UpdateMomentum(LawProposal proposal, GovernmentFormProposalBehavior behavior, PolityContext context, int relevance)
     {
-        proposal.Urgency = Math.Clamp(
-            Math.Max(proposal.Urgency, relevance + (proposal.ImpactScale * 8)),
-            0,
-            100);
+        var governanceDrag = Math.Max(0, 55 - context.Governance.Governability) / 6;
+        proposal.Urgency = Math.Clamp(Math.Max(proposal.Urgency, relevance + (proposal.ImpactScale * 8) - governanceDrag), 0, 100);
 
-        if (proposal.IgnoredMonths < 24)
+        if (proposal.IgnoredMonths < 18)
         {
             return;
         }
 
-        var momentum = (relevance - 50) / 10;
-        var indecision = 1 + ((proposal.IgnoredMonths - 24) / 12) * behavior.IndecisionPenaltyStrength;
-
-        proposal.Support = Math.Clamp(
-            proposal.Support + momentum + behavior.AutoPassBias - Math.Max(0, indecision / 3),
-            0,
-            100);
-        proposal.Opposition = Math.Clamp(
-            proposal.Opposition + Math.Max(0, -momentum) + behavior.AutoVetoBias + Math.Max(1, indecision / 2),
-            0,
-            100);
-        proposal.Urgency = Math.Clamp(
-            proposal.Urgency + Math.Max(-2, momentum) - behavior.IgnoreTolerance + indecision,
-            0,
-            100);
+        var supportDrift = (relevance - 50) / 10;
+        var indecision = 1 + ((proposal.IgnoredMonths - 18) / 12) * behavior.IndecisionPenaltyStrength;
+        proposal.Support = Math.Clamp(proposal.Support + supportDrift - governanceDrag, 0, 100);
+        proposal.Opposition = Math.Clamp(proposal.Opposition + Math.Max(0, -supportDrift) + indecision + governanceDrag, 0, 100);
     }
 
-    private static LawProposalStatus? ResolveIgnoredProposal(LawProposal proposal, GovernmentFormProposalBehavior behavior, int relevance)
+    private static LawProposalStatus? ResolveIgnoredProposal(
+        LawProposal proposal,
+        GovernmentFormProposalBehavior behavior,
+        PolityContext context,
+        int relevance)
     {
-        if (proposal.IgnoredMonths < 60)
+        if (proposal.IgnoredMonths < 48)
         {
             return null;
         }
 
-        var timePressure = 1 + ((proposal.IgnoredMonths - 60) / 6);
+        var timePressure = 1 + ((proposal.IgnoredMonths - 48) / 6);
         var supportMargin = proposal.Support - proposal.Opposition;
-        var passScore = supportMargin + (behavior.AutoPassBias * 6) + (relevance / 4) + timePressure;
+        var governanceAssist = (context.Governance.Authority - 50) / 8;
+        var passScore = supportMargin + (behavior.AutoPassBias * 6) + (relevance / 4) + timePressure + governanceAssist;
         var vetoScore = (-supportMargin) + (behavior.AutoVetoBias * 6) + ((100 - relevance) / 4) + timePressure;
-        var abstainScore = (behavior.AbstainBias * 8) + Math.Max(0, timePressure - behavior.IgnoreTolerance) + Math.Abs(supportMargin / 4);
+        var abstainScore = (behavior.AbstainBias * 8) + Math.Abs(supportMargin / 4);
 
-        if (passScore >= vetoScore && passScore >= abstainScore && passScore >= 30)
+        if (passScore >= vetoScore && passScore >= abstainScore && passScore >= 28)
         {
             return LawProposalStatus.Passed;
         }
 
-        if (vetoScore >= passScore && vetoScore >= abstainScore && vetoScore >= 30)
+        if (vetoScore >= passScore && vetoScore >= abstainScore && vetoScore >= 28)
         {
             return LawProposalStatus.Vetoed;
         }
@@ -731,9 +418,32 @@ public sealed class LawProposalSystem
                 GroupId = polity.Id,
                 GroupName = polity.Name,
                 ProposalTitle = proposal.Title,
+                ChronicleLine = BuildLawChronicleLine(polity.Name, proposal, status),
                 Status = status
             }
         ];
+    }
+
+    private static string BuildLawChronicleLine(string polityName, LawProposal proposal, LawProposalStatus status)
+    {
+        if (status == LawProposalStatus.Vetoed)
+        {
+            return $"{polityName} rejected {proposal.Title.ToLowerInvariant()}.";
+        }
+
+        return proposal.DefinitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId => $"{polityName} centralized its stores under emergency law.",
+            GovernanceLawCatalog.LocalStoreAutonomyId => $"{polityName} left store control with local settlements.",
+            GovernanceLawCatalog.ExtractionObligationId => $"{polityName} imposed stricter extraction obligations.",
+            GovernanceLawCatalog.EaseExtractionBurdenId => $"{polityName} eased extraction burdens on local sites.",
+            GovernanceLawCatalog.CrisisMovementRestrictionId => $"{polityName} restricted movement during instability.",
+            GovernanceLawCatalog.OpenMovementId => $"{polityName} kept routes open despite instability.",
+            GovernanceLawCatalog.StrengthenCentralAuthorityId => $"{polityName} concentrated authority around the core order.",
+            GovernanceLawCatalog.SharedGovernanceId => $"{polityName} widened shared governance across the polity.",
+            GovernanceLawCatalog.FrontierIntegrationId => $"{polityName} tied frontier settlements more closely to the core.",
+            _ => $"{polityName} passed {proposal.Title}."
+        };
     }
 
     private static int ScoreWhen(bool eligible, int score)
@@ -743,19 +453,13 @@ public sealed class LawProposalSystem
 
     private static bool IsBlockedByEnactedLaw(Polity polity, LawProposalDefinition definition)
     {
-        if (polity.EnactedLaws.Any(law =>
-                law.IsActive &&
-                (string.Equals(law.DefinitionId, definition.Id, StringComparison.Ordinal) ||
-                 string.Equals(law.Title, definition.Title, StringComparison.Ordinal) ||
-                 (!string.IsNullOrWhiteSpace(definition.ConflictSlot) &&
-                  string.Equals(law.ConflictSlot, definition.ConflictSlot, StringComparison.Ordinal) &&
-                  !definition.RequiredActiveDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal)) ||
-                 definition.ConflictingDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal))))
-        {
-            return true;
-        }
-
-        return false;
+        return polity.EnactedLaws.Any(law =>
+            law.IsActive &&
+            (string.Equals(law.DefinitionId, definition.Id, StringComparison.Ordinal) ||
+             (!string.IsNullOrWhiteSpace(definition.ConflictSlot) &&
+              string.Equals(law.ConflictSlot, definition.ConflictSlot, StringComparison.Ordinal) &&
+              !definition.RequiredActiveDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal)) ||
+             definition.ConflictingDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal)));
     }
 
     private static bool IsEligibleByLawState(Polity polity, LawProposalDefinition definition)
@@ -766,9 +470,7 @@ public sealed class LawProposalSystem
         }
 
         return definition.RequiredActiveDefinitionIds.All(requiredId =>
-            polity.EnactedLaws.Any(law =>
-                law.IsActive &&
-                string.Equals(law.DefinitionId, requiredId, StringComparison.Ordinal)));
+            polity.EnactedLaws.Any(law => law.IsActive && string.Equals(law.DefinitionId, requiredId, StringComparison.Ordinal)));
     }
 
     private static int ResolveEnactedLawModifier(Polity polity, LawProposalDefinition definition)
@@ -782,15 +484,67 @@ public sealed class LawProposalSystem
         return modifier;
     }
 
+    private static int ResolveGovernmentBias(GovernmentFormProposalBehavior behavior, string definitionId)
+    {
+        return definitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId => behavior.CentralizationBias / 8,
+            GovernanceLawCatalog.LocalStoreAutonomyId => behavior.SharedGovernanceBias / 8,
+            GovernanceLawCatalog.StrengthenCentralAuthorityId => behavior.CentralizationBias / 6,
+            GovernanceLawCatalog.SharedGovernanceId => behavior.SharedGovernanceBias / 6,
+            GovernanceLawCatalog.CrisisMovementRestrictionId => behavior.CentralizationBias / 9,
+            GovernanceLawCatalog.OpenMovementId => behavior.SharedGovernanceBias / 9,
+            _ => 0
+        };
+    }
+
+    private static int ResolveSocialIdentityModifier(PolityContext context, string definitionId)
+    {
+        return definitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId => (context.SocialIdentity.Communalism / 12) + (HasTradition(context, SocialTraditionCatalog.StorageDisciplineId) ? 8 : 0) - (context.SocialIdentity.AutonomyOrientation / 14),
+            GovernanceLawCatalog.LocalStoreAutonomyId => (context.SocialIdentity.AutonomyOrientation / 10) + (context.SocialIdentity.FrontierDistinctiveness / 14),
+            GovernanceLawCatalog.ExtractionObligationId => (context.SocialIdentity.OrderOrientation / 12) - (context.SocialIdentity.AutonomyOrientation / 12),
+            GovernanceLawCatalog.EaseExtractionBurdenId => (context.SocialIdentity.AutonomyOrientation / 12) + (context.SocialIdentity.FrontierDistinctiveness / 16),
+            GovernanceLawCatalog.CrisisMovementRestrictionId => (context.SocialIdentity.OrderOrientation / 12) - (context.SocialIdentity.Mobility / 12),
+            GovernanceLawCatalog.OpenMovementId => (context.SocialIdentity.Mobility / 10) + (HasTradition(context, SocialTraditionCatalog.SeasonalReturnId) ? 8 : 0),
+            GovernanceLawCatalog.StrengthenCentralAuthorityId => (context.SocialIdentity.OrderOrientation / 10) - (context.SocialIdentity.AutonomyOrientation / 10),
+            GovernanceLawCatalog.SharedGovernanceId => (context.SocialIdentity.Communalism / 10) + (context.SocialIdentity.AutonomyOrientation / 14),
+            GovernanceLawCatalog.FrontierIntegrationId => (context.SocialIdentity.FrontierDistinctiveness / 12) + (context.SocialIdentity.Rootedness / 16),
+            _ => 0
+        };
+    }
+
+    private static int ResolveProposalSupportIdentityShift(PolityContext context, string definitionId)
+    {
+        return Math.Clamp(ResolveSocialIdentityModifier(context, definitionId) / 2, -10, 12);
+    }
+
+    private static int ResolveProposalOppositionIdentityShift(PolityContext context, string definitionId)
+    {
+        return definitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.StrengthenCentralAuthorityId
+                => Math.Clamp((context.SocialIdentity.AutonomyOrientation / 10) + (context.SocialIdentity.FrontierDistinctiveness / 16), 0, 12),
+            GovernanceLawCatalog.CrisisMovementRestrictionId
+                => Math.Clamp((context.SocialIdentity.Mobility / 10) + (HasTradition(context, SocialTraditionCatalog.SeasonalReturnId) ? 6 : 0), 0, 12),
+            GovernanceLawCatalog.SharedGovernanceId
+                => Math.Clamp(context.SocialIdentity.OrderOrientation / 14, 0, 8),
+            _ => 0
+        };
+    }
+
     private static void ApplyPassedLaw(World world, Polity polity, LawProposal proposal)
     {
-        var definition = Definitions.First(definition => string.Equals(definition.Id, proposal.DefinitionId, StringComparison.Ordinal));
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
+        var definition = Definitions.First(item => string.Equals(item.Id, proposal.DefinitionId, StringComparison.Ordinal));
+        var behavior = Behaviors[polity.GovernmentForm];
         var enactedLaw = new EnactedLaw
         {
             DefinitionId = proposal.DefinitionId,
             Title = proposal.Title,
             Summary = proposal.Summary,
+            IntentSummary = definition.IntentSummary,
+            TradeoffSummary = definition.TradeoffSummary,
             Category = proposal.Category,
             ConflictGroup = definition.ConflictGroup,
             ConflictSlot = definition.ConflictSlot,
@@ -799,12 +553,14 @@ public sealed class LawProposalSystem
             EnactedOnMonth = world.CurrentMonth,
             EnforcementStrength = behavior.EnforcementTendency,
             ComplianceLevel = behavior.ComplianceTendency,
+            CoreEffectiveness = Math.Clamp((behavior.EnforcementTendency + behavior.AuthorityBaseline) / 2, 0, 100),
+            PeripheralEffectiveness = Math.Clamp((behavior.ComplianceTendency + behavior.CohesionBaseline) / 2, 0, 100),
+            ResistanceLevel = 0,
             IsActive = true
         };
 
         foreach (var existing in polity.EnactedLaws.Where(law =>
                      string.Equals(law.DefinitionId, proposal.DefinitionId, StringComparison.Ordinal) ||
-                     string.Equals(law.Title, proposal.Title, StringComparison.Ordinal) ||
                      definition.RepealsDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal) ||
                      (!string.IsNullOrWhiteSpace(definition.ConflictSlot) &&
                       string.Equals(law.ConflictSlot, definition.ConflictSlot, StringComparison.Ordinal)) ||
@@ -819,7 +575,7 @@ public sealed class LawProposalSystem
 
     private static (ProposalBackingSource Primary, ProposalBackingSource? Secondary) ResolveBackingSources(
         Polity polity,
-        PopulationGroup aggregateGroup,
+        PolityContext context,
         GovernmentFormProposalBehavior behavior,
         LawProposalDefinition definition)
     {
@@ -830,8 +586,8 @@ public sealed class LawProposalSystem
             {
                 Source = source,
                 Score = behavior.GetBackingSourceWeight(source) +
-                        GetSourceCategoryWeight(source, definition.Category) +
-                        ResolveSourceStateWeight(aggregateGroup, source, definition.Category) +
+                        PoliticalBlocCatalog.GetCategoryWeight(source, definition.Category) +
+                        ResolveSourceStateWeight(context, source, definition.Id) +
                         ResolveBlocBackingWeight(blocsBySource.GetValueOrDefault(source))
             })
             .OrderByDescending(item => item.Score)
@@ -848,77 +604,62 @@ public sealed class LawProposalSystem
         return (primary, secondary);
     }
 
-    private static int GetSourceCategoryWeight(ProposalBackingSource source, LawProposalCategory category)
-    {
-        return PoliticalBlocCatalog.GetCategoryWeight(source, category);
-    }
-
-    private static int ResolveSourceStateWeight(PopulationGroup group, ProposalBackingSource source, LawProposalCategory category)
+    private static int ResolveSourceStateWeight(PolityContext context, ProposalBackingSource source, string definitionId)
     {
         return source switch
         {
-            ProposalBackingSource.Priests when category is LawProposalCategory.Faith or LawProposalCategory.Symbolic or LawProposalCategory.Punishment
-                => group.Pressures.MigrationPressure / 10 + group.Pressures.ThreatPressure / 20,
-            ProposalBackingSource.Warriors when category is LawProposalCategory.Military or LawProposalCategory.Order or LawProposalCategory.Movement
-                => group.Pressures.ThreatPressure / 8 + group.Pressures.MigrationPressure / 12,
-            ProposalBackingSource.Merchants when category is LawProposalCategory.Trade or LawProposalCategory.Movement or LawProposalCategory.Food
-                => group.Pressures.MigrationPressure / 10 + Math.Max(0, 50 - group.Pressures.ThreatPressure) / 12,
-            ProposalBackingSource.CommonFolk when category is LawProposalCategory.Food or LawProposalCategory.Custom
-                => group.Pressures.FoodPressure / 8 + group.Pressures.OvercrowdingPressure / 16,
-            ProposalBackingSource.FrontierSettlers when category is LawProposalCategory.Movement or LawProposalCategory.Military or LawProposalCategory.Food
-                => group.Pressures.MigrationPressure / 8 + group.Pressures.ThreatPressure / 16,
-            ProposalBackingSource.Elders when category is LawProposalCategory.Custom or LawProposalCategory.Order or LawProposalCategory.Symbolic
-                => Math.Max(group.Pressures.ThreatPressure, group.Pressures.OvercrowdingPressure) / 12,
+            ProposalBackingSource.Warriors when definitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId
+                => context.Pressures.ThreatPressure / 8 + context.Governance.Authority / 15 + context.ExternalPressure.Threat / 8,
+            ProposalBackingSource.Merchants when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.LocalStoreAutonomyId
+                => context.MaterialProduction.StorageSupport / 12 + context.Pressures.MigrationPressure / 16 + context.ExternalPressure.Cooperation / 10,
+            ProposalBackingSource.Elders when definitionId is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId
+                => (100 - context.Governance.Authority) / 10 + context.Governance.Cohesion / 15,
+            ProposalBackingSource.CommonFolk when definitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.SharedGovernanceId
+                => context.Pressures.FoodPressure / 10 + (100 - context.Governance.Legitimacy) / 12 + context.ExternalPressure.RaidPressure / 10,
+            ProposalBackingSource.FrontierSettlers when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.FrontierIntegrationId or GovernanceLawCatalog.LocalStoreAutonomyId
+                => context.Governance.PeripheralStrain / 8 + context.Pressures.MigrationPressure / 12 + context.ExternalPressure.FrontierFriction / 8,
+            ProposalBackingSource.Priests when definitionId is GovernanceLawCatalog.StrengthenCentralAuthorityId
+                => context.Pressures.ThreatPressure / 20 + context.Governance.Authority / 18,
             _ => 0
         };
     }
 
     private static int ResolveBackingSupportShift(
         Polity polity,
-        PopulationGroup aggregateGroup,
+        PolityContext context,
         LawProposalDefinition definition,
         ProposalBackingSource primary,
         ProposalBackingSource? secondary)
     {
         PoliticalBlocSystem.EnsureBlocs(polity);
         var blocsBySource = polity.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
-
-        var shift = ResolveSingleBlocSupportShift(aggregateGroup, definition, primary, blocsBySource.GetValueOrDefault(primary));
+        var shift = ResolveSingleBlocSupportShift(context, definition.Id, primary, blocsBySource.GetValueOrDefault(primary));
         if (secondary is not null)
         {
-            shift += ResolveSingleBlocSupportShift(aggregateGroup, definition, secondary.Value, blocsBySource.GetValueOrDefault(secondary.Value)) / 2;
-        }
-
-        if (definition.Category == LawProposalCategory.Faith &&
-            primary == ProposalBackingSource.Priests &&
-            polity.GovernmentForm == GovernmentForm.Theocracy)
-        {
-            shift += 4;
+            shift += ResolveSingleBlocSupportShift(context, definition.Id, secondary.Value, blocsBySource.GetValueOrDefault(secondary.Value)) / 2;
         }
 
         return Math.Clamp(shift, -15, 20);
     }
 
     private static int ResolveSingleBlocSupportShift(
-        PopulationGroup group,
-        LawProposalDefinition definition,
+        PolityContext context,
+        string definitionId,
         ProposalBackingSource source,
         PoliticalBloc? bloc)
     {
         var shift = source switch
         {
-            ProposalBackingSource.Priests when definition.Category is LawProposalCategory.Faith or LawProposalCategory.Symbolic or LawProposalCategory.Punishment
-                => group.Pressures.MigrationPressure >= 40 ? 6 : 3,
-            ProposalBackingSource.Warriors when definition.Category is LawProposalCategory.Military or LawProposalCategory.Order or LawProposalCategory.Movement
-                => group.Pressures.ThreatPressure >= 45 ? 7 : 3,
-            ProposalBackingSource.Merchants when definition.Category is LawProposalCategory.Trade or LawProposalCategory.Movement or LawProposalCategory.Food
-                => group.Pressures.FoodPressure >= 40 || group.Pressures.MigrationPressure >= 40 ? 5 : 2,
-            ProposalBackingSource.CommonFolk when definition.Category is LawProposalCategory.Food or LawProposalCategory.Custom
-                => group.Pressures.FoodPressure >= 45 ? 7 : 3,
-            ProposalBackingSource.Elders when definition.Category is LawProposalCategory.Custom or LawProposalCategory.Order
-                => group.Pressures.ThreatPressure >= 35 || group.Pressures.OvercrowdingPressure >= 35 ? 4 : 2,
-            ProposalBackingSource.FrontierSettlers when definition.Category is LawProposalCategory.Movement or LawProposalCategory.Military or LawProposalCategory.Food
-                => group.Pressures.MigrationPressure >= 45 ? 5 : 2,
+            ProposalBackingSource.Warriors when definitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId
+                => context.Pressures.ThreatPressure >= 45 || context.ExternalPressure.Threat >= 40 ? 7 : 3,
+            ProposalBackingSource.Merchants when definitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.LocalStoreAutonomyId
+                => context.Pressures.ThreatPressure < 60 && context.ExternalPressure.RaidPressure < 35 ? 6 : 2,
+            ProposalBackingSource.CommonFolk when definitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.SharedGovernanceId
+                => context.Pressures.FoodPressure >= 45 || context.ExternalPressure.RaidPressure >= 35 ? 6 : 3,
+            ProposalBackingSource.Elders when definitionId is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId
+                => context.Governance.Legitimacy <= 55 ? 5 : 2,
+            ProposalBackingSource.FrontierSettlers when definitionId is GovernanceLawCatalog.FrontierIntegrationId or GovernanceLawCatalog.OpenMovementId
+                => context.Governance.PeripheralStrain >= 30 || context.ExternalPressure.FrontierFriction >= 25 ? 5 : 2,
             _ => 0
         };
 
@@ -929,18 +670,17 @@ public sealed class LawProposalSystem
 
         shift += (bloc.Influence - 50) / 8;
         shift += (bloc.Satisfaction - 50) / 6;
-        shift += Math.Max(0, 60 - bloc.Satisfaction) / 10;
         return shift;
     }
 
     private static int ResolveBlocOppositionShift(
         Polity polity,
+        PolityContext context,
         LawProposalDefinition definition,
         ProposalBackingSource primary,
         ProposalBackingSource? secondary)
     {
         PoliticalBlocSystem.EnsureBlocs(polity);
-
         var opposition = 0;
         foreach (var bloc in polity.PoliticalBlocs)
         {
@@ -949,7 +689,7 @@ public sealed class LawProposalSystem
                 continue;
             }
 
-            var categoryWeight = GetSourceCategoryWeight(bloc.Source, definition.Category);
+            var categoryWeight = PoliticalBlocCatalog.GetCategoryWeight(bloc.Source, definition.Category);
             if (categoryWeight >= 7)
             {
                 continue;
@@ -957,30 +697,52 @@ public sealed class LawProposalSystem
 
             opposition += Math.Max(0, (bloc.Influence - 45) / 10);
             opposition += Math.Max(0, (55 - bloc.Satisfaction) / 12);
-            if (categoryWeight <= 2)
-            {
-                opposition += 2;
-            }
         }
 
-        return Math.Clamp(opposition, 0, 18);
+        if (definition.Id is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.ExtractionObligationId or GovernanceLawCatalog.CrisisMovementRestrictionId)
+        {
+            opposition += context.Governance.PeripheralStrain / 12;
+        }
+
+        return Math.Clamp(opposition, 0, 20);
     }
 
-    private static int ResolveBlocProposalModifier(Polity polity, PopulationGroup aggregateGroup, LawProposalDefinition definition)
+    private static int ResolveBlocProposalModifier(Polity polity, PolityContext context, LawProposalDefinition definition)
     {
         PoliticalBlocSystem.EnsureBlocs(polity);
-
         var modifier = 0;
         foreach (var bloc in polity.PoliticalBlocs)
         {
-            var categoryWeight = GetSourceCategoryWeight(bloc.Source, definition.Category);
+            var categoryWeight = PoliticalBlocCatalog.GetCategoryWeight(bloc.Source, definition.Category);
             if (categoryWeight == 0)
             {
                 continue;
             }
 
             modifier += ((categoryWeight - 4) * bloc.Influence) / 18;
-            modifier += ((100 - bloc.Satisfaction) * categoryWeight) / 40;
+            modifier += ((100 - bloc.Satisfaction) * categoryWeight) / 45;
+        }
+
+        if (definition.Id is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId)
+        {
+            modifier += Math.Max(0, 55 - context.Governance.Legitimacy) / 5;
+        }
+
+        if (definition.Id is GovernanceLawCatalog.StrengthenCentralAuthorityId or GovernanceLawCatalog.CentralizeStoresId)
+        {
+            modifier += context.Pressures.ThreatPressure / 10;
+        }
+
+        if (definition.Id is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId or GovernanceLawCatalog.FrontierIntegrationId)
+        {
+            modifier += context.ExternalPressure.Threat / 8;
+            modifier += context.ExternalPressure.FrontierFriction / 10;
+        }
+
+        if (definition.Id == GovernanceLawCatalog.OpenMovementId)
+        {
+            modifier += context.ExternalPressure.Cooperation / 10;
+            modifier -= context.ExternalPressure.RaidPressure / 12;
         }
 
         return Math.Clamp(modifier, -10, 35);
@@ -1025,5 +787,59 @@ public sealed class LawProposalSystem
         }
 
         return (bloc.Influence / 5) + Math.Max(0, 55 - bloc.Satisfaction) / 8;
+    }
+
+    private static int ResolveExternalPressureModifier(PolityContext context, string definitionId)
+    {
+        return definitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId => context.ExternalPressure.RaidPressure / 8 + context.ExternalPressure.Threat / 10,
+            GovernanceLawCatalog.LocalStoreAutonomyId => context.ExternalPressure.FrontierFriction / 10 - context.ExternalPressure.RaidPressure / 14,
+            GovernanceLawCatalog.ExtractionObligationId => context.ExternalPressure.Threat / 8 + context.ExternalPressure.HostileNeighborCount * 4,
+            GovernanceLawCatalog.EaseExtractionBurdenId => context.ExternalPressure.Cooperation / 12,
+            GovernanceLawCatalog.CrisisMovementRestrictionId => context.ExternalPressure.Threat / 7 + context.ExternalPressure.RaidPressure / 8,
+            GovernanceLawCatalog.OpenMovementId => context.ExternalPressure.Cooperation / 8 - context.ExternalPressure.RaidPressure / 10,
+            GovernanceLawCatalog.StrengthenCentralAuthorityId => context.ExternalPressure.Threat / 7 + context.ExternalPressure.HostileNeighborCount * 5,
+            GovernanceLawCatalog.SharedGovernanceId => context.ExternalPressure.Cooperation / 10,
+            GovernanceLawCatalog.FrontierIntegrationId => context.ExternalPressure.FrontierFriction / 7 + context.ExternalPressure.HostileNeighborCount * 4,
+            _ => 0
+        };
+    }
+
+    private static string BuildReasonSummary(string definitionId, PolityContext context)
+    {
+        return definitionId switch
+        {
+            GovernanceLawCatalog.CentralizeStoresId when context.ExternalPressure.RaidPressure >= 30 => "Outside raids are pushing the core toward tighter control over stores.",
+            GovernanceLawCatalog.CentralizeStoresId => "Shortages and weak storage are pushing the core toward tighter distribution.",
+            GovernanceLawCatalog.LocalStoreAutonomyId when context.ExternalPressure.FrontierFriction >= 25 => "Frontier strain is pushing settlements to keep greater local control.",
+            GovernanceLawCatalog.LocalStoreAutonomyId => "Peripheral strain is pushing settlements to keep greater local control.",
+            GovernanceLawCatalog.ExtractionObligationId when context.ExternalPressure.Threat >= 35 => "Hostile outside pressure is pushing a harder extraction burden.",
+            GovernanceLawCatalog.ExtractionObligationId => "Material deficits and pressure for tools are pushing a harder extraction burden.",
+            GovernanceLawCatalog.EaseExtractionBurdenId => "Falling legitimacy and frontier strain are pushing relief from extraction demands.",
+            GovernanceLawCatalog.CrisisMovementRestrictionId when context.ExternalPressure.RaidPressure >= 30 => "Raids and outside danger are pushing the polity toward tighter movement control.",
+            GovernanceLawCatalog.CrisisMovementRestrictionId => "Threat and migration pressure are pushing the polity toward tighter movement control.",
+            GovernanceLawCatalog.OpenMovementId when context.ExternalPressure.Cooperation >= 25 => "Practical outside contact is pushing the polity to keep routes open.",
+            GovernanceLawCatalog.OpenMovementId => "Frontier use and legitimacy strain are pushing the polity to keep routes open.",
+            GovernanceLawCatalog.StrengthenCentralAuthorityId when context.ExternalPressure.Threat >= 35 => "Outside hostility is pushing authority back toward the core.",
+            GovernanceLawCatalog.StrengthenCentralAuthorityId => "Unsteady command under pressure is pushing authority back toward the core.",
+            GovernanceLawCatalog.SharedGovernanceId => "Legitimacy and cohesion are weak enough that broader buy-in is being demanded.",
+            GovernanceLawCatalog.FrontierIntegrationId when context.ExternalPressure.FrontierFriction >= 25 => "Frontier friction is pushing the polity to bind peripheral sites more deliberately.",
+            GovernanceLawCatalog.FrontierIntegrationId => "Peripheral strain is pushing the polity to bind frontier sites more deliberately.",
+            _ => string.Empty
+        };
+    }
+
+    private static World ReplacePolity(World world, Polity polity)
+    {
+        var updatedPolities = world.Polities
+            .Select(item => string.Equals(item.Id, polity.Id, StringComparison.Ordinal) ? polity : item)
+            .ToArray();
+        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, world.Chronicle, updatedPolities, world.FocalPolityId);
+    }
+
+    private static bool HasTradition(PolityContext context, string traditionId)
+    {
+        return context.SocialIdentity.TraditionIds.Contains(traditionId, StringComparer.Ordinal);
     }
 }

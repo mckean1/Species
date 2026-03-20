@@ -24,6 +24,11 @@ public static class AdvancementCatalogValidator
             {
                 errors.Add($"Advancement definition {definition.Id} is missing a name.");
             }
+
+            if (string.IsNullOrWhiteSpace(definition.PrerequisiteSummary))
+            {
+                errors.Add($"Advancement definition {definition.Id} is missing a prerequisite summary.");
+            }
         }
 
         return errors;

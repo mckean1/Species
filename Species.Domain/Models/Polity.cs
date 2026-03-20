@@ -34,6 +34,32 @@ public sealed class Polity
 
     public List<PolityRegionalPresence> RegionalPresences { get; init; } = [];
 
+    public List<InterPolityRelation> InterPolityRelations { get; init; } = [];
+
+    public string ParentPolityId { get; set; } = string.Empty;
+
+    public List<PoliticalAttachment> PoliticalAttachments { get; init; } = [];
+
+    public List<PoliticalHistoryRecord> PoliticalHistory { get; init; } = [];
+
+    public GovernanceState Governance { get; set; } = new();
+
+    public ExternalPressureState ExternalPressure { get; set; } = new();
+
+    public PoliticalScaleState ScaleState { get; set; } = new();
+
+    public SocialMemoryState SocialMemory { get; set; } = new();
+
+    public SocialIdentityState SocialIdentity { get; set; } = new();
+
+    public MaterialStockpile MaterialStores { get; set; } = new();
+
+    public MaterialProductionState MaterialProduction { get; set; } = new();
+
+    public int MaterialShortageMonths { get; set; }
+
+    public int MaterialSurplusMonths { get; set; }
+
     public Polity Clone()
     {
         return new Polity
@@ -51,7 +77,20 @@ public sealed class Polity
             EnactedLaws = EnactedLaws.Select(law => law.Clone()).ToList(),
             PoliticalBlocs = PoliticalBlocs.Select(bloc => bloc.Clone()).ToList(),
             Settlements = Settlements.Select(settlement => settlement.Clone()).ToList(),
-            RegionalPresences = RegionalPresences.Select(presence => presence.Clone()).ToList()
+            RegionalPresences = RegionalPresences.Select(presence => presence.Clone()).ToList(),
+            InterPolityRelations = InterPolityRelations.Select(relation => relation.Clone()).ToList(),
+            ParentPolityId = ParentPolityId,
+            PoliticalAttachments = PoliticalAttachments.Select(attachment => attachment.Clone()).ToList(),
+            PoliticalHistory = PoliticalHistory.Select(record => record.Clone()).ToList(),
+            Governance = Governance.Clone(),
+            ExternalPressure = ExternalPressure.Clone(),
+            ScaleState = ScaleState.Clone(),
+            SocialMemory = SocialMemory.Clone(),
+            SocialIdentity = SocialIdentity.Clone(),
+            MaterialStores = MaterialStores.Clone(),
+            MaterialProduction = MaterialProduction.Clone(),
+            MaterialShortageMonths = MaterialShortageMonths,
+            MaterialSurplusMonths = MaterialSurplusMonths
         };
     }
 }

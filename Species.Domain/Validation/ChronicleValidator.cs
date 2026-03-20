@@ -53,21 +53,51 @@ public static class ChronicleValidator
             }
 
             if (entry.Category == ChronicleEventCategory.Discovery &&
-                !entry.Message.Contains(" discovered ", StringComparison.Ordinal))
+                !IsValidKnowledgeChronicleLine(entry.Message))
             {
-                errors.Add($"Chronicle discovery entry {entry.RecordSequence} does not use discovered wording.");
+                errors.Add($"Chronicle discovery entry {entry.RecordSequence} does not use valid knowledge wording.");
             }
 
             if (entry.Category == ChronicleEventCategory.Advancement &&
-                !entry.Message.Contains(" learned ", StringComparison.Ordinal))
+                !IsValidCapabilityChronicleLine(entry.Message))
             {
-                errors.Add($"Chronicle advancement entry {entry.RecordSequence} does not use learned wording.");
+                errors.Add($"Chronicle advancement entry {entry.RecordSequence} does not use valid capability wording.");
             }
 
             if (entry.Category == ChronicleEventCategory.Law &&
                 !IsValidLawChronicleLine(entry.Message))
             {
                 errors.Add($"Chronicle law entry {entry.RecordSequence} does not use the canonical pass/veto format.");
+            }
+
+            if (entry.Category == ChronicleEventCategory.Material &&
+                !entry.Message.EndsWith(".", StringComparison.Ordinal))
+            {
+                errors.Add($"Chronicle material entry {entry.RecordSequence} is missing terminal punctuation.");
+            }
+
+            if (entry.Category == ChronicleEventCategory.Social &&
+                !entry.Message.EndsWith(".", StringComparison.Ordinal))
+            {
+                errors.Add($"Chronicle social entry {entry.RecordSequence} is missing terminal punctuation.");
+            }
+
+            if (entry.Category == ChronicleEventCategory.Biological &&
+                !entry.Message.EndsWith(".", StringComparison.Ordinal))
+            {
+                errors.Add($"Chronicle biological entry {entry.RecordSequence} is missing terminal punctuation.");
+            }
+
+            if (entry.Category == ChronicleEventCategory.External &&
+                !entry.Message.EndsWith(".", StringComparison.Ordinal))
+            {
+                errors.Add($"Chronicle external entry {entry.RecordSequence} is missing terminal punctuation.");
+            }
+
+            if (entry.Category == ChronicleEventCategory.Political &&
+                !entry.Message.EndsWith(".", StringComparison.Ordinal))
+            {
+                errors.Add($"Chronicle political entry {entry.RecordSequence} is missing terminal punctuation.");
             }
         }
 
@@ -94,8 +124,30 @@ public static class ChronicleValidator
             return false;
         }
 
-        var hasPass = message.Contains(" passed ", StringComparison.Ordinal);
-        var hasVeto = message.Contains(" vetoed ", StringComparison.Ordinal);
-        return hasPass ^ hasVeto;
+        return message.Contains(' ');
+    }
+
+    private static bool IsValidKnowledgeChronicleLine(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message) || !message.EndsWith(".", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return message.Contains(" discovered ", StringComparison.Ordinal) ||
+               message.Contains(" learned ", StringComparison.Ordinal) ||
+               message.Contains(" exposed ", StringComparison.Ordinal);
+    }
+
+    private static bool IsValidCapabilityChronicleLine(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message) || !message.EndsWith(".", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return message.Contains(" learned ", StringComparison.Ordinal) ||
+               message.Contains(" adopted ", StringComparison.Ordinal) ||
+               message.Contains(" improved ", StringComparison.Ordinal);
     }
 }

@@ -12,6 +12,10 @@ public sealed class LawProposal
 
     public string Summary { get; init; } = string.Empty;
 
+    public string ReasonSummary { get; init; } = string.Empty;
+
+    public string TradeoffSummary { get; init; } = string.Empty;
+
     public LawProposalCategory Category { get; init; }
 
     public LawProposalStatus Status { get; set; }
@@ -42,6 +46,8 @@ public sealed class LawProposal
             DefinitionId = DefinitionId,
             Title = Title,
             Summary = Summary,
+            ReasonSummary = ReasonSummary,
+            TradeoffSummary = TradeoffSummary,
             Category = Category,
             Status = Status,
             Support = Support,

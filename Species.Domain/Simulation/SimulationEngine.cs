@@ -12,12 +12,17 @@ public sealed class SimulationEngine
     private readonly AdvancementCatalog advancementCatalog;
     private readonly FloraSimulationSystem floraSimulationSystem;
     private readonly FaunaSimulationSystem faunaSimulationSystem;
+    private readonly BiologicalEvolutionSystem biologicalEvolutionSystem;
     private readonly PressureCalculationSystem pressureCalculationSystem;
     private readonly GroupSurvivalSystem groupSurvivalSystem;
     private readonly MigrationSystem migrationSystem;
     private readonly DiscoverySystem discoverySystem;
     private readonly AdvancementSystem advancementSystem;
+    private readonly SocialIdentitySystem socialIdentitySystem;
+    private readonly InterPolityInteractionSystem interPolityInteractionSystem;
+    private readonly PoliticalScalingSystem politicalScalingSystem;
     private readonly SettlementSystem settlementSystem;
+    private readonly MaterialEconomySystem materialEconomySystem;
     private readonly PoliticalBlocSystem politicalBlocSystem;
     private readonly LawProposalSystem lawProposalSystem;
     private readonly EnactedLawSystem enactedLawSystem;
@@ -37,12 +42,17 @@ public sealed class SimulationEngine
         this.advancementCatalog = advancementCatalog;
         floraSimulationSystem = new FloraSimulationSystem();
         faunaSimulationSystem = new FaunaSimulationSystem();
+        biologicalEvolutionSystem = new BiologicalEvolutionSystem();
         pressureCalculationSystem = new PressureCalculationSystem();
         groupSurvivalSystem = new GroupSurvivalSystem();
         migrationSystem = new MigrationSystem();
         discoverySystem = new DiscoverySystem();
         advancementSystem = new AdvancementSystem();
+        socialIdentitySystem = new SocialIdentitySystem();
+        interPolityInteractionSystem = new InterPolityInteractionSystem();
+        politicalScalingSystem = new PoliticalScalingSystem();
         settlementSystem = new SettlementSystem();
+        materialEconomySystem = new MaterialEconomySystem();
         politicalBlocSystem = new PoliticalBlocSystem();
         lawProposalSystem = new LawProposalSystem();
         enactedLawSystem = new EnactedLawSystem();
@@ -70,20 +80,25 @@ public sealed class SimulationEngine
         var advancedWorld = AdvanceMonth(CurrentWorld);
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
-        var pressureResult = pressureCalculationSystem.Run(faunaResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
+        var biologicalEvolutionResult = biologicalEvolutionSystem.Run(faunaResult.World, floraCatalog, faunaCatalog, floraResult.Changes, faunaResult.Changes);
+        var pressureResult = pressureCalculationSystem.Run(biologicalEvolutionResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
         var enactedLawWorld = enactedLawSystem.Run(pressureResult.World);
         var survivalResult = groupSurvivalSystem.Run(enactedLawWorld, floraCatalog, faunaCatalog, advancementCatalog);
         var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
         var settlementResult = settlementSystem.Run(migrationResult.World);
-        var discoveryResult = discoverySystem.Run(settlementResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
+        var materialEconomyResult = materialEconomySystem.Run(settlementResult.World);
+        var discoveryResult = discoverySystem.Run(materialEconomyResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
         var advancementResult = advancementSystem.Run(discoveryResult.World, discoveryCatalog, advancementCatalog, survivalResult.Changes, migrationResult.Changes);
-        var politicalBlocWorld = politicalBlocSystem.Run(advancementResult.World);
+        var socialIdentityResult = socialIdentitySystem.Run(advancementResult.World);
+        var interPolityResult = interPolityInteractionSystem.Run(socialIdentityResult.World);
+        var politicalScaleResult = politicalScalingSystem.Run(interPolityResult.World);
+        var politicalBlocWorld = politicalBlocSystem.Run(politicalScaleResult.World);
         var lawProposalResult = lawProposalSystem.Run(politicalBlocWorld, PlayerPolityId);
-        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, settlementResult.Changes);
+        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, settlementResult.Changes, materialEconomyResult.Changes);
         var finalizedWorld = FinalizeTick(chronicleResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, settlementResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, settlementResult.Changes, materialEconomyResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
     }
 
     public bool PassActiveLawProposal()

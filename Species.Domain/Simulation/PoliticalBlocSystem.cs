@@ -73,12 +73,12 @@ public sealed class PoliticalBlocSystem
 
         baseline += source switch
         {
-            ProposalBackingSource.Priests => CountAlignment(activeLaws, source) * 3 + (polity.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0) + context.Pressures.MigrationPressure / 12,
-            ProposalBackingSource.Warriors => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 8,
-            ProposalBackingSource.Merchants => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.FoodPressure) / 10 + (context.TotalStoredFood > context.TotalPopulation ? 6 : 0),
-            ProposalBackingSource.Elders => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.MigrationPressure) / 10,
-            ProposalBackingSource.CommonFolk => CountAlignment(activeLaws, source) * 2 + context.Pressures.FoodPressure / 10 + context.Pressures.OvercrowdingPressure / 14,
-            ProposalBackingSource.FrontierSettlers => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 12 + context.Pressures.MigrationPressure / 9,
+            ProposalBackingSource.Priests => CountAlignment(activeLaws, source) * 3 + (polity.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0) + context.Governance.Authority / 14,
+            ProposalBackingSource.Warriors => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 8 + context.ExternalPressure.Threat / 6 + context.Governance.Authority / 12 + context.SocialIdentity.OrderOrientation / 14,
+            ProposalBackingSource.Merchants => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.FoodPressure) / 10 + (context.TotalStoredFood > context.TotalPopulation ? 6 : 0) + context.MaterialProduction.StorageSupport / 18 + context.ExternalPressure.Cooperation / 8 + context.ScaleState.CompositeComplexity / 10 + context.SocialIdentity.Mobility / 16,
+            ProposalBackingSource.Elders => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.MigrationPressure) / 10 + context.Governance.Legitimacy / 16 + context.SocialIdentity.Rootedness / 14,
+            ProposalBackingSource.CommonFolk => CountAlignment(activeLaws, source) * 2 + context.Pressures.FoodPressure / 10 + context.Pressures.OvercrowdingPressure / 14 + context.MaterialProduction.DeficitScore / 18 + Math.Max(0, 55 - context.Governance.Legitimacy) / 10 + context.SocialIdentity.Communalism / 16,
+            ProposalBackingSource.FrontierSettlers => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 12 + context.ExternalPressure.FrontierFriction / 6 + context.ExternalPressure.RaidPressure / 7 + context.Pressures.MigrationPressure / 9 + context.MaterialProduction.DeficitScore / 16 + context.Governance.PeripheralStrain / 8 + context.SocialIdentity.FrontierDistinctiveness / 10,
             _ => 0
         };
 
@@ -107,9 +107,9 @@ public sealed class PoliticalBlocSystem
     private static int ResolvePriestSatisfaction(Polity polity, PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = polity.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0;
-        score += CountByCategory(activeLaws, LawProposalCategory.Faith) * 6;
-        score += CountByCategory(activeLaws, LawProposalCategory.Symbolic) * 4;
-        score -= activeLaws.Count(law => law.DefinitionId == "permit-foreign-worship") * 10;
+        score += CountByCategory(activeLaws, LawProposalCategory.Order) * 2;
+        score += context.Governance.Authority / 12;
+        score += context.SocialIdentity.OrderOrientation / 18;
         score += context.Pressures.ThreatPressure / 20;
         return score;
     }
@@ -117,20 +117,29 @@ public sealed class PoliticalBlocSystem
     private static int ResolveWarriorSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = context.Pressures.ThreatPressure / 8;
-        score += CountByCategory(activeLaws, LawProposalCategory.Military) * 6;
+        score += context.ExternalPressure.Threat / 7;
+        score += context.ExternalPressure.RaidPressure / 8;
+        score += CountByCategory(activeLaws, LawProposalCategory.Order) * 4;
         score += CountByCategory(activeLaws, LawProposalCategory.Order) * 3;
-        score += CountByCategory(activeLaws, LawProposalCategory.Punishment) * 2;
-        score -= activeLaws.Count(law => law.DefinitionId is "restrict-private-retainers" or "limit-emergency-decrees") * 8;
+        score += activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.StrengthenCentralAuthorityId) * 7;
+        score -= activeLaws.Count(law => law.DefinitionId == GovernanceLawCatalog.SharedGovernanceId) * 6;
+        score -= context.ScaleState.FragmentationRisk / 12;
+        score += context.SocialIdentity.OrderOrientation / 10;
         return score;
     }
 
     private static int ResolveMerchantSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
-        var score = CountByCategory(activeLaws, LawProposalCategory.Trade) * 6;
+        var score = CountByCategory(activeLaws, LawProposalCategory.Movement) * 4;
         score += CountByCategory(activeLaws, LawProposalCategory.Movement) * 4;
         score += Math.Max(0, 50 - context.Pressures.ThreatPressure) / 10;
-        score -= activeLaws.Count(law => law.DefinitionId is "close-city-gates" or "initiate-curfew") * 10;
+        score += context.ExternalPressure.Cooperation / 8;
+        score += context.MaterialProduction.StorageSupport / 10;
+        score += context.ScaleState.CompositeComplexity / 12;
+        score += activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.LocalStoreAutonomyId) * 7;
+        score -= activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.CrisisMovementRestrictionId or GovernanceLawCatalog.CentralizeStoresId) * 8;
         score -= context.Pressures.MigrationPressure / 16;
+        score += context.SocialIdentity.Mobility / 12;
         return score;
     }
 
@@ -138,28 +147,45 @@ public sealed class PoliticalBlocSystem
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Custom) * 6;
         score += CountByCategory(activeLaws, LawProposalCategory.Order) * 3;
-        score -= CountDisruptiveReforms(activeLaws) * 6;
+        score += activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.SharedGovernanceId or GovernanceLawCatalog.LocalStoreAutonomyId) * 5;
+        score -= activeLaws.Count(law => law.DefinitionId == GovernanceLawCatalog.StrengthenCentralAuthorityId) * 7;
         score -= context.Pressures.MigrationPressure / 14;
+        score -= context.ExternalPressure.RaidPressure / 14;
+        score -= context.ScaleState.Centralization / 16;
+        score += context.SocialIdentity.Rootedness / 12;
         return score;
     }
 
     private static int ResolveCommonSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Food) * 5;
-        score += activeLaws.Count(law => law.DefinitionId is "open-grain-stores" or "grant-market-rights" or "expand-civic-assembly") * 8;
-        score -= activeLaws.Count(law => law.DefinitionId is "raise-war-levy" or "establish-public-executions" or "authorize-secret-arrests" or "impose-emergency-rule") * 8;
+        score += activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.SharedGovernanceId) * 5;
+        score -= activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.ExtractionObligationId or GovernanceLawCatalog.CrisisMovementRestrictionId) * 7;
         score -= context.Pressures.FoodPressure / 6;
+        score -= context.ExternalPressure.RaidPressure / 8;
+        score -= context.ScaleState.OverextensionPressure / 10;
         score -= context.Pressures.OvercrowdingPressure / 12;
+        score -= context.MaterialProduction.DeficitScore / 8;
+        score += context.Governance.Legitimacy / 12;
+        score += context.SocialIdentity.Communalism / 12;
         return score;
     }
 
     private static int ResolveFrontierSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Movement) * 5;
-        score += CountByCategory(activeLaws, LawProposalCategory.Military) * 4;
+        score += CountByCategory(activeLaws, LawProposalCategory.Order) * 3;
         score += context.Pressures.ThreatPressure / 12;
+        score += context.ExternalPressure.FrontierFriction / 7;
+        score += context.ExternalPressure.RaidPressure / 8;
+        score += context.ScaleState.AutonomyTolerance / 12;
         score += context.Pressures.MigrationPressure / 12;
-        score -= activeLaws.Count(law => law.DefinitionId is "close-city-gates" or "ban-hunting") * 7;
+        score += context.MaterialProduction.ToolSupport / 12;
+        score += activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.OpenMovementId or GovernanceLawCatalog.FrontierIntegrationId) * 7;
+        score -= activeLaws.Count(law => law.DefinitionId is GovernanceLawCatalog.CentralizeStoresId or GovernanceLawCatalog.ExtractionObligationId or GovernanceLawCatalog.CrisisMovementRestrictionId) * 7;
+        score -= context.Governance.PeripheralStrain / 10;
+        score += context.SocialIdentity.FrontierDistinctiveness / 10;
+        score += context.SocialIdentity.AutonomyOrientation / 12;
         return score;
     }
 
@@ -172,12 +198,6 @@ public sealed class PoliticalBlocSystem
     {
         return activeLaws.Count(law => law.Category == category);
     }
-
-    private static int CountDisruptiveReforms(IEnumerable<EnactedLaw> activeLaws)
-    {
-        return activeLaws.Count(law => law.DefinitionId is "permit-foreign-worship" or "expand-civic-assembly" or "expand-council-seats");
-    }
-
     private static int DriftToward(int current, int target)
     {
         return Math.Clamp((current * 2 + target) / 3, 0, 100);

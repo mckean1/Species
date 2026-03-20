@@ -66,7 +66,15 @@ public static class WorldGenerator
             var provisionalRegion = new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors);
             var ecosystem = RegionEcosystemSeeder.Seed(provisionalRegion, floraCatalog, faunaCatalog, random);
 
-            regions.Add(new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors, ecosystem));
+            regions.Add(new Region(
+                regionId,
+                regionName,
+                fertility,
+                biome,
+                waterAvailability,
+                neighbors,
+                ecosystem,
+                Species.Domain.Simulation.MaterialEconomySystem.BuildRegionMaterialProfile(provisionalRegion)));
         }
 
         var provisionalWorld = new World(worldSeed, 1, 1, regions);

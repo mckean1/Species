@@ -34,6 +34,13 @@ public static class SpeciesDefinitionValidator
 
             ValidateNonNegative(definition.GrowthRate, $"Flora species {definition.Id} has negative GrowthRate.", errors);
             ValidateNonNegative(definition.FoodValue, $"Flora species {definition.Id} has negative FoodValue.", errors);
+            ValidateTraitRange(definition.Id, definition.BaselineTraits, errors);
+
+            if (!string.IsNullOrWhiteSpace(definition.ParentSpeciesId) &&
+                !floraCatalog.Definitions.Any(item => string.Equals(item.Id, definition.ParentSpeciesId, StringComparison.Ordinal)))
+            {
+                errors.Add($"Flora species {definition.Id} references missing parent lineage {definition.ParentSpeciesId}.");
+            }
         }
 
         return errors;
@@ -57,6 +64,13 @@ public static class SpeciesDefinitionValidator
             ValidateNonNegative(definition.ReproductionRate, $"Fauna species {definition.Id} has negative ReproductionRate.", errors);
             ValidateNonNegative(definition.MigrationTendency, $"Fauna species {definition.Id} has negative MigrationTendency.", errors);
             ValidateNonNegative(definition.FoodYield, $"Fauna species {definition.Id} has negative FoodYield.", errors);
+            ValidateTraitRange(definition.Id, definition.BaselineTraits, errors);
+
+            if (!string.IsNullOrWhiteSpace(definition.ParentSpeciesId) &&
+                !faunaCatalog.Definitions.Any(item => string.Equals(item.Id, definition.ParentSpeciesId, StringComparison.Ordinal)))
+            {
+                errors.Add($"Fauna species {definition.Id} references missing parent lineage {definition.ParentSpeciesId}.");
+            }
         }
 
         return errors;
@@ -101,6 +115,22 @@ public static class SpeciesDefinitionValidator
         if (value < SpeciesDefinitionConstants.NormalizedMinimum)
         {
             errors.Add(message);
+        }
+    }
+
+    private static void ValidateTraitRange(string speciesId, BiologicalTraitProfile traits, ICollection<string> errors)
+    {
+        if (traits.ColdTolerance is < 0 or > 100 ||
+            traits.HeatTolerance is < 0 or > 100 ||
+            traits.DroughtTolerance is < 0 or > 100 ||
+            traits.Flexibility is < 0 or > 100 ||
+            traits.BodySize is < 0 or > 100 ||
+            traits.Reproduction is < 0 or > 100 ||
+            traits.Mobility is < 0 or > 100 ||
+            traits.Defense is < 0 or > 100 ||
+            traits.Resilience is < 0 or > 100)
+        {
+            errors.Add($"Species {speciesId} has baseline traits outside the valid range.");
         }
     }
 }

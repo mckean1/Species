@@ -13,4 +13,10 @@ public sealed class DiscoveryDefinition
     public DiscoveryCategory Category { get; init; }
 
     public string DecisionEffectSummary { get; init; } = string.Empty;
+
+    public string CausalSummary { get; init; } = string.Empty;
+
+    public bool InternalSpreadAllowed { get; init; } = true;
+
+    public bool ContactSpreadAllowed { get; init; }
 }

@@ -76,25 +76,43 @@ public static class KnownPolitiesScreenDataBuilder
             (string.Equals(context.CurrentRegionId, focusContext.CurrentRegionId, StringComparison.Ordinal) ||
              (regionsById.TryGetValue(context.CurrentRegionId, out var current) &&
               current.NeighborIds.Contains(focusContext.CurrentRegionId, StringComparer.Ordinal)));
+        var relation = focusPolity?.InterPolityRelations
+            .FirstOrDefault(item => string.Equals(item.OtherPolityId, polity.Id, StringComparison.Ordinal));
 
         return new KnownPolitySummary(
             polity.Id,
             polity.Name,
-            PolityPresentation.DescribeGovernmentForm(polity.GovernmentForm),
+            $"{PolityPresentation.DescribeGovernmentForm(polity.GovernmentForm)} / {PolityPresentation.DescribePoliticalScaleForm(polity.ScaleState.Form)}",
             coreRegionName,
             currentRegionName,
             KnowledgePresentation.ApproximatePopulation(context.TotalPopulation, exactAllowed: isNearby),
-            ResolveRelationship(context, focusContext, isNearby),
+            ResolveRelationship(context, focusContext, isNearby, relation),
             isNearby ? "Nearby" : "Distant",
-            BuildPressureSummary(context),
+            BuildPressureSummary(context, relation),
             BuildTraits(context),
             BuildRisks(context),
-            BuildNotes(context, focusPolity, focusContext, currentRegionName, coreRegionName, isNearby),
+            BuildNotes(context, focusPolity, focusContext, currentRegionName, coreRegionName, isNearby, relation),
             BuildKnownLaws(polity));
     }
 
-    private static string ResolveRelationship(PolityContext context, PolityContext? focusContext, bool isNearby)
+    private static string ResolveRelationship(PolityContext context, PolityContext? focusContext, bool isNearby, InterPolityRelation? relation)
     {
+        if (relation is not null)
+        {
+            return relation.Stance switch
+            {
+                Species.Domain.Enums.InterPolityStance.Cooperative => "Cooperative",
+                Species.Domain.Enums.InterPolityStance.Wary => "Wary",
+                Species.Domain.Enums.InterPolityStance.Rival => "Rival",
+                Species.Domain.Enums.InterPolityStance.Hostile => "Hostile",
+                Species.Domain.Enums.InterPolityStance.RaidingConflict => "Raiding conflict",
+                Species.Domain.Enums.InterPolityStance.OpenConflict => "Open conflict",
+                Species.Domain.Enums.InterPolityStance.UneasyPeace => "Uneasy peace",
+                Species.Domain.Enums.InterPolityStance.Neutral => "Neutral contact",
+                _ => "Unknown"
+            };
+        }
+
         if (focusContext is null)
         {
             return "Unknown";
@@ -113,7 +131,7 @@ public static class KnownPolitiesScreenDataBuilder
         return isNearby ? "Cautious" : "Known contact";
     }
 
-    private static string BuildPressureSummary(PolityContext context)
+    private static string BuildPressureSummary(PolityContext context, InterPolityRelation? relation)
     {
         var notable = new List<string>();
 
@@ -140,6 +158,16 @@ public static class KnownPolitiesScreenDataBuilder
         if (context.Pressures.ThreatPressure >= 60)
         {
             notable.Add("danger");
+        }
+
+        if (relation?.RaidPressure >= 35)
+        {
+            notable.Add("raid damage");
+        }
+
+        if (relation?.FrontierFriction >= 35)
+        {
+            notable.Add("frontier friction");
         }
 
         return notable.Count > 0
@@ -221,7 +249,8 @@ public static class KnownPolitiesScreenDataBuilder
         PolityContext? focusContext,
         string currentRegionName,
         string coreRegionName,
-        bool isNearby)
+        bool isNearby,
+        InterPolityRelation? relation)
     {
         var notes = new List<string> { $"Current region: {currentRegionName}" };
 
@@ -237,6 +266,8 @@ public static class KnownPolitiesScreenDataBuilder
             notes.Add($"Primary site: {context.PrimarySettlement.Name}");
         }
 
+        notes.Add($"State form: {PolityPresentation.DescribePoliticalScaleForm(context.ScaleState.Form)}");
+
         if (isNearby)
         {
             notes.Add("This polity is operating near the player polity");
@@ -250,6 +281,16 @@ public static class KnownPolitiesScreenDataBuilder
         if (focusContext is not null && string.Equals(context.HomeRegionId, focusContext.HomeRegionId, StringComparison.Ordinal))
         {
             notes.Add("Shares the same homeland");
+        }
+
+        if (relation is not null && !string.IsNullOrWhiteSpace(relation.RecentSummary))
+        {
+            notes.Add(relation.RecentSummary);
+        }
+
+        if (relation?.RaidsSuffered > 0 || relation?.RaidsInflicted > 0)
+        {
+            notes.Add($"Recent clashes: suffered {relation.RaidsSuffered}, inflicted {relation.RaidsInflicted}");
         }
 
         if (focusPolity is not null && string.Equals(context.Polity.Id, focusPolity.Id, StringComparison.Ordinal))

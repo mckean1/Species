@@ -6,5 +6,7 @@ public enum DiscoveryCategory
     Fauna,
     Water,
     Route,
-    Region
+    Region,
+    Material,
+    Contact
 }

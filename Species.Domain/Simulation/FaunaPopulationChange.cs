@@ -22,6 +22,8 @@ public sealed class FaunaPopulationChange
 
     public required float HabitatSupport { get; init; }
 
+    public required float BiologicalFit { get; init; }
+
     public required string Outcome { get; init; }
 
     public required string ConsumedFloraSummary { get; init; }

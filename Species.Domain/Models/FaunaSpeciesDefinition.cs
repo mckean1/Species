@@ -21,4 +21,16 @@ public sealed class FaunaSpeciesDefinition
     public float MigrationTendency { get; init; }
 
     public float FoodYield { get; init; }
+
+    public BiologicalTraitProfile BaselineTraits { get; init; } = new();
+
+    public string ParentSpeciesId { get; init; } = string.Empty;
+
+    public string OriginRegionId { get; init; } = string.Empty;
+
+    public bool IsExtinct { get; init; }
+
+    public int? ExtinctOnYear { get; init; }
+
+    public int? ExtinctOnMonth { get; init; }
 }

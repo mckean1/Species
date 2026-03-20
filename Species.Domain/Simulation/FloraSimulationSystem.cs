@@ -1,5 +1,6 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
+using Species.Domain.Enums;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -18,16 +19,19 @@ public sealed class FloraSimulationSystem
             foreach (var floraEntry in region.Ecosystem.FloraPopulations.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 var species = floraCatalog.GetById(floraEntry.Key);
-                if (species is null)
+                if (species is null || species.IsExtinct)
                 {
                     continue;
                 }
 
+                var profile = region.Ecosystem.FloraProfiles.GetValueOrDefault(species.Id);
+                var traits = profile?.Traits ?? species.BaselineTraits;
                 var waterSupported = species.SupportedWaterAvailabilities.Contains(region.WaterAvailability);
                 var coreBiomeFit = species.CoreBiomes.Contains(region.Biome);
                 var fertilityFit = GetFertilityFit((float)region.Fertility, species.PreferredFertilityMin, species.PreferredFertilityMax);
-                var targetPopulation = GetTargetPopulation(species, waterSupported, coreBiomeFit, fertilityFit);
-                var newPopulation = MoveTowardTarget(floraEntry.Value, targetPopulation, species.GrowthRate, waterSupported);
+                var biologicalFit = ResolveBiologicalFit(region, traits, coreBiomeFit, fertilityFit);
+                var targetPopulation = GetTargetPopulation(species, waterSupported, coreBiomeFit, fertilityFit, traits, biologicalFit);
+                var newPopulation = MoveTowardTarget(floraEntry.Value, targetPopulation, species.GrowthRate, waterSupported, traits);
 
                 if (newPopulation > 0)
                 {
@@ -47,6 +51,7 @@ public sealed class FloraSimulationSystem
                     WaterSupported = waterSupported,
                     CoreBiomeFit = coreBiomeFit,
                     FertilityFit = fertilityFit,
+                    BiologicalFit = biologicalFit,
                     PrimaryCause = ResolvePrimaryCause(waterSupported, coreBiomeFit, fertilityFit, floraEntry.Value, targetPopulation, newPopulation)
                 });
             }
@@ -58,7 +63,14 @@ public sealed class FloraSimulationSystem
                 region.Biome,
                 region.WaterAvailability,
                 region.NeighborIds,
-                new RegionEcosystem(updatedFlora, new Dictionary<string, int>(region.Ecosystem.FaunaPopulations, StringComparer.Ordinal)));
+                new RegionEcosystem(
+                    updatedFlora,
+                    new Dictionary<string, int>(region.Ecosystem.FaunaPopulations, StringComparer.Ordinal),
+                    CloneProfiles(region.Ecosystem.FloraProfiles),
+                    CloneProfiles(region.Ecosystem.FaunaProfiles),
+                    region.Ecosystem.FossilRecords.ToArray(),
+                    region.Ecosystem.BiologicalHistoryRecords.ToArray()),
+                region.MaterialProfile.Clone());
 
             updatedRegions.Add(updatedRegion);
         }
@@ -72,7 +84,9 @@ public sealed class FloraSimulationSystem
         FloraSpeciesDefinition species,
         bool waterSupported,
         bool coreBiomeFit,
-        float fertilityFit)
+        float fertilityFit,
+        BiologicalTraitProfile traits,
+        float biologicalFit)
     {
         if (!waterSupported)
         {
@@ -81,7 +95,7 @@ public sealed class FloraSimulationSystem
 
         var biomeFitMultiplier = coreBiomeFit
             ? FloraSimulationConstants.CoreBiomeFitMultiplier
-            : FloraSimulationConstants.NonCoreBiomeFitMultiplier;
+            : FloraSimulationConstants.NonCoreBiomeFitMultiplier + (traits.Flexibility / 250.0f);
         var targetNormalized =
             FloraSimulationConstants.BaseTargetContribution +
             (species.GrowthRate * FloraSimulationConstants.GrowthRateTargetWeight) +
@@ -90,6 +104,9 @@ public sealed class FloraSimulationSystem
             (coreBiomeFit ? FloraSimulationConstants.CoreBiomeTargetBonus : 0.0f);
 
         targetNormalized *= biomeFitMultiplier;
+        targetNormalized *= biologicalFit;
+        targetNormalized *= 0.90f + ((traits.Resilience + traits.Defense) / 400.0f);
+        targetNormalized *= 0.92f + (traits.Reproduction / 300.0f);
 
         return ToPopulationCount(ClampNormalized(targetNormalized));
     }
@@ -98,11 +115,14 @@ public sealed class FloraSimulationSystem
         int currentPopulation,
         int targetPopulation,
         float growthRate,
-        bool waterSupported)
+        bool waterSupported,
+        BiologicalTraitProfile traits)
     {
         var adjustmentRate = waterSupported
             ? MathF.Max(FloraSimulationConstants.MinimumMonthlyAdjustmentRate, growthRate * FloraSimulationConstants.GrowthRateAdjustmentWeight)
             : FloraSimulationConstants.UnsupportedWaterDeclineRate;
+        adjustmentRate *= 0.92f + (traits.Reproduction / 260.0f);
+        adjustmentRate *= 0.92f + (traits.Resilience / 300.0f);
         var updatedValue = currentPopulation + ((targetPopulation - currentPopulation) * adjustmentRate);
         var nextPopulation = Math.Max(0, (int)MathF.Round(updatedValue, MidpointRounding.AwayFromZero));
 
@@ -112,6 +132,41 @@ public sealed class FloraSimulationSystem
         }
 
         return nextPopulation;
+    }
+
+    private static float ResolveBiologicalFit(Region region, BiologicalTraitProfile traits, bool coreBiomeFit, float fertilityFit)
+    {
+        var coldDemand = region.Biome switch
+        {
+            Biome.Tundra => 78,
+            Biome.Highlands => 62,
+            _ => 34
+        };
+        var heatDemand = region.Biome switch
+        {
+            Biome.Desert => 80,
+            Biome.Wetlands => 58,
+            Biome.Plains => 52,
+            _ => 36
+        };
+        var droughtDemand = region.WaterAvailability switch
+        {
+            WaterAvailability.Low => 82,
+            WaterAvailability.Medium => 46,
+            _ => 22
+        };
+
+        var coldFit = 1.0f - MathF.Abs(traits.ColdTolerance - coldDemand) / 100.0f;
+        var heatFit = 1.0f - MathF.Abs(traits.HeatTolerance - heatDemand) / 100.0f;
+        var droughtFit = 1.0f - MathF.Abs(traits.DroughtTolerance - droughtDemand) / 100.0f;
+        var flexibilityBonus = traits.Flexibility / 220.0f;
+        var sizeTradeoff = 1.0f + ((traits.BodySize - 50) / 250.0f) - ((droughtDemand > 60 ? traits.BodySize : 0) / 500.0f);
+        var fit = ((coldFit * 0.20f) + (heatFit * 0.20f) + (droughtFit * 0.25f) + (fertilityFit * 0.20f) +
+                   ((coreBiomeFit ? 1.0f : 0.78f) * 0.15f));
+
+        fit += flexibilityBonus;
+        fit *= sizeTradeoff;
+        return Math.Clamp(fit, 0.35f, 1.35f);
     }
 
     private static float GetFertilityFit(float fertility, float preferredMin, float preferredMax)
@@ -187,6 +242,11 @@ public sealed class FloraSimulationSystem
         }
 
         return "Near habitat target";
+    }
+
+    private static Dictionary<string, RegionalBiologicalProfile> CloneProfiles(IReadOnlyDictionary<string, RegionalBiologicalProfile> profiles)
+    {
+        return profiles.ToDictionary(entry => entry.Key, entry => entry.Value.Clone(), StringComparer.Ordinal);
     }
 
     private static int ToPopulationCount(float value)
