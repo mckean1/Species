@@ -1,4 +1,5 @@
 using Species.Domain.Catalogs;
+using Species.Domain.Enums;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -16,6 +17,9 @@ public sealed class SimulationEngine
     private readonly MigrationSystem migrationSystem;
     private readonly DiscoverySystem discoverySystem;
     private readonly AdvancementSystem advancementSystem;
+    private readonly PoliticalBlocSystem politicalBlocSystem;
+    private readonly LawProposalSystem lawProposalSystem;
+    private readonly EnactedLawSystem enactedLawSystem;
     private readonly ChronicleSystem chronicleSystem;
 
     public SimulationEngine(
@@ -37,10 +41,15 @@ public sealed class SimulationEngine
         migrationSystem = new MigrationSystem();
         discoverySystem = new DiscoverySystem();
         advancementSystem = new AdvancementSystem();
+        politicalBlocSystem = new PoliticalBlocSystem();
+        lawProposalSystem = new LawProposalSystem();
+        enactedLawSystem = new EnactedLawSystem();
         chronicleSystem = new ChronicleSystem();
     }
 
     public World CurrentWorld { get; private set; }
+
+    public string PlayerPolityId { get; set; } = string.Empty;
 
     public SimulationTickResult Tick()
     {
@@ -48,15 +57,28 @@ public sealed class SimulationEngine
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
         var pressureResult = pressureCalculationSystem.Run(faunaResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
-        var survivalResult = groupSurvivalSystem.Run(pressureResult.World, floraCatalog, faunaCatalog, advancementCatalog);
+        var enactedLawWorld = enactedLawSystem.Run(pressureResult.World);
+        var survivalResult = groupSurvivalSystem.Run(enactedLawWorld, floraCatalog, faunaCatalog, advancementCatalog);
         var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
         var discoveryResult = discoverySystem.Run(migrationResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
         var advancementResult = advancementSystem.Run(discoveryResult.World, discoveryCatalog, advancementCatalog, survivalResult.Changes, migrationResult.Changes);
-        var chronicleResult = chronicleSystem.Run(advancementResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes);
+        var politicalBlocWorld = politicalBlocSystem.Run(advancementResult.World);
+        var lawProposalResult = lawProposalSystem.Run(politicalBlocWorld, PlayerPolityId);
+        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes);
         var finalizedWorld = FinalizeTick(chronicleResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
+    }
+
+    public bool PassActiveLawProposal()
+    {
+        return ResolveActiveLawProposal(LawProposalStatus.Passed);
+    }
+
+    public bool VetoActiveLawProposal()
+    {
+        return ResolveActiveLawProposal(LawProposalStatus.Vetoed);
     }
 
     private static World AdvanceMonth(World world)
@@ -69,5 +91,23 @@ public sealed class SimulationEngine
     private static World FinalizeTick(World world)
     {
         return world;
+    }
+
+    private bool ResolveActiveLawProposal(LawProposalStatus status)
+    {
+        var result = lawProposalSystem.ResolvePlayerDecision(CurrentWorld, PlayerPolityId, status);
+        if (result.Changes.Count == 0)
+        {
+            return false;
+        }
+
+        var updatedWorld = result.World;
+        foreach (var change in result.Changes)
+        {
+            updatedWorld = chronicleSystem.RecordLawDecision(updatedWorld, change);
+        }
+
+        CurrentWorld = updatedWorld;
+        return true;
     }
 }

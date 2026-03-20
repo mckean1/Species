@@ -1,6 +1,7 @@
 using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 namespace Species.Domain.Generation;
 
@@ -40,6 +41,7 @@ public static class PopulationGroupSpawner
                 PopulationGroupSpawningConstants.MinimumStartingStoredFood,
                 PopulationGroupSpawningConstants.MaximumStartingStoredFood + 1);
             var subsistenceMode = ResolveSubsistenceMode(region);
+            var governmentForm = ResolveGovernmentForm(region, subsistenceMode, index);
 
             groups.Add(new PopulationGroup
             {
@@ -51,6 +53,7 @@ public static class PopulationGroupSpawner
                 Population = population,
                 StoredFood = storedFood,
                 SubsistenceMode = subsistenceMode,
+                GovernmentForm = governmentForm,
                 Pressures = new PressureState(),
                 LastRegionId = string.Empty,
                 MonthsSinceLastMove = 0,
@@ -58,7 +61,11 @@ public static class PopulationGroupSpawner
                 KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal),
                 DiscoveryEvidence = new DiscoveryEvidenceState(),
                 LearnedAdvancementIds = new HashSet<string>(StringComparer.Ordinal),
-                AdvancementEvidence = new AdvancementEvidenceState()
+                AdvancementEvidence = new AdvancementEvidenceState(),
+                ActiveLawProposal = null,
+                LawProposalHistory = [],
+                EnactedLaws = [],
+                PoliticalBlocs = PoliticalBlocCatalog.CreateInitialBlocs(governmentForm).ToList()
             });
         }
 
@@ -103,5 +110,51 @@ public static class PopulationGroupSpawner
     private static string BuildGroupName(Region region, int index)
     {
         return $"{region.Name} Group {index + 1}";
+    }
+
+    private static GovernmentForm ResolveGovernmentForm(Region region, SubsistenceMode subsistenceMode, int index)
+    {
+        if (subsistenceMode is SubsistenceMode.Hunter or SubsistenceMode.Gatherer)
+        {
+            return index % 4 == 0
+                ? GovernmentForm.Confederation
+                : GovernmentForm.TribalClanRule;
+        }
+
+        if (region.WaterAvailability == WaterAvailability.High &&
+            region.Biome is Biome.Forest or Biome.Wetlands)
+        {
+            return index % 3 == 0
+                ? GovernmentForm.Theocracy
+                : GovernmentForm.Republic;
+        }
+
+        if (region.Fertility >= 0.72 && region.WaterAvailability == WaterAvailability.High)
+        {
+            return index % 2 == 0
+                ? GovernmentForm.MerchantRule
+                : GovernmentForm.ImperialBureaucracy;
+        }
+
+        if (region.Biome is Biome.Plains or Biome.Highlands && region.Fertility >= 0.56)
+        {
+            return (index % 3) switch
+            {
+                0 => GovernmentForm.FeudalRule,
+                1 => GovernmentForm.CouncilRule,
+                _ => GovernmentForm.ImperialBureaucracy
+            };
+        }
+
+        if (region.WaterAvailability == WaterAvailability.Low)
+        {
+            return index % 2 == 0
+                ? GovernmentForm.DespoticRule
+                : GovernmentForm.AbsoluteRule;
+        }
+
+        return index % 2 == 0
+            ? GovernmentForm.Republic
+            : GovernmentForm.AbsoluteRule;
     }
 }

@@ -13,6 +13,7 @@ public sealed class SimulationTickResult
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<LawProposalChange> lawProposalChanges,
         IReadOnlyList<ChronicleEntry> recordedChronicleEntries,
         IReadOnlyList<ChronicleEntry> revealedChronicleEntries)
     {
@@ -24,6 +25,7 @@ public sealed class SimulationTickResult
         MigrationChanges = migrationChanges;
         DiscoveryChanges = discoveryChanges;
         AdvancementChanges = advancementChanges;
+        LawProposalChanges = lawProposalChanges;
         RecordedChronicleEntries = recordedChronicleEntries;
         RevealedChronicleEntries = revealedChronicleEntries;
     }
@@ -43,6 +45,8 @@ public sealed class SimulationTickResult
     public IReadOnlyList<DiscoveryChange> DiscoveryChanges { get; }
 
     public IReadOnlyList<AdvancementChange> AdvancementChanges { get; }
+
+    public IReadOnlyList<LawProposalChange> LawProposalChanges { get; }
 
     public IReadOnlyList<ChronicleEntry> RecordedChronicleEntries { get; }
 

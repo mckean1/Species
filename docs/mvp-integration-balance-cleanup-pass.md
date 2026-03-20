@@ -21,12 +21,13 @@ The MVP now preserves this monthly order:
 2. Flora simulation
 3. Fauna simulation
 4. Group pressure recalculation
-5. Group survival and consumption
-6. Migration decision and movement
-7. Discovery evaluation
-8. Advancement evaluation
-9. Chronicle update and feed progression
-10. End-of-tick finalization
+5. Enacted law monthly effects
+6. Group survival and consumption
+7. Migration decision and movement
+8. Discovery evaluation
+9. Advancement evaluation
+10. Chronicle update and feed progression
+11. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -117,3 +118,27 @@ Still intentionally deferred after this pass:
 - new large UI frameworks
 - new screen families beyond Chronicle and Region Viewer
 - broad feature expansion beyond cleanup/integration
+- weak enforcement and region-specific resistance to enacted laws
+- law legitimacy by class, faith, or region
+- slot-based government/legal structures beyond simple title conflicts
+- multi-step reform chains beyond one-step repeal/replacement
+- legal memory or tradition effects around repealed laws
+- government-form-specific repeal mechanics beyond the shared MVP rules
+- full faction and backing-bloc simulation
+- proposal debates, petitions, and competing support/opposition coalitions
+- proposal origin memory and law popularity tracking by subgroup or region
+- regional resistance to law enforcement
+- class, faith, or subgroup-specific compliance differences
+- lawbreaking events, crackdowns, and richer enforcement decay/recovery
+- enforcement tied to institutions, infrastructure, or bureaucracy
+- corruption and active resistance movements weakening enforcement
+- government-form transitions, reform paths, and government replacement
+- elections, office rotation, and representation systems
+- noble houses, guilds, temple hierarchies, and court politics as real entities
+- regional autonomy within large governments
+- legal codification, legitimacy, charters, and succession/inheritance systems
+- advanced bureaucratic capacity systems beyond the current law-enforcement layer
+- regional bloc variation inside large polities
+- inter-bloc rivalries, coalitions, and negotiated bargaining
+- coups, uprisings, and broader political crisis behavior
+- bloc memory, long-term ideology, and political legitimacy by bloc support

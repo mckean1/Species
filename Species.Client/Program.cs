@@ -37,6 +37,7 @@ if (validationErrors.Length > 0)
 var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
 var viewState = new PlayerViewState();
 viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
+simulationEngine.PlayerPolityId = viewState.FocalGroupId;
 var chronicleFrameRenderer = new ConsoleFrameRenderer();
 var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog).ToArray();
 if (viewErrors.Length > 0)
@@ -171,6 +172,18 @@ while (true)
             var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentLawIndex).Laws.Count;
             switch (key.Key)
             {
+                case ConsoleKey.P:
+                    if (!viewState.IsSimulationRunning && simulationEngine.PassActiveLawProposal())
+                    {
+                        shouldRender = true;
+                    }
+                    break;
+                case ConsoleKey.V:
+                    if (!viewState.IsSimulationRunning && simulationEngine.VetoActiveLawProposal())
+                    {
+                        shouldRender = true;
+                    }
+                    break;
                 case ConsoleKey.RightArrow:
                 case ConsoleKey.D:
                 case ConsoleKey.N:
@@ -182,7 +195,6 @@ while (true)
                     break;
                 case ConsoleKey.LeftArrow:
                 case ConsoleKey.A:
-                case ConsoleKey.P:
                     if (lawCount > 0)
                     {
                         viewState.MoveToPreviousLaw(lawCount);
@@ -231,6 +243,7 @@ while (true)
     }
 
     viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
+    simulationEngine.PlayerPolityId = viewState.FocalGroupId;
     viewState.ClampRegionIndex(RegionsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
     viewState.ClampKnownPolityIndex(KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
     viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);

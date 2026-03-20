@@ -90,7 +90,7 @@ public static class KnownPolitiesScreenDataBuilder
         return new KnownPolitySummary(
             group.Id,
             group.Name,
-            "Unknown",
+            PolityPresentation.DescribeGovernmentForm(group.GovernmentForm),
             coreRegionName,
             currentRegionName,
             KnowledgePresentation.ApproximatePopulation(group.Population, exactAllowed: isNearby),
@@ -100,7 +100,7 @@ public static class KnownPolitiesScreenDataBuilder
             traits,
             risks,
             notes,
-            ["No known laws"]);
+            BuildKnownLaws(group));
     }
 
     private static string ResolveRelationship(PopulationGroup group, PopulationGroup focusGroup, bool isNearby)
@@ -245,6 +245,20 @@ public static class KnownPolitiesScreenDataBuilder
         }
 
         return notes;
+    }
+
+    private static IReadOnlyList<string> BuildKnownLaws(PopulationGroup group)
+    {
+        var activeEnacted = group.EnactedLaws
+            .Where(law => law.IsActive)
+            .OrderByDescending(law => law.EnactedOnYear)
+            .ThenByDescending(law => law.EnactedOnMonth)
+            .Select(law => law.Title)
+            .ToArray();
+
+        return activeEnacted.Length > 0
+            ? activeEnacted.Take(2).ToArray()
+            : ["No known laws"];
     }
 
     private static string FormatMonthYear(int month, int year)

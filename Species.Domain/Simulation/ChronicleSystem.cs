@@ -11,9 +11,10 @@ public sealed class ChronicleSystem
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
-        IReadOnlyList<AdvancementChange> advancementChanges)
+        IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<LawProposalChange> lawProposalChanges)
     {
-        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, discoveryChanges, advancementChanges);
+        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, discoveryChanges, advancementChanges, lawProposalChanges);
         var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
@@ -27,7 +28,8 @@ public sealed class ChronicleSystem
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
-        IReadOnlyList<AdvancementChange> advancementChanges)
+        IReadOnlyList<AdvancementChange> advancementChanges,
+        IReadOnlyList<LawProposalChange> lawProposalChanges)
     {
         var entries = new List<ChronicleEntry>();
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -118,7 +120,38 @@ public sealed class ChronicleSystem
             }
         }
 
+        foreach (var change in lawProposalChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.GroupId,
+                change.GroupName,
+                ChronicleEventCategory.Law,
+                change.Status == Species.Domain.Enums.LawProposalStatus.Passed
+                    ? $"{change.GroupName} passed {change.ProposalTitle}."
+                    : $"{change.GroupName} vetoed {change.ProposalTitle}.",
+                "law"));
+        }
+
         return entries;
+    }
+
+    public World RecordLawDecision(World world, LawProposalChange change)
+    {
+        var message = change.Status == Species.Domain.Enums.LawProposalStatus.Passed
+            ? $"{change.GroupName} passed {change.ProposalTitle}."
+            : $"{change.GroupName} vetoed {change.ProposalTitle}.";
+        var entry = BuildEntry(
+            world,
+            world.Chronicle.NextRecordSequence,
+            change.GroupId,
+            change.GroupName,
+            ChronicleEventCategory.Law,
+            message,
+            "law");
+        var chronicle = RecordEntries(world.Chronicle, [entry], world.CurrentYear, world.CurrentMonth);
+        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, chronicle);
     }
 
     private static void AddEntry(ICollection<ChronicleEntry> entries, ISet<string> seenKeys, ChronicleEntry entry)

@@ -20,6 +20,8 @@ public sealed class PopulationGroup
 
     public SubsistenceMode SubsistenceMode { get; set; }
 
+    public GovernmentForm GovernmentForm { get; set; }
+
     public PressureState Pressures { get; set; } = new();
 
     public string LastRegionId { get; set; } = string.Empty;
@@ -35,4 +37,12 @@ public sealed class PopulationGroup
     public HashSet<string> LearnedAdvancementIds { get; init; } = new(StringComparer.Ordinal);
 
     public AdvancementEvidenceState AdvancementEvidence { get; set; } = new();
+
+    public LawProposal? ActiveLawProposal { get; set; }
+
+    public List<LawProposal> LawProposalHistory { get; init; } = [];
+
+    public List<EnactedLaw> EnactedLaws { get; init; } = [];
+
+    public List<PoliticalBloc> PoliticalBlocs { get; init; } = [];
 }

@@ -83,7 +83,27 @@ public static class PolityScreenRenderer
             lines.Add(law);
         }
 
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Political Blocs{Reset}");
+        foreach (var bloc in BuildPoliticalBlocLines(data.PoliticalBlocs, leftWidth + rightWidth + 3))
+        {
+            lines.Add(bloc);
+        }
+
         return lines;
+    }
+
+    private static IReadOnlyList<string> BuildPoliticalBlocLines(IReadOnlyList<PoliticalBlocScreenItem> blocs, int width)
+    {
+        if (blocs.Count == 0)
+        {
+            return BuildBulletLines(["No political blocs are visible."], width, Dim);
+        }
+
+        return BuildBulletLines(
+            blocs.Select(bloc => $"{bloc.Name} [Influence {bloc.Influence} | Satisfaction {bloc.Satisfaction}]").ToArray(),
+            width,
+            Dim);
     }
 
     private static IReadOnlyList<string> BuildPressureLines(IReadOnlyList<PolityPressureItem> pressures, int width)

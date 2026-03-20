@@ -1,4 +1,5 @@
 using System.Text;
+using Species.Domain.Enums;
 using Species.Domain.Models;
 
 public static class LawsScreenRenderer
@@ -23,7 +24,7 @@ public static class LawsScreenRenderer
         var data = LawsScreenDataBuilder.Build(world, focalGroupId, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var leftWidth = Math.Max(32, ((innerWidth - 3) * 9) / 20);
-        var rightWidth = Math.Max(28, innerWidth - leftWidth - 3);
+        var rightWidth = Math.Max(30, innerWidth - leftWidth - 3);
         var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var bodyLines = BuildBodyLines(data, leftWidth, rightWidth, isSimulationRunning);
@@ -40,10 +41,11 @@ public static class LawsScreenRenderer
 
         var lines = new List<string>();
         lines.AddRange(PlayerScreenShell.BuildHeader("Laws", data.PolityName, data.CurrentDate, isSimulationRunning, innerWidth));
-
         lines.AddRange(bodyLines.Select(line => BorderLine(FitVisible(line, innerWidth), innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select law"));
+        lines.Add(PlayerScreenShell.BuildFooter(
+            innerWidth,
+            data.HasActiveProposal && !isSimulationRunning ? "Arrows select | P pass | V veto" : "Arrows select"));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
@@ -56,17 +58,43 @@ public static class LawsScreenRenderer
 
         lines.Add($"Runtime: {runtimeText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add(CombinePaneRow($"{PaneTitle}Law Proposals{Reset}", $"{PaneTitle}Selected Proposal{Reset}", leftWidth, rightWidth));
+        lines.AddRange(CombinePaneRows(BuildLawList(data, leftWidth), BuildLawDetail(data, rightWidth, isSimulationRunning), leftWidth, rightWidth));
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Enacted Laws{Reset}");
 
-        var listLines = BuildLawList(data, leftWidth);
-        var detailLines = BuildLawDetail(data, rightWidth);
-        lines.Add(CombinePaneRow($"{PaneTitle}Laws{Reset}", $"{PaneTitle}Selected Law{Reset}", leftWidth, rightWidth));
-        lines.AddRange(CombinePaneRows(listLines, detailLines, leftWidth, rightWidth));
+        foreach (var line in BuildEnactedLawLines(data.EnactedLaws, leftWidth + rightWidth + 3))
+        {
+            lines.Add(line);
+        }
 
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
         lines.Add($"{PaneTitle}Law Notes{Reset}");
-        foreach (var note in BuildBulletLines(data.DraftNotes, leftWidth + rightWidth + 3, Dim))
+
+        foreach (var note in BuildBulletLines(data.Laws.Count == 0 ? data.EmptyStateNotes : data.Notes, leftWidth + rightWidth + 3, Dim))
         {
             lines.Add(note);
+        }
+
+        return lines;
+    }
+
+    private static IReadOnlyList<string> BuildEnactedLawLines(IReadOnlyList<EnactedLawScreenItem> laws, int width)
+    {
+        if (laws.Count == 0)
+        {
+            return BuildBulletLines(["No enacted laws are active."], width, Dim);
+        }
+
+        var lines = new List<string>();
+        foreach (var law in laws)
+        {
+            lines.AddRange(BuildBulletLines(
+                [$"{law.Name} [{law.Category} | impact {law.ImpactScale}]",
+                  $"Enforcement: {law.Enforcement} | Compliance: {law.Compliance}",
+                  law.Summary],
+                width,
+                Dim));
         }
 
         return lines;
@@ -84,101 +112,71 @@ public static class LawsScreenRenderer
         {
             var law = data.Laws[index];
             var marker = index == data.SelectedIndex ? $"{Yellow}> {Reset}" : "  ";
-            var row = $"{marker}{ColorStatus(law.Status)} {Blue}{law.Name}{Reset}";
-
-            if (!string.IsNullOrWhiteSpace(law.Category))
-            {
-                row += $" {Dim}[{law.Category}]{Reset}";
-            }
-
-            if (law.IsQuestionable)
-            {
-                row += $" {Orange}!{Reset}";
-            }
-
+            var row = $"{marker}{ColorStatus(law.Status)} {Blue}{law.Name}{Reset} {Dim}[{law.Category}]{Reset}";
             lines.Add(FitVisible(row, width));
         }
 
         return lines;
     }
 
-    private static IReadOnlyList<string> BuildLawDetail(LawsScreenData data, int width)
+    private static IReadOnlyList<string> BuildLawDetail(LawsScreenData data, int width, bool isSimulationRunning)
     {
         if (data.SelectedLaw is null)
         {
-            var lines = new List<string>
-            {
-                $"{Dim}No laws are currently in force.{Reset}",
-                $"{Dim}This polity has not adopted formal laws yet.{Reset}",
-                $"{Dim}{new string('-', width)}{Reset}",
-                $"{PaneTitle}What To Expect{Reset}"
-            };
-            lines.AddRange(BuildBulletLines(
-                [
-                    "Active laws will appear here once the law system provides polity law state.",
-                    "Draft or available laws will be listed separately when they exist.",
-                    "Benefits and risks will be shown in plain language rather than raw internals."
-                ],
-                width,
-                Dim));
-            return lines;
+            return
+            [
+                $"{Dim}No active law proposal.{Reset}",
+                $"{Dim}When current pressures and government form align, a proposal will appear.{Reset}"
+            ];
         }
 
         var law = data.SelectedLaw;
-        var lines2 = new List<string>
+        var lines = new List<string>
         {
             $"{Blue}{law.Name}{Reset}",
-            $"Status: {ColorStatus(law.Status)}"
+            $"Status: {ColorStatus(law.Status)}",
+            $"Category: {Purple}{law.Category}{Reset}",
+            $"Backed By: {Yellow}{law.BackedBy}{Reset}",
+            $"Support: {Green}{law.Support}{Reset}",
+            $"Opposition: {Red}{law.Opposition}{Reset}",
+            $"Urgency: {Orange}{law.Urgency}{Reset}",
+            $"Age: {law.AgeInMonths} months",
+            $"Ignored: {law.IgnoredMonths} months",
+            $"Impact: {law.ImpactScale}",
+            $"{Dim}{new string('-', width)}{Reset}"
         };
 
-        if (!string.IsNullOrWhiteSpace(law.Category))
+        lines.AddRange(WrapText(law.Summary, width));
+
+        if (law.Status == LawProposalStatus.Active)
         {
-            lines2.Add($"Category: {Purple}{law.Category}{Reset}");
-        }
-
-        lines2.AddRange(WrapText(law.Description, width));
-        lines2.Add($"{Dim}{new string('-', width)}{Reset}");
-        lines2.Add($"{PaneTitle}Why It Matters{Reset}");
-        lines2.AddRange(BuildBulletLines([law.WhyItMatters], width, Yellow));
-        lines2.Add($"{PaneTitle}Benefits{Reset}");
-        lines2.AddRange(BuildBulletLines(law.Benefits, width, Green));
-        lines2.Add($"{PaneTitle}Risks / Tradeoffs{Reset}");
-        lines2.AddRange(BuildBulletLines(law.Risks, width, Orange));
-
-        if (law.IsQuestionable)
-        {
-            lines2.Add($"{PaneTitle}Risk Profile{Reset}");
-            lines2.AddRange(BuildBulletLines(["This law carries visible social or moral risk."], width, Red));
-        }
-
-        return lines2;
-    }
-
-    private static IReadOnlyList<string> BuildBulletLines(IReadOnlyList<string> items, int width, string color)
-    {
-        var lines = new List<string>();
-
-        foreach (var item in items)
-        {
-            lines.AddRange(WrapBullet(item, width, color));
-        }
-
-        if (lines.Count == 0)
-        {
-            lines.Add(FitVisible($"{Dim}None{Reset}", width));
+            lines.Add($"{Dim}{new string('-', width)}{Reset}");
+            lines.Add($"{PaneTitle}Actions{Reset}");
+            lines.AddRange(BuildBulletLines(
+                isSimulationRunning
+                    ? ["Pause the simulation to Pass or Veto the active proposal."]
+                    : ["Press P to pass this law.", "Press V to veto this law."],
+                width,
+                law.Status == LawProposalStatus.Active && !isSimulationRunning ? Yellow : Dim));
         }
 
         return lines;
     }
 
+    private static IReadOnlyList<string> BuildBulletLines(IReadOnlyList<string> items, int width, string color)
+    {
+        var lines = new List<string>();
+        foreach (var item in items)
+        {
+            lines.AddRange(Wrap(item, width, $"{color}* {Reset}", "  "));
+        }
+
+        return lines.Count > 0 ? lines : [FitVisible($"{Dim}None{Reset}", width)];
+    }
+
     private static IReadOnlyList<string> WrapText(string text, int width)
     {
         return Wrap(text, width, string.Empty, string.Empty);
-    }
-
-    private static IReadOnlyList<string> WrapBullet(string text, int width, string color)
-    {
-        return Wrap(text, width, $"{color}* {Reset}", "  ");
     }
 
     private static IReadOnlyList<string> Wrap(string text, int width, string firstPrefix, string nextPrefix)
@@ -194,7 +192,9 @@ public static class LawsScreenRenderer
 
         foreach (var word in words)
         {
-            var candidate = BuildCandidate(current, word);
+            var candidate = string.IsNullOrEmpty(current) || current.EndsWith(' ')
+                ? $"{current}{word}"
+                : $"{current} {word}";
             if (VisibleLength(candidate) <= width)
             {
                 current = candidate;
@@ -233,25 +233,15 @@ public static class LawsScreenRenderer
         return $"{FitVisible(left, leftWidth)} | {FitVisible(right, rightWidth)}";
     }
 
-    private static string BuildCandidate(string current, string word)
-    {
-        if (string.IsNullOrEmpty(current))
-        {
-            return word;
-        }
-
-        return current.EndsWith(' ')
-            ? $"{current}{word}"
-            : $"{current} {word}";
-    }
-
-    private static string ColorStatus(LawScreenStatus status)
+    private static string ColorStatus(LawProposalStatus status)
     {
         return status switch
         {
-            LawScreenStatus.Active => $"{Green}Active{Reset}",
-            LawScreenStatus.Draft => $"{Yellow}Draft{Reset}",
-            _ => $"{Dim}Inactive{Reset}"
+            LawProposalStatus.Active => $"{Green}Active{Reset}",
+            LawProposalStatus.Passed => $"{Green}Passed{Reset}",
+            LawProposalStatus.Vetoed => $"{Red}Vetoed{Reset}",
+            LawProposalStatus.Abstained => $"{Dim}Abstained{Reset}",
+            _ => $"{Dim}Unknown{Reset}"
         };
     }
 
@@ -301,7 +291,6 @@ public static class LawsScreenRenderer
     private static int VisibleLength(string text)
     {
         var length = 0;
-
         for (var index = 0; index < text.Length; index++)
         {
             if (text[index] == '\u001b')
@@ -318,17 +307,6 @@ public static class LawsScreenRenderer
         }
 
         return length;
-    }
-
-    private static string PadBetween(string left, string right, int width)
-    {
-        var spaces = Math.Max(1, width - VisibleLength(left) - VisibleLength(right));
-        return left + new string(' ', spaces) + right;
-    }
-
-    private static string HorizontalBorder(int innerWidth)
-    {
-        return "+" + new string('-', innerWidth + 2) + "+";
     }
 
     private static string BorderLine(string content, int innerWidth)

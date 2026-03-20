@@ -24,7 +24,8 @@ public static class PolityScreenDataBuilder
                 ["No notable strengths yet."],
                 ["No acute problems detected."],
                 ["No notable discoveries yet."],
-                ["No active laws yet."]);
+                ["No active laws yet."],
+                Array.Empty<PoliticalBlocScreenItem>());
         }
 
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
@@ -35,7 +36,7 @@ public static class PolityScreenDataBuilder
         return new PolityScreenData(
             focusGroup.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
-            "Unknown",
+            PolityPresentation.DescribeGovernmentForm(focusGroup.GovernmentForm),
             BuildSpeciesLabel(focusGroup.SpeciesId),
             coreRegionName,
             focusGroup.Population.ToString("N0"),
@@ -44,7 +45,8 @@ public static class PolityScreenDataBuilder
             BuildStrengths(focusGroup, pressures),
             BuildProblems(focusGroup, pressures),
             BuildProgress(focusGroup, discoveryCatalog, advancementCatalog),
-            ["No active laws yet."]);
+            BuildActiveLaws(focusGroup),
+            BuildPoliticalBlocs(focusGroup));
     }
 
     private static string BuildSpeciesLabel(string speciesId)
@@ -176,6 +178,33 @@ public static class PolityScreenDataBuilder
             : ["No notable discoveries yet."];
     }
 
+    private static IReadOnlyList<string> BuildActiveLaws(PopulationGroup group)
+    {
+        var enacted = group.EnactedLaws
+            .Where(law => law.IsActive)
+            .OrderByDescending(law => law.EnactedOnYear)
+            .ThenByDescending(law => law.EnactedOnMonth)
+            .ThenBy(law => law.Title, StringComparer.Ordinal)
+            .Select(law => $"{law.Title} [{PolityPresentation.DescribeLawCategory(law.Category)} | E {PolityPresentation.DescribeLawStrengthBand(law.EnforcementStrength)} | C {PolityPresentation.DescribeLawStrengthBand(law.ComplianceLevel)}]")
+            .ToArray();
+
+        return enacted.Length > 0 ? enacted : ["No enacted laws yet."];
+    }
+
+    private static IReadOnlyList<PoliticalBlocScreenItem> BuildPoliticalBlocs(PopulationGroup group)
+    {
+        return group.PoliticalBlocs
+            .OrderByDescending(bloc => bloc.Influence)
+            .ThenByDescending(bloc => bloc.Satisfaction)
+            .ThenBy(bloc => PolityPresentation.DescribeBackingSource(bloc.Source), StringComparer.Ordinal)
+            .Take(6)
+            .Select(bloc => new PoliticalBlocScreenItem(
+                PolityPresentation.DescribeBackingSource(bloc.Source),
+                bloc.Influence,
+                bloc.Satisfaction))
+            .ToArray();
+    }
+
     private static string FormatMonthYear(int month, int year)
     {
         var monthText = month switch
@@ -211,6 +240,9 @@ public sealed record PolityScreenData(
     IReadOnlyList<string> Strengths,
     IReadOnlyList<string> Problems,
     IReadOnlyList<string> ProgressItems,
-    IReadOnlyList<string> ActiveLaws);
+    IReadOnlyList<string> ActiveLaws,
+    IReadOnlyList<PoliticalBlocScreenItem> PoliticalBlocs);
 
 public sealed record PolityPressureItem(string Label, int Value);
+
+public sealed record PoliticalBlocScreenItem(string Name, int Influence, int Satisfaction);

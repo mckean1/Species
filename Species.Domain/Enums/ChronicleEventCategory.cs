@@ -7,5 +7,6 @@ public enum ChronicleEventCategory
     Decline,
     Extinction,
     Discovery,
-    Advancement
+    Advancement,
+    Law
 }

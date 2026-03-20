@@ -63,6 +63,13 @@ public static class ChronicleValidator
             {
                 errors.Add($"Chronicle advancement entry {entry.RecordSequence} does not use learned wording.");
             }
+
+            if (entry.Category == ChronicleEventCategory.Law &&
+                !(entry.Message.Contains(" passed ", StringComparison.Ordinal) ||
+                  entry.Message.Contains(" vetoed ", StringComparison.Ordinal)))
+            {
+                errors.Add($"Chronicle law entry {entry.RecordSequence} does not use pass or veto wording.");
+            }
         }
 
         if (tickResult is null)
