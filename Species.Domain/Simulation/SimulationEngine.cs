@@ -17,6 +17,7 @@ public sealed class SimulationEngine
     private readonly MigrationSystem migrationSystem;
     private readonly DiscoverySystem discoverySystem;
     private readonly AdvancementSystem advancementSystem;
+    private readonly SettlementSystem settlementSystem;
     private readonly PoliticalBlocSystem politicalBlocSystem;
     private readonly LawProposalSystem lawProposalSystem;
     private readonly EnactedLawSystem enactedLawSystem;
@@ -41,6 +42,7 @@ public sealed class SimulationEngine
         migrationSystem = new MigrationSystem();
         discoverySystem = new DiscoverySystem();
         advancementSystem = new AdvancementSystem();
+        settlementSystem = new SettlementSystem();
         politicalBlocSystem = new PoliticalBlocSystem();
         lawProposalSystem = new LawProposalSystem();
         enactedLawSystem = new EnactedLawSystem();
@@ -72,15 +74,16 @@ public sealed class SimulationEngine
         var enactedLawWorld = enactedLawSystem.Run(pressureResult.World);
         var survivalResult = groupSurvivalSystem.Run(enactedLawWorld, floraCatalog, faunaCatalog, advancementCatalog);
         var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
-        var discoveryResult = discoverySystem.Run(migrationResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
+        var settlementResult = settlementSystem.Run(migrationResult.World);
+        var discoveryResult = discoverySystem.Run(settlementResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
         var advancementResult = advancementSystem.Run(discoveryResult.World, discoveryCatalog, advancementCatalog, survivalResult.Changes, migrationResult.Changes);
         var politicalBlocWorld = politicalBlocSystem.Run(advancementResult.World);
         var lawProposalResult = lawProposalSystem.Run(politicalBlocWorld, PlayerPolityId);
-        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes);
+        var chronicleResult = chronicleSystem.Run(lawProposalResult.World, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, settlementResult.Changes);
         var finalizedWorld = FinalizeTick(chronicleResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, settlementResult.Changes, discoveryResult.Changes, advancementResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
     }
 
     public bool PassActiveLawProposal()
@@ -102,7 +105,48 @@ public sealed class SimulationEngine
 
     private static World FinalizeTick(World world)
     {
-        return world;
+        var memberGroupIdsByPolityId = world.PopulationGroups
+            .GroupBy(group => group.PolityId, StringComparer.Ordinal)
+            .ToDictionary(
+                grouping => grouping.Key,
+                grouping => grouping
+                    .OrderBy(group => group.Id, StringComparer.Ordinal)
+                    .Select(group => group.Id)
+                    .ToArray(),
+                StringComparer.Ordinal);
+        var populationByPolityId = world.PopulationGroups
+            .GroupBy(group => group.PolityId, StringComparer.Ordinal)
+            .ToDictionary(
+                grouping => grouping.Key,
+                grouping => grouping.Sum(group => group.Population),
+                StringComparer.Ordinal);
+        var updatedPolities = world.Polities
+            .Where(polity => memberGroupIdsByPolityId.ContainsKey(polity.Id))
+            .Select(polity =>
+            {
+                var updatedPolity = polity.Clone();
+                updatedPolity.MemberGroupIds.Clear();
+                updatedPolity.MemberGroupIds.AddRange(memberGroupIdsByPolityId[polity.Id]);
+                return updatedPolity;
+            })
+            .ToArray();
+        var focalPolityId = updatedPolities.Any(polity => string.Equals(polity.Id, world.FocalPolityId, StringComparison.Ordinal))
+            ? world.FocalPolityId
+            : updatedPolities
+                .OrderByDescending(polity => populationByPolityId.GetValueOrDefault(polity.Id))
+                .ThenBy(polity => polity.Name, StringComparer.Ordinal)
+                .Select(polity => polity.Id)
+                .FirstOrDefault() ?? string.Empty;
+
+        return new World(
+            world.Seed,
+            world.CurrentYear,
+            world.CurrentMonth,
+            world.Regions,
+            world.PopulationGroups,
+            world.Chronicle,
+            updatedPolities,
+            focalPolityId);
     }
 
     private bool ResolveActiveLawProposal(LawProposalStatus status)

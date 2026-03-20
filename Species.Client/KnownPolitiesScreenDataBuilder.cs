@@ -64,11 +64,11 @@ public static class KnownPolitiesScreenDataBuilder
         _ = advancementCatalog;
 
         var currentRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.CurrentRegionId);
-        var originRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.OriginRegionId);
+        var coreRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.CoreRegionId);
         var currentRegionName = currentRegionKnown && regionsById.TryGetValue(context.CurrentRegionId, out var currentRegion)
             ? currentRegion.Name
             : "Not yet known";
-        var coreRegionName = originRegionKnown && regionsById.TryGetValue(context.OriginRegionId, out var originRegion)
+        var coreRegionName = coreRegionKnown && regionsById.TryGetValue(context.CoreRegionId, out var originRegion)
             ? originRegion.Name
             : currentRegionName;
 
@@ -89,7 +89,7 @@ public static class KnownPolitiesScreenDataBuilder
             BuildPressureSummary(context),
             BuildTraits(context),
             BuildRisks(context),
-            BuildNotes(context, focusPolity, focusContext, currentRegionName, isNearby),
+            BuildNotes(context, focusPolity, focusContext, currentRegionName, coreRegionName, isNearby),
             BuildKnownLaws(polity));
     }
 
@@ -170,6 +170,10 @@ public static class KnownPolitiesScreenDataBuilder
         {
             traits.Add("Frequently on the move");
         }
+        else if (context.AnchoringKind == Species.Domain.Enums.PolityAnchoringKind.Anchored)
+        {
+            traits.Add("Clearly anchored to a core site");
+        }
 
         if (context.TotalStoredFood > context.TotalPopulation)
         {
@@ -216,9 +220,22 @@ public static class KnownPolitiesScreenDataBuilder
         Polity? focusPolity,
         PolityContext? focusContext,
         string currentRegionName,
+        string coreRegionName,
         bool isNearby)
     {
         var notes = new List<string> { $"Current region: {currentRegionName}" };
+
+        if (!string.Equals(coreRegionName, currentRegionName, StringComparison.Ordinal))
+        {
+            notes.Add($"Core region: {coreRegionName}");
+        }
+
+        notes.Add($"Anchoring: {PolityPresentation.DescribeAnchoringKind(context.AnchoringKind)}");
+
+        if (context.PrimarySettlement is not null)
+        {
+            notes.Add($"Primary site: {context.PrimarySettlement.Name}");
+        }
 
         if (isNearby)
         {
@@ -230,7 +247,7 @@ public static class KnownPolitiesScreenDataBuilder
             notes.Add("Competes for the same local space");
         }
 
-        if (focusContext is not null && string.Equals(context.OriginRegionId, focusContext.OriginRegionId, StringComparison.Ordinal))
+        if (focusContext is not null && string.Equals(context.HomeRegionId, focusContext.HomeRegionId, StringComparison.Ordinal))
         {
             notes.Add("Shares the same homeland");
         }

@@ -24,12 +24,13 @@ The MVP now preserves this monthly order:
 5. Enacted law monthly effects
 6. Group survival and consumption
 7. Migration decision and movement
-8. Discovery evaluation
-9. Advancement evaluation
-10. Political bloc monthly update
-11. Law proposal update
-12. Chronicle update and feed progression
-13. End-of-tick finalization
+8. Settlement / polity presence update
+9. Discovery evaluation
+10. Advancement evaluation
+11. Political bloc monthly update
+12. Law proposal update
+13. Chronicle update and feed progression
+14. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -41,6 +42,7 @@ The MVP player-facing structure is now:
 - Region Viewer and supporting knowledge/polity screens for current state
 - player-facing polity presentation backed by explicit `Polity` state
 - Laws, Advancements, Known Polities, and Known Species screens in the current console client
+- settlement, anchoring, and regional presence shown in compact polity-facing form
 - `TAB` cycles between screens and wraps
 - `SPACE` toggles run/pause
 - simulation advances automatically while running
@@ -50,6 +52,7 @@ Chronicle remains the main player-facing history view.
 Region Viewer remains a player-facing state view, not a debug console.
 Player-facing screens respect focal-polity knowledge limits instead of exposing global truth.
 The player now controls a real `Polity` actor, while `PopulationGroup` remains the constituent demographic/ecological layer underneath it.
+Polities can now truthfully remain mobile, become seasonal, become semi-rooted, or anchor around a primary site without implying a full border or province system.
 
 ## Discoveries Versus Advancements
 
@@ -119,7 +122,7 @@ The cleanup pass also replaces stable-ID first-come food contention with explici
 Still intentionally deferred after this pass:
 
 - mutation / inheritance / evolution
-- settlements and territorial control
+- full border/territory control semantics
 - trade / economy
 - diplomacy and warfare overhauls
 - kingdom / empire scaling

@@ -8,5 +8,6 @@ public enum ChronicleEventCategory
     Extinction,
     Discovery,
     Advancement,
-    Law
+    Law,
+    Settlement
 }

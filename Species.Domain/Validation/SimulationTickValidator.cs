@@ -67,6 +67,14 @@ public static class SimulationTickValidator
             }
         }
 
+        foreach (var change in tickResult.SettlementChanges)
+        {
+            if (string.IsNullOrWhiteSpace(change.PolityId) || string.IsNullOrWhiteSpace(change.Message))
+            {
+                errors.Add("Settlement update reported an incomplete polity anchoring change.");
+            }
+        }
+
         if (tickResult.LawProposalChanges.Any(change => change.Status is not (LawProposalStatus.Passed or LawProposalStatus.Vetoed)))
         {
             errors.Add("Simulation tick reported a law proposal change that was not passed or vetoed.");

@@ -5,8 +5,8 @@ Species is a simulation-first command-line fantasy world prototype.
 The simulation is now split between `PopulationGroup` constituents and explicit `Polity` actors.
 
 - `PopulationGroup` remains the demographic, ecological, migration, discovery, and advancement-bearing unit.
-- `Polity` is now the player-guided political actor that owns government form, law state, political blocs, and player-facing political identity.
-- Larger later-phase polity architecture such as settlements, territorial control, economy, diplomacy, and scaling beyond the current MVP remains deferred.
+- `Polity` is now the player-guided political actor that owns government form, law state, political blocs, settlement/presence state, and player-facing political identity.
+- Larger later-phase polity architecture such as territorial control, economy, diplomacy, and scaling beyond the current MVP remains deferred.
 
 ## Current Prototype Truths
 
@@ -23,6 +23,7 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Discoveries remain knowledge.
 - Advancements remain capability.
 - Laws, enacted-law monthly effects, political blocs, and polity-facing governance presentation are already implemented on explicit polity state.
+- Settlements, polity regional presence, and place-based anchoring are now implemented in lightweight form.
 
 ## Canonical Monthly Flow
 
@@ -33,12 +34,13 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 5. Enacted law monthly effects
 6. Group survival and consumption
 7. Migration decision and movement
-8. Discovery evaluation
-9. Advancement evaluation
-10. Political bloc monthly update
-11. Law proposal update
-12. Chronicle update and feed progression
-13. End-of-tick finalization
+8. Settlement / polity presence update
+9. Discovery evaluation
+10. Advancement evaluation
+11. Political bloc monthly update
+12. Law proposal update
+13. Chronicle update and feed progression
+14. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -52,10 +54,12 @@ Implemented prototype layers already include:
 - law proposals and player pass/veto decisions
 - enacted laws with monthly effects
 - lightweight political blocs backing proposals
+- lightweight settlements, regional presence, and anchoring
+- mobile, seasonal, semi-rooted, and anchored polity forms
 
 Still deferred:
 
-- settlements / territorial control
+- territorial borders / control
 - trade / economy
 - diplomacy and war overhauls
 - kingdom / empire scaling

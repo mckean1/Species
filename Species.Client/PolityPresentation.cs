@@ -71,4 +71,39 @@ public static class PolityPresentation
             _ => "Low"
         };
     }
+
+    public static string DescribeAnchoringKind(PolityAnchoringKind anchoringKind)
+    {
+        return anchoringKind switch
+        {
+            PolityAnchoringKind.Mobile => "Mobile",
+            PolityAnchoringKind.Seasonal => "Seasonal",
+            PolityAnchoringKind.SemiRooted => "Semi-Rooted",
+            PolityAnchoringKind.Anchored => "Anchored",
+            _ => "Unknown"
+        };
+    }
+
+    public static string DescribePresenceKind(PolityPresenceKind presenceKind)
+    {
+        return presenceKind switch
+        {
+            PolityPresenceKind.PassingThrough => "Passing Through",
+            PolityPresenceKind.Seasonal => "Seasonal",
+            PolityPresenceKind.Habitation => "Habitation",
+            PolityPresenceKind.Core => "Core",
+            _ => "Unknown"
+        };
+    }
+
+    public static string DescribeSettlementType(SettlementType settlementType)
+    {
+        return settlementType switch
+        {
+            SettlementType.CampHub => "Camp Hub",
+            SettlementType.SeasonalBase => "Seasonal Base",
+            SettlementType.Village => "Village",
+            _ => "Unknown"
+        };
+    }
 }

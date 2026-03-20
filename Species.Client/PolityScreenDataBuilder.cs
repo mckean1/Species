@@ -21,26 +21,37 @@ public static class PolityScreenDataBuilder
                 "Unknown",
                 "Unknown",
                 "Unknown",
+                "Unknown",
+                "Unknown",
+                "None",
                 Array.Empty<PolityPressureItem>(),
                 ["No current alerts."],
                 ["No notable strengths yet."],
                 ["No acute problems detected."],
                 ["No notable discoveries yet."],
                 ["No active laws yet."],
+                ["No regional presence yet."],
                 Array.Empty<PoliticalBlocScreenItem>());
         }
 
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var currentRegionName = regionsById.GetValueOrDefault(context.CurrentRegionId)?.Name ?? "Unknown";
-        var coreRegionName = regionsById.GetValueOrDefault(context.OriginRegionId)?.Name ?? currentRegionName;
+        var homeRegionName = regionsById.GetValueOrDefault(context.HomeRegionId)?.Name ?? currentRegionName;
+        var coreRegionName = regionsById.GetValueOrDefault(context.CoreRegionId)?.Name ?? homeRegionName;
         var pressures = BuildPressureItems(context.Pressures);
+        var primarySite = context.PrimarySettlement is null
+            ? "None"
+            : $"{context.PrimarySettlement.Name} ({PolityPresentation.DescribeSettlementType(context.PrimarySettlement.Type)})";
 
         return new PolityScreenData(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             PolityPresentation.DescribeGovernmentForm(focusPolity.GovernmentForm),
             BuildSpeciesLabel(context.SpeciesId),
+            PolityPresentation.DescribeAnchoringKind(context.AnchoringKind),
+            homeRegionName,
             coreRegionName,
+            primarySite,
             context.TotalPopulation.ToString("N0"),
             pressures,
             BuildAlerts(pressures),
@@ -48,6 +59,7 @@ public static class PolityScreenDataBuilder
             BuildProblems(context, pressures),
             BuildProgress(context, discoveryCatalog, advancementCatalog),
             BuildActiveLaws(focusPolity),
+            BuildRegionalPresence(focusPolity, regionsById),
             BuildPoliticalBlocs(focusPolity));
     }
 
@@ -193,6 +205,25 @@ public static class PolityScreenDataBuilder
         return enacted.Length > 0 ? enacted : ["No enacted laws yet."];
     }
 
+    private static IReadOnlyList<string> BuildRegionalPresence(Polity polity, IReadOnlyDictionary<string, Region> regionsById)
+    {
+        var activePresence = polity.RegionalPresences
+            .Where(presence => presence.IsCurrent || presence.MonthsSinceLastPresence <= 6)
+            .OrderByDescending(presence => presence.Kind)
+            .ThenBy(presence => presence.MonthsSinceLastPresence)
+            .ThenBy(presence => presence.RegionId, StringComparer.Ordinal)
+            .Take(4)
+            .Select(presence =>
+            {
+                var regionName = regionsById.TryGetValue(presence.RegionId, out var region) ? region.Name : presence.RegionId;
+                var recency = presence.IsCurrent ? "current" : $"{presence.MonthsSinceLastPresence}m ago";
+                return $"{regionName} [{PolityPresentation.DescribePresenceKind(presence.Kind)} | {recency}]";
+            })
+            .ToArray();
+
+        return activePresence.Length > 0 ? activePresence : ["No notable regional footholds yet."];
+    }
+
     private static IReadOnlyList<PoliticalBlocScreenItem> BuildPoliticalBlocs(Polity polity)
     {
         return polity.PoliticalBlocs
@@ -235,7 +266,10 @@ public sealed record PolityScreenData(
     string CurrentDate,
     string GovernmentForm,
     string Species,
+    string Anchoring,
+    string HomeRegion,
     string CoreRegion,
+    string PrimarySite,
     string Population,
     IReadOnlyList<PolityPressureItem> Pressures,
     IReadOnlyList<string> Alerts,
@@ -243,6 +277,7 @@ public sealed record PolityScreenData(
     IReadOnlyList<string> Problems,
     IReadOnlyList<string> ProgressItems,
     IReadOnlyList<string> ActiveLaws,
+    IReadOnlyList<string> RegionalPresence,
     IReadOnlyList<PoliticalBlocScreenItem> PoliticalBlocs);
 
 public sealed record PolityPressureItem(string Label, int Value);

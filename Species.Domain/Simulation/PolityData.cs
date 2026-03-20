@@ -1,3 +1,4 @@
+using Species.Domain.Enums;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -12,9 +13,13 @@ public sealed record PolityContext(
     IReadOnlySet<string> KnownRegionIds,
     IReadOnlySet<string> KnownDiscoveryIds,
     IReadOnlySet<string> LearnedAdvancementIds,
+    Settlement? PrimarySettlement,
+    string HomeRegionId,
+    string CoreRegionId,
     string CurrentRegionId,
     string OriginRegionId,
-    string SpeciesId);
+    string SpeciesId,
+    PolityAnchoringKind AnchoringKind);
 
 public static class PolityData
 {
@@ -96,9 +101,13 @@ public static class PolityData
             knownRegionIds,
             knownDiscoveryIds,
             learnedAdvancementIds,
+            polity.Settlements.FirstOrDefault(settlement => settlement.IsActive && settlement.IsPrimary),
+            string.IsNullOrWhiteSpace(polity.HomeRegionId) ? leadGroup.OriginRegionId : polity.HomeRegionId,
+            string.IsNullOrWhiteSpace(polity.CoreRegionId) ? leadGroup.OriginRegionId : polity.CoreRegionId,
             leadGroup.CurrentRegionId,
             leadGroup.OriginRegionId,
-            leadGroup.SpeciesId);
+            leadGroup.SpeciesId,
+            polity.AnchoringKind);
     }
 
     private static int WeightedAverage(

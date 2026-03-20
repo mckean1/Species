@@ -146,6 +146,7 @@ public static class ChronicleScreenRenderer
             ChronicleEventCategory.Shortage => BuildSimpleSegments(entry.GroupName, " suffered food shortages.", Orange),
             ChronicleEventCategory.Decline => BuildSimpleSegments(entry.GroupName, " declined after hunger and loss.", Orange),
             ChronicleEventCategory.Extinction => BuildSimpleSegments(entry.GroupName, " died out.", Orange),
+            ChronicleEventCategory.Settlement => [new Segment(entry.Message, Cyan)],
             _ => [new Segment(entry.Message)]
         };
     }
@@ -223,6 +224,12 @@ public static class ChronicleScreenRenderer
         }
 
         TryAddLine(lines, PadVisible($"{Dim}Polity:{Reset} {Blue}{focusPolity.Name}{Reset}", contentWidth), availableHeight);
+        TryAddLine(lines, PadVisible($"{Dim}Anchoring:{Reset} {Cyan}{PolityPresentation.DescribeAnchoringKind(focusContext.AnchoringKind)}{Reset}", contentWidth), availableHeight);
+        if (focusContext.PrimarySettlement is not null)
+        {
+            TryAddLine(lines, PadVisible($"{Dim}Primary Site:{Reset} {Cyan}{focusContext.PrimarySettlement.Name}{Reset}", contentWidth), availableHeight);
+        }
+
         TryAddLine(lines, string.Empty, availableHeight);
         TryAddLine(lines, PadVisible($"{PaneTitle}Pressure State{Reset}", contentWidth), availableHeight);
 

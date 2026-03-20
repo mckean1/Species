@@ -14,6 +14,26 @@ public sealed class GroupSurvivalSystem
         FaunaSpeciesCatalog faunaCatalog,
         AdvancementCatalog advancementCatalog)
     {
+        var updatedPolities = world.Polities
+            .Select(polity => polity.Clone())
+            .ToArray();
+        var settlementLookup = updatedPolities
+            .SelectMany(polity => polity.Settlements
+                .Where(settlement => settlement.IsActive)
+                .Select(settlement => new
+                {
+                    Key = BuildSettlementLookupKey(polity.Id, settlement.RegionId),
+                    Settlement = settlement
+                }))
+            .GroupBy(item => item.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                grouping => grouping.Key,
+                grouping => grouping
+                    .OrderByDescending(item => item.Settlement.IsPrimary)
+                    .ThenByDescending(item => item.Settlement.StoredFood)
+                    .Select(item => item.Settlement)
+                    .First(),
+                StringComparer.Ordinal);
         var mutableRegions = world.Regions.ToDictionary(
             region => region.Id,
             region => new MutableRegionState(
@@ -64,10 +84,14 @@ public sealed class GroupSurvivalSystem
 
             var totalFoodAcquired = state.PrimaryAcquisition.FoodGained + state.FallbackAcquisition.FoodGained;
             var effectiveStoredFood = ApplyStoredFoodEffect(group, state.StoredFoodBefore);
-            var availableFood = totalFoodAcquired + effectiveStoredFood;
-            var consumedForNeed = Math.Min(state.MonthlyFoodNeed, availableFood);
+            var consumedFromActions = Math.Min(state.MonthlyFoodNeed, totalFoodAcquired);
+            var remainingNeedAfterActions = Math.Max(0, state.MonthlyFoodNeed - consumedFromActions);
+            var consumedFromStoredFood = Math.Min(remainingNeedAfterActions, effectiveStoredFood);
+            var remainingNeedAfterStoredFood = Math.Max(0, remainingNeedAfterActions - consumedFromStoredFood);
+            var settlementFoodUsed = ConsumeSettlementReserve(settlementLookup, group, remainingNeedAfterStoredFood);
+            var consumedForNeed = consumedFromActions + consumedFromStoredFood + settlementFoodUsed;
             var shortage = Math.Max(0, state.MonthlyFoodNeed - consumedForNeed);
-            var storedFoodAfter = Math.Max(0, availableFood - consumedForNeed);
+            var storedFoodAfter = Math.Max(0, effectiveStoredFood - consumedFromStoredFood);
             var starvationLoss = CalculateStarvationLoss(group.Population, state.MonthlyFoodNeed, shortage);
             var finalPopulation = Math.Max(0, group.Population - starvationLoss);
 
@@ -89,11 +113,12 @@ public sealed class GroupSurvivalSystem
                 TotalFoodAcquired = totalFoodAcquired,
                 StoredFoodBefore = state.StoredFoodBefore,
                 StoredFoodAfter = storedFoodAfter,
+                SettlementFoodUsed = settlementFoodUsed,
                 Shortage = shortage,
                 StarvationLoss = starvationLoss,
                 FinalPopulation = finalPopulation,
                 Outcome = ResolveOutcome(group.Population, finalPopulation),
-                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, state.StoredFoodBefore, shortage, starvationLoss)
+                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, state.StoredFoodBefore, settlementFoodUsed, shortage, starvationLoss)
             });
 
             if (finalPopulation > 0)
@@ -110,7 +135,7 @@ public sealed class GroupSurvivalSystem
             .ToArray();
 
         return new GroupSurvivalResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle, world.Polities, world.FocalPolityId),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle, updatedPolities, world.FocalPolityId),
             changes);
     }
 
@@ -350,11 +375,37 @@ public sealed class GroupSurvivalSystem
         return "Survived";
     }
 
-    private static string ResolveSurvivalReason(int monthlyFoodNeed, int acquiredFood, int storedFoodBefore, int shortage, int starvationLoss)
+    private static int ConsumeSettlementReserve(
+        IReadOnlyDictionary<string, Settlement> settlementLookup,
+        PopulationGroup group,
+        int remainingNeed)
+    {
+        if (remainingNeed <= 0)
+        {
+            return 0;
+        }
+
+        var key = BuildSettlementLookupKey(group.PolityId, group.CurrentRegionId);
+        if (!settlementLookup.TryGetValue(key, out var settlement) || !settlement.IsActive || settlement.StoredFood <= 0)
+        {
+            return 0;
+        }
+
+        var used = Math.Min(settlement.StoredFood, remainingNeed);
+        settlement.StoredFood -= used;
+        return used;
+    }
+
+    private static string ResolveSurvivalReason(int monthlyFoodNeed, int acquiredFood, int storedFoodBefore, int settlementFoodUsed, int shortage, int starvationLoss)
     {
         if (starvationLoss > 0)
         {
             return $"Group starved due to severe shortfall of {shortage}.";
+        }
+
+        if (settlementFoodUsed > 0)
+        {
+            return $"Group used {settlementFoodUsed} food from a local settlement reserve to help cover monthly need.";
         }
 
         if (storedFoodBefore > 0 && acquiredFood < monthlyFoodNeed)
@@ -404,6 +455,11 @@ public sealed class GroupSurvivalSystem
         }
 
         return (int)MathF.Round(storedFoodBefore * AdvancementConstants.FoodStorageStoredFoodMultiplier, MidpointRounding.AwayFromZero);
+    }
+
+    private static string BuildSettlementLookupKey(string polityId, string regionId)
+    {
+        return $"{polityId}|{regionId}";
     }
 
     private sealed class MutableRegionState

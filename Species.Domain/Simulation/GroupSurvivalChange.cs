@@ -34,6 +34,8 @@ public sealed class GroupSurvivalChange
 
     public required int StoredFoodAfter { get; init; }
 
+    public required int SettlementFoodUsed { get; init; }
+
     public required int Shortage { get; init; }
 
     public required int StarvationLoss { get; init; }

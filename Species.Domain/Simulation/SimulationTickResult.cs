@@ -11,6 +11,7 @@ public sealed class SimulationTickResult
         IReadOnlyList<GroupPressureChange> groupPressureChanges,
         IReadOnlyList<GroupSurvivalChange> groupSurvivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges,
+        IReadOnlyList<SettlementChange> settlementChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
         IReadOnlyList<LawProposalChange> lawProposalChanges,
@@ -23,6 +24,7 @@ public sealed class SimulationTickResult
         GroupPressureChanges = groupPressureChanges;
         GroupSurvivalChanges = groupSurvivalChanges;
         MigrationChanges = migrationChanges;
+        SettlementChanges = settlementChanges;
         DiscoveryChanges = discoveryChanges;
         AdvancementChanges = advancementChanges;
         LawProposalChanges = lawProposalChanges;
@@ -41,6 +43,8 @@ public sealed class SimulationTickResult
     public IReadOnlyList<GroupSurvivalChange> GroupSurvivalChanges { get; }
 
     public IReadOnlyList<MigrationChange> MigrationChanges { get; }
+
+    public IReadOnlyList<SettlementChange> SettlementChanges { get; }
 
     public IReadOnlyList<DiscoveryChange> DiscoveryChanges { get; }
 

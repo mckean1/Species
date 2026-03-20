@@ -2,6 +2,7 @@ using Species.Domain.Catalogs;
 using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 public static class RegionsScreenDataBuilder
 {
@@ -13,6 +14,8 @@ public static class RegionsScreenDataBuilder
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog)
     {
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var regionCandidates = GetKnownRegions(world, focusGroup);
         var selectedIndex = regionCandidates.Count == 0
@@ -23,7 +26,7 @@ public static class RegionsScreenDataBuilder
             : GroupKnowledgeContext.Create(world, focusGroup, discoveryCatalog, floraCatalog, faunaCatalog);
 
         var summaries = regionCandidates
-            .Select(region => BuildSummary(region, world, focusGroup, knowledgeContext, floraCatalog, faunaCatalog, discoveryCatalog))
+            .Select(region => BuildSummary(region, world, focusPolity, focusContext, focusGroup, knowledgeContext, floraCatalog, faunaCatalog, discoveryCatalog))
             .ToArray();
 
         return new RegionsScreenData(
@@ -57,6 +60,8 @@ public static class RegionsScreenDataBuilder
     private static RegionSummary BuildSummary(
         Region region,
         World world,
+        Polity? focusPolity,
+        PolityContext? focusContext,
         PopulationGroup? focusGroup,
         GroupKnowledgeContext? knowledgeContext,
         FloraSpeciesCatalog floraCatalog,
@@ -111,14 +116,34 @@ public static class RegionsScreenDataBuilder
                 context.Add("Current region of the polity");
             }
 
-            if (string.Equals(region.Id, focusGroup.OriginRegionId, StringComparison.Ordinal))
+            if (focusContext is not null && string.Equals(region.Id, focusContext.HomeRegionId, StringComparison.Ordinal))
             {
                 context.Add("Home region");
+            }
+
+            if (focusContext is not null && string.Equals(region.Id, focusContext.CoreRegionId, StringComparison.Ordinal))
+            {
+                context.Add("Core polity region");
             }
 
             if (region.NeighborIds.Contains(focusGroup.CurrentRegionId, StringComparer.Ordinal))
             {
                 context.Add("Connected to the polity's current path");
+            }
+        }
+
+        if (focusPolity is not null)
+        {
+            var presence = focusPolity.RegionalPresences.FirstOrDefault(item => string.Equals(item.RegionId, region.Id, StringComparison.Ordinal));
+            if (presence is not null && (presence.IsCurrent || presence.MonthsSinceLastPresence <= 6))
+            {
+                context.Add($"Polity presence: {PolityPresentation.DescribePresenceKind(presence.Kind)}");
+            }
+
+            var settlement = focusPolity.Settlements.FirstOrDefault(item => item.IsActive && string.Equals(item.RegionId, region.Id, StringComparison.Ordinal));
+            if (settlement is not null)
+            {
+                context.Add($"Primary site nearby: {settlement.Name}");
             }
         }
 

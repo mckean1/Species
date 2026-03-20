@@ -12,9 +12,10 @@ public sealed class ChronicleSystem
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
-        IReadOnlyList<LawProposalChange> lawProposalChanges)
+        IReadOnlyList<LawProposalChange> lawProposalChanges,
+        IReadOnlyList<SettlementChange> settlementChanges)
     {
-        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, discoveryChanges, advancementChanges, lawProposalChanges);
+        var recordedEntries = BuildRecordedEntries(world, survivalChanges, migrationChanges, discoveryChanges, advancementChanges, lawProposalChanges, settlementChanges);
         var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
@@ -29,7 +30,8 @@ public sealed class ChronicleSystem
         IReadOnlyList<MigrationChange> migrationChanges,
         IReadOnlyList<DiscoveryChange> discoveryChanges,
         IReadOnlyList<AdvancementChange> advancementChanges,
-        IReadOnlyList<LawProposalChange> lawProposalChanges)
+        IReadOnlyList<LawProposalChange> lawProposalChanges,
+        IReadOnlyList<SettlementChange> settlementChanges)
     {
         var entries = new List<ChronicleEntry>();
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -132,6 +134,19 @@ public sealed class ChronicleSystem
                     ? $"{change.GroupName} passed {change.ProposalTitle}."
                     : $"{change.GroupName} vetoed {change.ProposalTitle}.",
                 "law"));
+        }
+
+        foreach (var change in settlementChanges)
+        {
+            AddEntry(entries, seenKeys, BuildEntry(
+                world,
+                nextRecordSequence++,
+                change.PolityId,
+                change.PolityName,
+                ChronicleEventCategory.Settlement,
+                change.Message,
+                "settlement",
+                change.RegionId));
         }
 
         return entries;

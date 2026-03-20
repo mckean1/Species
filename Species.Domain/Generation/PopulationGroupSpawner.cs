@@ -73,10 +73,16 @@ public static class PopulationGroupSpawner
                 Name = name,
                 GovernmentForm = governmentForm,
                 MemberGroupIds = [$"group-{index + 1:D2}"],
+                HomeRegionId = region.Id,
+                CoreRegionId = region.Id,
+                PrimarySettlementId = string.Empty,
+                AnchoringKind = PolityAnchoringKind.Mobile,
                 ActiveLawProposal = null,
                 LawProposalHistory = [],
                 EnactedLaws = [],
-                PoliticalBlocs = PoliticalBlocCatalog.CreateInitialBlocs(governmentForm).ToList()
+                PoliticalBlocs = PoliticalBlocCatalog.CreateInitialBlocs(governmentForm).ToList(),
+                Settlements = [],
+                RegionalPresences = []
             });
         }
 

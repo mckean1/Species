@@ -10,6 +10,7 @@ public static class PolityValidator
         var errors = new List<string>();
         var polityIds = new HashSet<string>(StringComparer.Ordinal);
         var groupIds = world.PopulationGroups.Select(group => group.Id).ToHashSet(StringComparer.Ordinal);
+        var regionIds = world.Regions.Select(region => region.Id).ToHashSet(StringComparer.Ordinal);
         var allSources = Enum.GetValues<ProposalBackingSource>().ToHashSet();
 
         foreach (var polity in world.Polities)
@@ -41,6 +42,16 @@ public static class PolityValidator
                 {
                     errors.Add($"Polity {polity.Id} references missing member group {groupId}.");
                 }
+            }
+
+            if (!string.IsNullOrWhiteSpace(polity.HomeRegionId) && !regionIds.Contains(polity.HomeRegionId))
+            {
+                errors.Add($"Polity {polity.Id} references missing home region {polity.HomeRegionId}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(polity.CoreRegionId) && !regionIds.Contains(polity.CoreRegionId))
+            {
+                errors.Add($"Polity {polity.Id} references missing core region {polity.CoreRegionId}.");
             }
 
             if (polity.ActiveLawProposal is not null)
@@ -100,6 +111,117 @@ public static class PolityValidator
                 {
                     errors.Add($"Polity {polity.Id} has political bloc {bloc.Source} with invalid Satisfaction.");
                 }
+            }
+
+            var settlementIds = new HashSet<string>(StringComparer.Ordinal);
+            var activeSettlementRegions = new HashSet<string>(StringComparer.Ordinal);
+            var activePrimarySettlements = 0;
+            foreach (var settlement in polity.Settlements)
+            {
+                if (string.IsNullOrWhiteSpace(settlement.Id))
+                {
+                    errors.Add($"Polity {polity.Id} has a settlement without an ID.");
+                    continue;
+                }
+
+                if (!settlementIds.Add(settlement.Id))
+                {
+                    errors.Add($"Polity {polity.Id} has duplicate settlement ID {settlement.Id}.");
+                }
+
+                if (!string.Equals(settlement.PolityId, polity.Id, StringComparison.Ordinal))
+                {
+                    errors.Add($"Settlement {settlement.Id} does not belong to polity {polity.Id}.");
+                }
+
+                if (!regionIds.Contains(settlement.RegionId))
+                {
+                    errors.Add($"Settlement {settlement.Id} references missing region {settlement.RegionId}.");
+                }
+
+                if (settlement.StoredFood < 0)
+                {
+                    errors.Add($"Settlement {settlement.Id} has negative stored food.");
+                }
+
+                if (settlement.IsActive && !activeSettlementRegions.Add(settlement.RegionId))
+                {
+                    errors.Add($"Polity {polity.Id} has multiple active settlements in region {settlement.RegionId}.");
+                }
+
+                if (settlement.IsPrimary)
+                {
+                    activePrimarySettlements++;
+
+                    if (!settlement.IsActive)
+                    {
+                        errors.Add($"Settlement {settlement.Id} is primary but inactive.");
+                    }
+                }
+            }
+
+            if (activePrimarySettlements > 1)
+            {
+                errors.Add($"Polity {polity.Id} has multiple primary settlements.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(polity.PrimarySettlementId) &&
+                !polity.Settlements.Any(settlement => string.Equals(settlement.Id, polity.PrimarySettlementId, StringComparison.Ordinal)))
+            {
+                errors.Add($"Polity {polity.Id} references missing primary settlement {polity.PrimarySettlementId}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(polity.PrimarySettlementId) &&
+                !polity.Settlements.Any(settlement =>
+                    string.Equals(settlement.Id, polity.PrimarySettlementId, StringComparison.Ordinal) &&
+                    settlement.IsActive &&
+                    settlement.IsPrimary))
+            {
+                errors.Add($"Polity {polity.Id} has a primary settlement reference that does not point at the active primary site.");
+            }
+
+            var presenceRegionIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var presence in polity.RegionalPresences)
+            {
+                if (string.IsNullOrWhiteSpace(presence.RegionId))
+                {
+                    errors.Add($"Polity {polity.Id} has a regional presence without a region.");
+                    continue;
+                }
+
+                if (!presenceRegionIds.Add(presence.RegionId))
+                {
+                    errors.Add($"Polity {polity.Id} has duplicate regional presence for {presence.RegionId}.");
+                }
+
+                if (!regionIds.Contains(presence.RegionId))
+                {
+                    errors.Add($"Polity {polity.Id} has regional presence in missing region {presence.RegionId}.");
+                }
+
+                if (presence.TotalMonthsPresent < 0 ||
+                    presence.ConsecutiveMonthsPresent < 0 ||
+                    presence.ReturnCount < 0 ||
+                    presence.MonthsSinceLastPresence < 0)
+                {
+                    errors.Add($"Polity {polity.Id} has negative regional presence counters for {presence.RegionId}.");
+                }
+
+                if (!presence.IsCurrent && presence.ConsecutiveMonthsPresent > 0)
+                {
+                    errors.Add($"Polity {polity.Id} has non-current presence {presence.RegionId} with positive consecutive months.");
+                }
+
+                if (presence.IsCurrent && presence.MonthsSinceLastPresence != 0)
+                {
+                    errors.Add($"Polity {polity.Id} has current presence {presence.RegionId} with MonthsSinceLastPresence set.");
+                }
+            }
+
+            if (polity.AnchoringKind == PolityAnchoringKind.Anchored &&
+                string.IsNullOrWhiteSpace(polity.CoreRegionId))
+            {
+                errors.Add($"Anchored polity {polity.Id} is missing a core region.");
             }
         }
 

@@ -58,8 +58,11 @@ public static class PolityScreenRenderer
 
         lines.Add($"{Blue}{data.PolityName}{Reset}");
         lines.Add($"Government Form: {data.GovernmentForm}");
+        lines.Add($"Anchoring: {data.Anchoring}");
         lines.Add($"Species: {data.Species}");
+        lines.Add($"Home Region: {data.HomeRegion}");
         lines.Add($"Core Region: {data.CoreRegion}");
+        lines.Add($"Primary Site: {data.PrimarySite}");
         lines.Add($"Population: {data.Population}");
         lines.Add($"Runtime: {runningText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
@@ -81,6 +84,13 @@ public static class PolityScreenRenderer
         foreach (var law in BuildBulletLines(data.ActiveLaws, leftWidth + rightWidth + 3, Dim))
         {
             lines.Add(law);
+        }
+
+        lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
+        lines.Add($"{PaneTitle}Regional Presence{Reset}");
+        foreach (var presence in BuildBulletLines(data.RegionalPresence, leftWidth + rightWidth + 3, Purple))
+        {
+            lines.Add(presence);
         }
 
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
