@@ -2,7 +2,6 @@ namespace Species.Domain.Constants;
 
 public static class WorldGenerationConstants
 {
-    public const int DefaultSeed = 1;
     public const int DefaultRegionCount = 12;
     public const int MinimumRegionCount = 3;
     public const int TargetNeighborCount = 3;

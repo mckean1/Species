@@ -45,7 +45,7 @@ public static class WorldGenerator
         int? seed = null,
         int? regionCount = null)
     {
-        var worldSeed = seed ?? WorldGenerationConstants.DefaultSeed;
+        var worldSeed = seed ?? Random.Shared.Next();
         var totalRegions = Math.Max(regionCount ?? WorldGenerationConstants.DefaultRegionCount, WorldGenerationConstants.MinimumRegionCount);
         var random = new Random(worldSeed);
 
