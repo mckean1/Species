@@ -24,7 +24,7 @@ public static class PolityScreenRenderer
     {
         var data = PolityScreenDataBuilder.Build(world, focalGroupId, discoveryCatalog, advancementCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
-        var bodyHeight = Math.Max(16, viewport.Height - 6);
+        var bodyHeight = Math.Max(16, viewport.Height - 7);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var rightWidth = Math.Max(24, innerWidth - leftWidth - 3);
 
@@ -40,17 +40,13 @@ public static class PolityScreenRenderer
             bodyLines.Add(string.Empty);
         }
 
-        var lines = new List<string>(bodyHeight + 6)
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Polity{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth)
-        };
+        var lines = new List<string>(bodyHeight + 8);
+        lines.AddRange(PlayerScreenShell.BuildHeader("Polity", data.PolityName, data.CurrentDate, isSimulationRunning, innerWidth));
 
         lines.AddRange(bodyLines.Select(line => BorderLine(FitVisible(line, innerWidth), innerWidth)));
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -61,7 +57,7 @@ public static class PolityScreenRenderer
         var runningText = isSimulationRunning ? $"{Green}Running{Reset}" : $"{Yellow}Paused{Reset}";
 
         lines.Add($"{Blue}{data.PolityName}{Reset}");
-        lines.Add($"Government: {data.GovernmentForm}");
+        lines.Add($"Government Form: {data.GovernmentForm}");
         lines.Add($"Species: {data.Species}");
         lines.Add($"Core Region: {data.CoreRegion}");
         lines.Add($"Population: {data.Population}");

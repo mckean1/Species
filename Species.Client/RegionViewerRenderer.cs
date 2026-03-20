@@ -24,22 +24,20 @@ public static class RegionViewerRenderer
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
+        bool isSimulationRunning,
         TerminalViewport viewport)
     {
         var data = RegionsScreenDataBuilder.Build(world, focalGroupId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var topListHeight = Math.Max(8, Math.Min(12, viewport.Height / 3));
-        var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 8);
+        var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 9);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var rightWidth = Math.Max(24, innerWidth - leftWidth - 3);
+        var polityName = PlayerScreenShell.ResolvePolityName(world, focalGroupId);
 
-        var lines = new List<string>
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Regions{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth),
-            BorderLine($"{PaneTitle}Known Regions{Reset}", innerWidth)
-        };
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader("Regions", polityName, data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.Add(BorderLine($"{PaneTitle}Known Regions{Reset}", innerWidth));
 
         var listLines = BuildRegionList(data, innerWidth, topListHeight);
         lines.AddRange(listLines.Select(line => BorderLine(line, innerWidth)));
@@ -47,9 +45,9 @@ public static class RegionViewerRenderer
 
         var lowerRows = BuildLowerRows(data.SelectedRegion, leftWidth, rightWidth, lowerHeight);
         lines.AddRange(lowerRows.Select(line => BorderLine(line, innerWidth)));
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, "Select region"), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select region"));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -161,14 +159,14 @@ public static class RegionViewerRenderer
         {
             return
             [
-                $"{PaneTitle}Presence & Context{Reset}",
+                $"{PaneTitle}Presence{Reset}",
                 $"{Dim}No regional context available.{Reset}"
             ];
         }
 
         var lines = new List<string>
         {
-            $"{PaneTitle}Presence & Context{Reset}",
+            $"{PaneTitle}Presence{Reset}",
             $"Threat: {ColorThreat(selectedRegion.ThreatText, selectedRegion.ThreatScore)}",
             $"{Dim}{new string('-', width)}{Reset}",
             $"{PaneTitle}Connection{Reset}"

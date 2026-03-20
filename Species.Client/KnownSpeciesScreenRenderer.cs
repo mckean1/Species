@@ -27,17 +27,13 @@ public static class KnownSpeciesScreenRenderer
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
-        var bodyHeight = Math.Max(18, viewport.Height - 6);
+        var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var listLines = BuildSpeciesList(data, listWidth, bodyHeight);
         var detailLines = BuildDetailPanel(data.SelectedSpecies, detailWidth, bodyHeight, isSimulationRunning);
 
-        var lines = new List<string>
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Known Species{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth)
-        };
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader("Known Species", PlayerScreenShell.ResolvePolityName(world, focalGroupId), data.CurrentDate, isSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {
@@ -46,9 +42,9 @@ public static class KnownSpeciesScreenRenderer
             lines.Add(BorderLine($"{FitVisible(left, listWidth)} | {FitVisible(right, detailWidth)}", innerWidth));
         }
 
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, "Select species"), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select species"));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -129,7 +125,7 @@ public static class KnownSpeciesScreenRenderer
         lines.AddRange(BuildBulletLines(species.Facts, width, Blue));
         lines.Add($"{PaneTitle}Traits{Reset}");
         lines.AddRange(BuildBulletLines(species.Traits, width, Green));
-        lines.Add($"{PaneTitle}Player Relevance{Reset}");
+        lines.Add($"{PaneTitle}Purpose{Reset}");
         lines.AddRange(BuildBulletLines(species.Relevance, width, species.IsPlayerSpecies ? Orange : Purple));
 
         while (lines.Count < bodyHeight)

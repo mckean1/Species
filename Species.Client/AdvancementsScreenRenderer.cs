@@ -28,17 +28,13 @@ public static class AdvancementsScreenRenderer
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(36, ((innerWidth - 3) * 10) / 21);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
-        var bodyHeight = Math.Max(18, viewport.Height - 6);
+        var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var listLines = BuildAdvancementList(data, listWidth, bodyHeight);
         var detailLines = BuildDetailPanel(data.SelectedItem, detailWidth, bodyHeight, isSimulationRunning);
 
-        var lines = new List<string>
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Advancements{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth)
-        };
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader("Advancements", PlayerScreenShell.ResolvePolityName(world, focalGroupId), data.CurrentDate, isSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {
@@ -47,9 +43,9 @@ public static class AdvancementsScreenRenderer
             lines.Add(BorderLine($"{FitVisible(left, listWidth)} | {FitVisible(right, detailWidth)}", innerWidth));
         }
 
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, "Select advancement"), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select advancement"));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -132,7 +128,7 @@ public static class AdvancementsScreenRenderer
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.AddRange(WrapText(item.Description, width));
         lines.Add(string.Empty);
-        lines.Add($"{PaneTitle}Capability{Reset}");
+        lines.Add($"{PaneTitle}Advancements{Reset}");
         lines.AddRange(BuildBulletLines([item.CapabilitySummary], width, Green));
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Requirements{Reset}");

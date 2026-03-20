@@ -29,13 +29,9 @@ public static class ChronicleScreenRenderer
         var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
         var recordsLines = BuildRecordsPane(world, focusGroup, layout.RecordsContentWidth, layout.BodyHeight);
         var situationLines = BuildSituationPane(focusGroup, layout.SituationContentWidth, layout.BodyHeight, isSimulationRunning);
-        var lines = new List<string>(layout.TotalHeight)
-        {
-            HorizontalBorder(layout.InnerWidth),
-            BuildTopBar(world, layout.InnerWidth),
-            HorizontalBorder(layout.InnerWidth),
-            CombinePaneHeaders(world, layout.RecordsWidth, layout.SituationWidth)
-        };
+        var lines = new List<string>(layout.TotalHeight);
+        lines.AddRange(PlayerScreenShell.BuildHeader("Chronicle", focusGroup?.Name ?? "Unknown polity", FormatMonthYear(world.CurrentMonth, world.CurrentYear), isSimulationRunning, layout.InnerWidth));
+        lines.Add(CombinePaneHeaders(layout.RecordsWidth, layout.SituationWidth));
 
         for (var row = 0; row < layout.BodyHeight; row++)
         {
@@ -44,9 +40,9 @@ public static class ChronicleScreenRenderer
             lines.Add(CombinePaneBodyRow(recordsLine, situationLine, layout.RecordsWidth, layout.SituationWidth));
         }
 
-        lines.Add(HorizontalBorder(layout.InnerWidth));
-        lines.Add(BuildFooter(layout.InnerWidth));
-        lines.Add(HorizontalBorder(layout.InnerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(layout.InnerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(layout.InnerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(layout.InnerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -323,31 +319,16 @@ public static class ChronicleScreenRenderer
         return (text, GetSeverityColor(severity), severity);
     }
 
-    private static string CombinePaneHeaders(World world, int recordsWidth, int situationWidth)
+    private static string CombinePaneHeaders(int recordsWidth, int situationWidth)
     {
         var left = PadVisible($"{PaneTitle}Records{Reset}", Math.Max(0, recordsWidth - 2));
         var right = PadVisible($"{PaneTitle}Situation{Reset}", Math.Max(0, situationWidth - 2));
         return $"| {left} | {right} |";
     }
 
-    private static string BuildTopBar(World world, int innerWidth)
-    {
-        return BorderLine(
-            PadBetween(
-                $"{PaneTitle}Chronicle{Reset}",
-                $"{White}{FormatMonthYear(world.CurrentMonth, world.CurrentYear)}{Reset}",
-                innerWidth),
-            innerWidth);
-    }
-
     private static string CombinePaneBodyRow(string recordsLine, string situationLine, int recordsWidth, int situationWidth)
     {
         return $"| {PadVisible(recordsLine, Math.Max(0, recordsWidth - 2))} | {PadVisible(situationLine, Math.Max(0, situationWidth - 2))} |";
-    }
-
-    private static string BuildFooter(int innerWidth)
-    {
-        return BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset), innerWidth);
     }
 
     private static IReadOnlyList<string> WrapSegments(
@@ -616,19 +597,6 @@ public static class ChronicleScreenRenderer
         return text + new string(' ', width - visibleLength);
     }
 
-    private static string PadBetween(string left, string right, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var leftLength = VisibleLength(left);
-        var rightLength = VisibleLength(right);
-        var spaces = Math.Max(1, width - leftLength - rightLength);
-        return left + new string(' ', spaces) + right;
-    }
-
     private static string PadHighlighted(string text, int width)
     {
         if (width <= 0)
@@ -692,16 +660,6 @@ public static class ChronicleScreenRenderer
         return $"{MonthNames[monthIndex]} {year:D3}";
     }
 
-    private static string HorizontalBorder(int innerWidth)
-    {
-        return "+" + new string('-', Math.Max(0, innerWidth + 2)) + "+";
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {PadVisible(content, Math.Max(0, innerWidth))} |";
-    }
-
     private readonly record struct Segment(string Text, string? Color = null);
 
     private readonly record struct ChronicleLayout(
@@ -717,7 +675,7 @@ public static class ChronicleScreenRenderer
         {
             var innerWidth = Math.Max(1, viewport.Width - 4);
             var totalHeight = Math.Max(8, viewport.Height);
-            var bodyHeight = Math.Max(1, totalHeight - 8);
+            var bodyHeight = Math.Max(1, totalHeight - 10);
             var availablePaneWidth = Math.Max(2, innerWidth - 3);
             var minimumRecordsWidth = Math.Min(availablePaneWidth, Math.Max(18, (int)Math.Ceiling(availablePaneWidth * 0.55)));
             var preferredSituationWidth = Math.Clamp((int)Math.Round(availablePaneWidth * 0.31), 22, 42);

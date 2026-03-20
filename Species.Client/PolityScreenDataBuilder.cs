@@ -63,7 +63,7 @@ public static class PolityScreenDataBuilder
     {
         return
         [
-            new PolityPressureItem("Food", pressures.FoodPressure),
+            new PolityPressureItem("Food Stores", pressures.FoodPressure),
             new PolityPressureItem("Water", pressures.WaterPressure),
             new PolityPressureItem("Threat", pressures.ThreatPressure),
             new PolityPressureItem("Crowding", pressures.OvercrowdingPressure),
@@ -78,7 +78,7 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food" => "Food stores are under strain",
+                "Food Stores" => "Food stores are under strain",
                 "Water" => "Water access is tightening",
                 "Threat" => "Threat pressure is rising nearby",
                 "Crowding" => "Living conditions are becoming crowded",
@@ -95,7 +95,7 @@ public static class PolityScreenDataBuilder
     {
         var strengths = new List<string>();
 
-        if (pressures.First(item => item.Label == "Food").Value < 40)
+        if (pressures.First(item => item.Label == "Food Stores").Value < 40)
         {
             strengths.Add("Food stores remain manageable");
         }
@@ -132,7 +132,7 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food" => "Food stress is shaping daily life",
+                "Food Stores" => "Food stress is shaping daily life",
                 "Water" => "Reliable water is becoming harder to secure",
                 "Threat" => "Threat pressure is weighing on safety",
                 "Crowding" => "Crowding is tightening local conditions",

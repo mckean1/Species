@@ -28,17 +28,13 @@ public static class KnownPolitiesScreenRenderer
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var detailWidth = Math.Max(24, innerWidth - listWidth - 3);
-        var bodyHeight = Math.Max(16, viewport.Height - 6);
+        var bodyHeight = Math.Max(16, viewport.Height - 7);
 
         var listLines = BuildPolityList(data, listWidth, bodyHeight);
         var detailLines = BuildDetailPanel(data.SelectedPolity, detailWidth, bodyHeight, isSimulationRunning);
 
-        var lines = new List<string>
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Known Polities{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth)
-        };
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader("Known Polities", PlayerScreenShell.ResolvePolityName(world, focalGroupId), data.CurrentDate, isSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {
@@ -47,9 +43,9 @@ public static class KnownPolitiesScreenRenderer
             lines.Add(BorderLine($"{FitVisible(left, listWidth)} | {FitVisible(right, detailWidth)}", innerWidth));
         }
 
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, "Select polity"), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select polity"));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }

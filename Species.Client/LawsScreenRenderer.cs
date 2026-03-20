@@ -24,7 +24,7 @@ public static class LawsScreenRenderer
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var leftWidth = Math.Max(32, ((innerWidth - 3) * 9) / 20);
         var rightWidth = Math.Max(28, innerWidth - leftWidth - 3);
-        var bodyHeight = Math.Max(18, viewport.Height - 6);
+        var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var bodyLines = BuildBodyLines(data, leftWidth, rightWidth, isSimulationRunning);
         if (bodyLines.Count > bodyHeight)
@@ -38,17 +38,13 @@ public static class LawsScreenRenderer
             bodyLines.Add(string.Empty);
         }
 
-        var lines = new List<string>
-        {
-            HorizontalBorder(innerWidth),
-            BorderLine(PadBetween($"{PaneTitle}Laws{Reset}", $"{Dim}{data.CurrentDate}{Reset}", innerWidth), innerWidth),
-            HorizontalBorder(innerWidth)
-        };
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader("Laws", data.PolityName, data.CurrentDate, isSimulationRunning, innerWidth));
 
         lines.AddRange(bodyLines.Select(line => BorderLine(FitVisible(line, innerWidth), innerWidth)));
-        lines.Add(HorizontalBorder(innerWidth));
-        lines.Add(BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, "Select law"), innerWidth));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, "Select law"));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -58,7 +54,6 @@ public static class LawsScreenRenderer
         var lines = new List<string>();
         var runtimeText = isSimulationRunning ? $"{Green}Running{Reset}" : $"{Yellow}Paused{Reset}";
 
-        lines.Add($"{Blue}{data.PolityName}{Reset}");
         lines.Add($"Runtime: {runtimeText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
 

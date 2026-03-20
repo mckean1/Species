@@ -2,9 +2,9 @@ public enum PlayerScreen
 {
     Chronicle,
     Polity,
-    Advancements,
-    Laws,
     Regions,
+    Laws,
+    Advancements,
     KnownPolities,
     KnownSpecies
 }
