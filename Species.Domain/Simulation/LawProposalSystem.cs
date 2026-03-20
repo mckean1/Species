@@ -503,54 +503,56 @@ public sealed class LawProposalSystem
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var focusGroup = world.PopulationGroups.FirstOrDefault(group => string.Equals(group.Id, playerPolityId, StringComparison.Ordinal));
-        if (focusGroup is null)
+        var focusPolity = PolityData.Resolve(world, playerPolityId);
+        var context = focusPolity is null ? null : PolityData.BuildContext(world, focusPolity);
+        if (focusPolity is null || context?.LeadGroup is null)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
-        if (!regionsById.TryGetValue(focusGroup.CurrentRegionId, out var region))
+        if (!regionsById.TryGetValue(context.CurrentRegionId, out var region))
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        PoliticalBlocSystem.EnsureBlocs(focusGroup);
+        PoliticalBlocSystem.EnsureBlocs(focusPolity);
+        var aggregateGroup = BuildAggregateGroup(context);
 
-        if (focusGroup.ActiveLawProposal is null)
+        if (focusPolity.ActiveLawProposal is null)
         {
-            var generated = TryGenerateProposal(focusGroup, region);
+            var generated = TryGenerateProposal(focusPolity, aggregateGroup, region);
             if (generated is not null)
             {
-                focusGroup.ActiveLawProposal = generated;
+                focusPolity.ActiveLawProposal = generated;
             }
 
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var activeProposal = focusGroup.ActiveLawProposal.Clone();
+        var activeProposal = focusPolity.ActiveLawProposal.Clone();
         activeProposal.AgeInMonths++;
         activeProposal.IgnoredMonths++;
 
         var definition = Definitions.FirstOrDefault(item => string.Equals(item.Id, activeProposal.DefinitionId, StringComparison.Ordinal));
         if (definition is null)
         {
-            focusGroup.ActiveLawProposal = activeProposal;
+            focusPolity.ActiveLawProposal = activeProposal;
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusGroup.GovernmentForm);
-        var relevance = definition.Score(focusGroup, region);
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusPolity.GovernmentForm);
+        var relevance = definition.Score(aggregateGroup, region);
         UpdateMomentum(activeProposal, behavior, relevance);
 
         var naturalStatus = ResolveIgnoredProposal(activeProposal, behavior, relevance);
         if (naturalStatus is null)
         {
-            focusGroup.ActiveLawProposal = activeProposal;
+            focusPolity.ActiveLawProposal = activeProposal;
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        return (world, FinalizeProposal(world, focusGroup, activeProposal, naturalStatus.Value));
+        return (world, FinalizeProposal(world, focusPolity, activeProposal, naturalStatus.Value));
     }
 
     public (World World, IReadOnlyList<LawProposalChange> Changes) ResolvePlayerDecision(
@@ -558,14 +560,14 @@ public sealed class LawProposalSystem
         string playerPolityId,
         LawProposalStatus status)
     {
-        var focusGroup = world.PopulationGroups.FirstOrDefault(group => string.Equals(group.Id, playerPolityId, StringComparison.Ordinal));
-        if (focusGroup?.ActiveLawProposal is null)
+        var focusPolity = PolityData.Resolve(world, playerPolityId);
+        if (focusPolity?.ActiveLawProposal is null)
         {
             return (world, Array.Empty<LawProposalChange>());
         }
 
-        var resolvedProposal = focusGroup.ActiveLawProposal.Clone();
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusGroup.GovernmentForm);
+        var resolvedProposal = focusPolity.ActiveLawProposal.Clone();
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(focusPolity.GovernmentForm);
 
         if (status == LawProposalStatus.Passed)
         {
@@ -576,26 +578,26 @@ public sealed class LawProposalSystem
             resolvedProposal.Opposition = Math.Clamp(resolvedProposal.Opposition + (behavior.PlayerDecisionStrength * 4), 0, 100);
         }
 
-        return (world, FinalizeProposal(world, focusGroup, resolvedProposal, status));
+        return (world, FinalizeProposal(world, focusPolity, resolvedProposal, status));
     }
 
-    private static LawProposal? TryGenerateProposal(PopulationGroup group, Region region)
+    private static LawProposal? TryGenerateProposal(Polity polity, PopulationGroup aggregateGroup, Region region)
     {
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(group.GovernmentForm);
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
         var candidate = Definitions
-            .Where(definition => definition.GovernmentForm == group.GovernmentForm)
+            .Where(definition => definition.GovernmentForm == polity.GovernmentForm)
             .Select(definition =>
             {
-                var relevance = definition.Score(group, region);
-                if (relevance == 0 || !IsEligibleByLawState(group, definition) || IsBlockedByEnactedLaw(group, definition))
+                var relevance = definition.Score(aggregateGroup, region);
+                if (relevance == 0 || !IsEligibleByLawState(polity, definition) || IsBlockedByEnactedLaw(polity, definition))
                 {
                     return new { Definition = definition, Relevance = 0, WeightedScore = 0 };
                 }
 
                 var weightedScore = relevance +
                     (behavior.GetCategoryWeight(definition.Category) * 3) +
-                    ResolveEnactedLawModifier(group, definition) +
-                    ResolveBlocProposalModifier(group, definition) +
+                    ResolveEnactedLawModifier(polity, definition) +
+                    ResolveBlocProposalModifier(polity, aggregateGroup, definition) +
                     ((definition.ImpactScale - 1) * behavior.ExtremityAllowance * 2);
                 return new { Definition = definition, Relevance = relevance, WeightedScore = weightedScore };
             })
@@ -618,9 +620,9 @@ public sealed class LawProposalSystem
             20 + ((100 - candidate.Relevance) / 4) + (candidate.Definition.ImpactScale * 8) + (behavior.AutoVetoBias * 5),
             5,
             90);
-        var backing = ResolveBackingSources(group, behavior, candidate.Definition);
-        var backingSupportShift = ResolveBackingSupportShift(group, candidate.Definition, backing.Primary, backing.Secondary);
-        var blocOppositionShift = ResolveBlocOppositionShift(group, candidate.Definition, backing.Primary, backing.Secondary);
+        var backing = ResolveBackingSources(polity, aggregateGroup, behavior, candidate.Definition);
+        var backingSupportShift = ResolveBackingSupportShift(polity, aggregateGroup, candidate.Definition, backing.Primary, backing.Secondary);
+        var blocOppositionShift = ResolveBlocOppositionShift(polity, candidate.Definition, backing.Primary, backing.Secondary);
         var urgency = Math.Clamp(
             candidate.Relevance + (candidate.Definition.ImpactScale * 10) + (behavior.GetCategoryWeight(candidate.Definition.Category) * 2),
             10,
@@ -628,7 +630,7 @@ public sealed class LawProposalSystem
 
         return new LawProposal
         {
-            Id = $"{group.Id}:{candidate.Definition.Id}:{candidate.Relevance}",
+            Id = $"{polity.Id}:{candidate.Definition.Id}:{candidate.Relevance}",
             DefinitionId = candidate.Definition.Id,
             Title = candidate.Definition.Title,
             Summary = candidate.Definition.Summary,
@@ -640,7 +642,7 @@ public sealed class LawProposalSystem
             AgeInMonths = 0,
             IgnoredMonths = 0,
             ImpactScale = candidate.Definition.ImpactScale,
-            GovernmentForm = group.GovernmentForm,
+            GovernmentForm = polity.GovernmentForm,
             PrimaryBackingSource = backing.Primary,
             SecondaryBackingSource = backing.Secondary
         };
@@ -706,15 +708,15 @@ public sealed class LawProposalSystem
         return null;
     }
 
-    private static IReadOnlyList<LawProposalChange> FinalizeProposal(World world, PopulationGroup group, LawProposal proposal, LawProposalStatus status)
+    private static IReadOnlyList<LawProposalChange> FinalizeProposal(World world, Polity polity, LawProposal proposal, LawProposalStatus status)
     {
         proposal.Status = status;
-        group.ActiveLawProposal = null;
-        group.LawProposalHistory.Add(proposal);
+        polity.ActiveLawProposal = null;
+        polity.LawProposalHistory.Add(proposal);
 
         if (status == LawProposalStatus.Passed)
         {
-            ApplyPassedLaw(world, group, proposal);
+            ApplyPassedLaw(world, polity, proposal);
         }
 
         if (status == LawProposalStatus.Abstained)
@@ -726,8 +728,8 @@ public sealed class LawProposalSystem
         [
             new LawProposalChange
             {
-                GroupId = group.Id,
-                GroupName = group.Name,
+                GroupId = polity.Id,
+                GroupName = polity.Name,
                 ProposalTitle = proposal.Title,
                 Status = status
             }
@@ -739,9 +741,9 @@ public sealed class LawProposalSystem
         return eligible ? Math.Clamp(score, 0, 100) : 0;
     }
 
-    private static bool IsBlockedByEnactedLaw(PopulationGroup group, LawProposalDefinition definition)
+    private static bool IsBlockedByEnactedLaw(Polity polity, LawProposalDefinition definition)
     {
-        if (group.EnactedLaws.Any(law =>
+        if (polity.EnactedLaws.Any(law =>
                 law.IsActive &&
                 (string.Equals(law.DefinitionId, definition.Id, StringComparison.Ordinal) ||
                  string.Equals(law.Title, definition.Title, StringComparison.Ordinal) ||
@@ -756,7 +758,7 @@ public sealed class LawProposalSystem
         return false;
     }
 
-    private static bool IsEligibleByLawState(PopulationGroup group, LawProposalDefinition definition)
+    private static bool IsEligibleByLawState(Polity polity, LawProposalDefinition definition)
     {
         if (definition.RequiredActiveDefinitionIds.Count == 0)
         {
@@ -764,15 +766,15 @@ public sealed class LawProposalSystem
         }
 
         return definition.RequiredActiveDefinitionIds.All(requiredId =>
-            group.EnactedLaws.Any(law =>
+            polity.EnactedLaws.Any(law =>
                 law.IsActive &&
                 string.Equals(law.DefinitionId, requiredId, StringComparison.Ordinal)));
     }
 
-    private static int ResolveEnactedLawModifier(PopulationGroup group, LawProposalDefinition definition)
+    private static int ResolveEnactedLawModifier(Polity polity, LawProposalDefinition definition)
     {
         var modifier = 0;
-        foreach (var enactedLaw in group.EnactedLaws.Where(law => law.IsActive))
+        foreach (var enactedLaw in polity.EnactedLaws.Where(law => law.IsActive))
         {
             modifier += definition.RelatedLawScoreModifiers.GetValueOrDefault(enactedLaw.DefinitionId);
         }
@@ -780,10 +782,10 @@ public sealed class LawProposalSystem
         return modifier;
     }
 
-    private static void ApplyPassedLaw(World world, PopulationGroup group, LawProposal proposal)
+    private static void ApplyPassedLaw(World world, Polity polity, LawProposal proposal)
     {
         var definition = Definitions.First(definition => string.Equals(definition.Id, proposal.DefinitionId, StringComparison.Ordinal));
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(group.GovernmentForm);
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
         var enactedLaw = new EnactedLaw
         {
             DefinitionId = proposal.DefinitionId,
@@ -800,7 +802,7 @@ public sealed class LawProposalSystem
             IsActive = true
         };
 
-        foreach (var existing in group.EnactedLaws.Where(law =>
+        foreach (var existing in polity.EnactedLaws.Where(law =>
                      string.Equals(law.DefinitionId, proposal.DefinitionId, StringComparison.Ordinal) ||
                      string.Equals(law.Title, proposal.Title, StringComparison.Ordinal) ||
                      definition.RepealsDefinitionIds.Contains(law.DefinitionId, StringComparer.Ordinal) ||
@@ -811,24 +813,25 @@ public sealed class LawProposalSystem
             existing.IsActive = false;
         }
 
-        group.EnactedLaws.RemoveAll(law => !law.IsActive);
-        group.EnactedLaws.Add(enactedLaw);
+        polity.EnactedLaws.RemoveAll(law => !law.IsActive);
+        polity.EnactedLaws.Add(enactedLaw);
     }
 
     private static (ProposalBackingSource Primary, ProposalBackingSource? Secondary) ResolveBackingSources(
-        PopulationGroup group,
+        Polity polity,
+        PopulationGroup aggregateGroup,
         GovernmentFormProposalBehavior behavior,
         LawProposalDefinition definition)
     {
-        PoliticalBlocSystem.EnsureBlocs(group);
-        var blocsBySource = group.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
+        PoliticalBlocSystem.EnsureBlocs(polity);
+        var blocsBySource = polity.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
         var rankedSources = Enum.GetValues<ProposalBackingSource>()
             .Select(source => new
             {
                 Source = source,
                 Score = behavior.GetBackingSourceWeight(source) +
                         GetSourceCategoryWeight(source, definition.Category) +
-                        ResolveSourceStateWeight(group, source, definition.Category) +
+                        ResolveSourceStateWeight(aggregateGroup, source, definition.Category) +
                         ResolveBlocBackingWeight(blocsBySource.GetValueOrDefault(source))
             })
             .OrderByDescending(item => item.Score)
@@ -871,23 +874,24 @@ public sealed class LawProposalSystem
     }
 
     private static int ResolveBackingSupportShift(
-        PopulationGroup group,
+        Polity polity,
+        PopulationGroup aggregateGroup,
         LawProposalDefinition definition,
         ProposalBackingSource primary,
         ProposalBackingSource? secondary)
     {
-        PoliticalBlocSystem.EnsureBlocs(group);
-        var blocsBySource = group.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
+        PoliticalBlocSystem.EnsureBlocs(polity);
+        var blocsBySource = polity.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
 
-        var shift = ResolveSingleBlocSupportShift(group, definition, primary, blocsBySource.GetValueOrDefault(primary));
+        var shift = ResolveSingleBlocSupportShift(aggregateGroup, definition, primary, blocsBySource.GetValueOrDefault(primary));
         if (secondary is not null)
         {
-            shift += ResolveSingleBlocSupportShift(group, definition, secondary.Value, blocsBySource.GetValueOrDefault(secondary.Value)) / 2;
+            shift += ResolveSingleBlocSupportShift(aggregateGroup, definition, secondary.Value, blocsBySource.GetValueOrDefault(secondary.Value)) / 2;
         }
 
         if (definition.Category == LawProposalCategory.Faith &&
             primary == ProposalBackingSource.Priests &&
-            group.GovernmentForm == GovernmentForm.Theocracy)
+            polity.GovernmentForm == GovernmentForm.Theocracy)
         {
             shift += 4;
         }
@@ -930,15 +934,15 @@ public sealed class LawProposalSystem
     }
 
     private static int ResolveBlocOppositionShift(
-        PopulationGroup group,
+        Polity polity,
         LawProposalDefinition definition,
         ProposalBackingSource primary,
         ProposalBackingSource? secondary)
     {
-        PoliticalBlocSystem.EnsureBlocs(group);
+        PoliticalBlocSystem.EnsureBlocs(polity);
 
         var opposition = 0;
-        foreach (var bloc in group.PoliticalBlocs)
+        foreach (var bloc in polity.PoliticalBlocs)
         {
             if (bloc.Source == primary || bloc.Source == secondary)
             {
@@ -962,12 +966,12 @@ public sealed class LawProposalSystem
         return Math.Clamp(opposition, 0, 18);
     }
 
-    private static int ResolveBlocProposalModifier(PopulationGroup group, LawProposalDefinition definition)
+    private static int ResolveBlocProposalModifier(Polity polity, PopulationGroup aggregateGroup, LawProposalDefinition definition)
     {
-        PoliticalBlocSystem.EnsureBlocs(group);
+        PoliticalBlocSystem.EnsureBlocs(polity);
 
         var modifier = 0;
-        foreach (var bloc in group.PoliticalBlocs)
+        foreach (var bloc in polity.PoliticalBlocs)
         {
             var categoryWeight = GetSourceCategoryWeight(bloc.Source, definition.Category);
             if (categoryWeight == 0)
@@ -980,6 +984,37 @@ public sealed class LawProposalSystem
         }
 
         return Math.Clamp(modifier, -10, 35);
+    }
+
+    private static PopulationGroup BuildAggregateGroup(PolityContext context)
+    {
+        return new PopulationGroup
+        {
+            Id = context.Polity.Id,
+            Name = context.Polity.Name,
+            SpeciesId = context.SpeciesId,
+            PolityId = context.Polity.Id,
+            CurrentRegionId = context.CurrentRegionId,
+            OriginRegionId = context.OriginRegionId,
+            Population = context.TotalPopulation,
+            StoredFood = context.TotalStoredFood,
+            SubsistenceMode = context.LeadGroup?.SubsistenceMode ?? SubsistenceMode.Mixed,
+            Pressures = new PressureState
+            {
+                FoodPressure = context.Pressures.FoodPressure,
+                WaterPressure = context.Pressures.WaterPressure,
+                ThreatPressure = context.Pressures.ThreatPressure,
+                OvercrowdingPressure = context.Pressures.OvercrowdingPressure,
+                MigrationPressure = context.Pressures.MigrationPressure
+            },
+            LastRegionId = context.LeadGroup?.LastRegionId ?? string.Empty,
+            MonthsSinceLastMove = context.LeadGroup?.MonthsSinceLastMove ?? 0,
+            KnownRegionIds = new HashSet<string>(context.KnownRegionIds, StringComparer.Ordinal),
+            KnownDiscoveryIds = new HashSet<string>(context.KnownDiscoveryIds, StringComparer.Ordinal),
+            DiscoveryEvidence = context.LeadGroup?.DiscoveryEvidence.Clone() ?? new DiscoveryEvidenceState(),
+            LearnedAdvancementIds = new HashSet<string>(context.LearnedAdvancementIds, StringComparer.Ordinal),
+            AdvancementEvidence = context.LeadGroup?.AdvancementEvidence.Clone() ?? new AdvancementEvidenceState()
+        };
     }
 
     private static int ResolveBlocBackingWeight(PoliticalBloc? bloc)

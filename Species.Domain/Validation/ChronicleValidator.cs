@@ -65,10 +65,9 @@ public static class ChronicleValidator
             }
 
             if (entry.Category == ChronicleEventCategory.Law &&
-                !(entry.Message.Contains(" passed ", StringComparison.Ordinal) ||
-                  entry.Message.Contains(" vetoed ", StringComparison.Ordinal)))
+                !IsValidLawChronicleLine(entry.Message))
             {
-                errors.Add($"Chronicle law entry {entry.RecordSequence} does not use pass or veto wording.");
+                errors.Add($"Chronicle law entry {entry.RecordSequence} does not use the canonical pass/veto format.");
             }
         }
 
@@ -86,5 +85,17 @@ public static class ChronicleValidator
         }
 
         return errors;
+    }
+
+    private static bool IsValidLawChronicleLine(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message) || !message.EndsWith(".", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var hasPass = message.Contains(" passed ", StringComparison.Ordinal);
+        var hasVeto = message.Contains(" vetoed ", StringComparison.Ordinal);
+        return hasPass ^ hasVeto;
     }
 }

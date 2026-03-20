@@ -49,7 +49,19 @@ public sealed class SimulationEngine
 
     public World CurrentWorld { get; private set; }
 
-    public string PlayerPolityId { get; set; } = string.Empty;
+    public string PlayerPolityId
+    {
+        get => CurrentWorld.FocalPolityId;
+        set => CurrentWorld = new World(
+            CurrentWorld.Seed,
+            CurrentWorld.CurrentYear,
+            CurrentWorld.CurrentMonth,
+            CurrentWorld.Regions,
+            CurrentWorld.PopulationGroups,
+            CurrentWorld.Chronicle,
+            CurrentWorld.Polities,
+            value);
+    }
 
     public SimulationTickResult Tick()
     {
@@ -85,7 +97,7 @@ public sealed class SimulationEngine
     {
         var nextMonth = world.CurrentMonth == 12 ? 1 : world.CurrentMonth + 1;
         var nextYear = world.CurrentMonth == 12 ? world.CurrentYear + 1 : world.CurrentYear;
-        return new World(world.Seed, nextYear, nextMonth, world.Regions, world.PopulationGroups, world.Chronicle);
+        return new World(world.Seed, nextYear, nextMonth, world.Regions, world.PopulationGroups, world.Chronicle, world.Polities, world.FocalPolityId);
     }
 
     private static World FinalizeTick(World world)

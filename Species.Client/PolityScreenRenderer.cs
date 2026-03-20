@@ -16,13 +16,13 @@ public static class PolityScreenRenderer
 
     public static string Render(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = PolityScreenDataBuilder.Build(world, focalGroupId, discoveryCatalog, advancementCatalog);
+        var data = PolityScreenDataBuilder.Build(world, focalPolityId, discoveryCatalog, advancementCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var bodyHeight = Math.Max(16, viewport.Height - 7);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);

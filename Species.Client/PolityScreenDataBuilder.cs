@@ -1,16 +1,18 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 public static class PolityScreenDataBuilder
 {
     public static PolityScreenData Build(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
-        if (focusGroup is null)
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var context = PlayerFocus.ResolveContext(world, focalPolityId);
+        if (focusPolity is null || context?.LeadGroup is null)
         {
             return new PolityScreenData(
                 "Unknown",
@@ -29,24 +31,24 @@ public static class PolityScreenDataBuilder
         }
 
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
-        var currentRegionName = regionsById.GetValueOrDefault(focusGroup.CurrentRegionId)?.Name ?? "Unknown";
-        var coreRegionName = regionsById.GetValueOrDefault(focusGroup.OriginRegionId)?.Name ?? currentRegionName;
-        var pressures = BuildPressureItems(focusGroup.Pressures);
+        var currentRegionName = regionsById.GetValueOrDefault(context.CurrentRegionId)?.Name ?? "Unknown";
+        var coreRegionName = regionsById.GetValueOrDefault(context.OriginRegionId)?.Name ?? currentRegionName;
+        var pressures = BuildPressureItems(context.Pressures);
 
         return new PolityScreenData(
-            focusGroup.Name,
+            focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
-            PolityPresentation.DescribeGovernmentForm(focusGroup.GovernmentForm),
-            BuildSpeciesLabel(focusGroup.SpeciesId),
+            PolityPresentation.DescribeGovernmentForm(focusPolity.GovernmentForm),
+            BuildSpeciesLabel(context.SpeciesId),
             coreRegionName,
-            focusGroup.Population.ToString("N0"),
+            context.TotalPopulation.ToString("N0"),
             pressures,
             BuildAlerts(pressures),
-            BuildStrengths(focusGroup, pressures),
-            BuildProblems(focusGroup, pressures),
-            BuildProgress(focusGroup, discoveryCatalog, advancementCatalog),
-            BuildActiveLaws(focusGroup),
-            BuildPoliticalBlocs(focusGroup));
+            BuildStrengths(context, pressures),
+            BuildProblems(context, pressures),
+            BuildProgress(context, discoveryCatalog, advancementCatalog),
+            BuildActiveLaws(focusPolity),
+            BuildPoliticalBlocs(focusPolity));
     }
 
     private static string BuildSpeciesLabel(string speciesId)
@@ -93,7 +95,7 @@ public static class PolityScreenDataBuilder
         return alerts.Length > 0 ? alerts : ["No urgent current issues."];
     }
 
-    private static IReadOnlyList<string> BuildStrengths(PopulationGroup group, IReadOnlyList<PolityPressureItem> pressures)
+    private static IReadOnlyList<string> BuildStrengths(PolityContext context, IReadOnlyList<PolityPressureItem> pressures)
     {
         var strengths = new List<string>();
 
@@ -112,12 +114,12 @@ public static class PolityScreenDataBuilder
             strengths.Add("Immediate threats are limited");
         }
 
-        if (group.KnownDiscoveryIds.Count + group.LearnedAdvancementIds.Count >= 3)
+        if (context.KnownDiscoveryIds.Count + context.LearnedAdvancementIds.Count >= 3)
         {
             strengths.Add("Practical knowledge is accumulating");
         }
 
-        if (group.KnownRegionIds.Count > 1)
+        if (context.KnownRegionIds.Count > 1)
         {
             strengths.Add("Nearby routes are known");
         }
@@ -127,7 +129,7 @@ public static class PolityScreenDataBuilder
             : ["No standout strengths yet."];
     }
 
-    private static IReadOnlyList<string> BuildProblems(PopulationGroup group, IReadOnlyList<PolityPressureItem> pressures)
+    private static IReadOnlyList<string> BuildProblems(PolityContext context, IReadOnlyList<PolityPressureItem> pressures)
     {
         var problems = pressures
             .Where(item => item.Value >= 60)
@@ -144,7 +146,7 @@ public static class PolityScreenDataBuilder
             .Take(3)
             .ToList();
 
-        if (group.StoredFood <= Math.Max(1, group.Population / 2) && problems.Count < 3)
+        if (context.TotalStoredFood <= Math.Max(1, context.TotalPopulation / 2) && problems.Count < 3)
         {
             problems.Add("Stored food is thin for the current population");
         }
@@ -155,19 +157,19 @@ public static class PolityScreenDataBuilder
     }
 
     private static IReadOnlyList<string> BuildProgress(
-        PopulationGroup group,
+        PolityContext context,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
         var progress = new List<string>();
 
-        progress.AddRange(group.LearnedAdvancementIds
+        progress.AddRange(context.LearnedAdvancementIds
             .OrderBy(id => id, StringComparer.Ordinal)
             .Select(id => advancementCatalog.GetById(id)?.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Cast<string>());
 
-        progress.AddRange(group.KnownDiscoveryIds
+        progress.AddRange(context.KnownDiscoveryIds
             .OrderBy(id => id, StringComparer.Ordinal)
             .Select(id => discoveryCatalog.GetById(id)?.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -178,9 +180,9 @@ public static class PolityScreenDataBuilder
             : ["No notable discoveries yet."];
     }
 
-    private static IReadOnlyList<string> BuildActiveLaws(PopulationGroup group)
+    private static IReadOnlyList<string> BuildActiveLaws(Polity polity)
     {
-        var enacted = group.EnactedLaws
+        var enacted = polity.EnactedLaws
             .Where(law => law.IsActive)
             .OrderByDescending(law => law.EnactedOnYear)
             .ThenByDescending(law => law.EnactedOnMonth)
@@ -191,9 +193,9 @@ public static class PolityScreenDataBuilder
         return enacted.Length > 0 ? enacted : ["No enacted laws yet."];
     }
 
-    private static IReadOnlyList<PoliticalBlocScreenItem> BuildPoliticalBlocs(PopulationGroup group)
+    private static IReadOnlyList<PoliticalBlocScreenItem> BuildPoliticalBlocs(Polity polity)
     {
-        return group.PoliticalBlocs
+        return polity.PoliticalBlocs
             .OrderByDescending(bloc => bloc.Influence)
             .ThenByDescending(bloc => bloc.Satisfaction)
             .ThenBy(bloc => PolityPresentation.DescribeBackingSource(bloc.Source), StringComparer.Ordinal)

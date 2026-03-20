@@ -17,13 +17,13 @@ public static class KnownSpeciesScreenRenderer
 
     public static string Render(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         FaunaSpeciesCatalog faunaCatalog,
         int selectedIndex,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalGroupId, selectedIndex);
+        var data = KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalPolityId, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
@@ -33,7 +33,7 @@ public static class KnownSpeciesScreenRenderer
         var detailLines = BuildDetailPanel(data.SelectedSpecies, detailWidth, bodyHeight, isSimulationRunning);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Known Species", PlayerScreenShell.ResolvePolityName(world, focalGroupId), data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Known Species", PlayerScreenShell.ResolvePolityName(world, focalPolityId), data.CurrentDate, isSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {

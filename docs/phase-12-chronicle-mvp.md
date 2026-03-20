@@ -29,12 +29,15 @@ Debug inspection remains separate from the player-facing feed.
 2. Flora simulation
 3. Fauna simulation
 4. Group pressure recalculation
-5. Group survival and consumption
-6. Migration decision and movement
-7. Discovery evaluation
-8. Advancement evaluation
-9. Chronicle update
-10. End-of-tick finalization
+5. Enacted law monthly effects
+6. Group survival and consumption
+7. Migration decision and movement
+8. Discovery evaluation
+9. Advancement evaluation
+10. Political bloc monthly update
+11. Law proposal update
+12. Chronicle update
+13. End-of-tick finalization
 
 This preserves the causal rule that Chronicle records are created only after meaningful monthly outcomes are known.
 

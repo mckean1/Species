@@ -18,7 +18,7 @@ public static class RegionViewerRenderer
 
     public static string Render(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         int regionIndex,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
@@ -27,13 +27,13 @@ public static class RegionViewerRenderer
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = RegionsScreenDataBuilder.Build(world, focalGroupId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
+        var data = RegionsScreenDataBuilder.Build(world, focalPolityId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var topListHeight = Math.Max(8, Math.Min(12, viewport.Height / 3));
         var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 9);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var rightWidth = Math.Max(24, innerWidth - leftWidth - 3);
-        var polityName = PlayerScreenShell.ResolvePolityName(world, focalGroupId);
+        var polityName = PlayerScreenShell.ResolvePolityName(world, focalPolityId);
 
         var lines = new List<string>();
         lines.AddRange(PlayerScreenShell.BuildHeader("Regions", polityName, data.CurrentDate, isSimulationRunning, innerWidth));

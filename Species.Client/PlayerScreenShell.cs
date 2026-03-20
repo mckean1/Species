@@ -32,9 +32,9 @@ public static class PlayerScreenShell
         return BorderLine(PlayerScreenNavigation.BuildFooterText(innerWidth, Dim, Reset, selectionLabel), innerWidth);
     }
 
-    public static string ResolvePolityName(World world, string focalGroupId)
+    public static string ResolvePolityName(World world, string focalPolityId)
     {
-        return PlayerFocus.Resolve(world, focalGroupId)?.Name ?? "Unknown polity";
+        return PlayerFocus.Resolve(world, focalPolityId)?.Name ?? "Unknown polity";
     }
 
     public static string HorizontalBorder(int innerWidth)

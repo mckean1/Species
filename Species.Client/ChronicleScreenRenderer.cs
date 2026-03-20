@@ -1,6 +1,7 @@
 using System.Text;
 using Species.Domain.Enums;
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 public static class ChronicleScreenRenderer
 {
@@ -23,14 +24,15 @@ public static class ChronicleScreenRenderer
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     ];
 
-    public static string Render(World world, string focalGroupId, bool isSimulationRunning, TerminalViewport viewport)
+    public static string Render(World world, string focalPolityId, bool isSimulationRunning, TerminalViewport viewport)
     {
         var layout = ChronicleLayout.Create(viewport);
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
-        var recordsLines = BuildRecordsPane(world, focusGroup, layout.RecordsContentWidth, layout.BodyHeight);
-        var situationLines = BuildSituationPane(focusGroup, layout.SituationContentWidth, layout.BodyHeight, isSimulationRunning);
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
+        var recordsLines = BuildRecordsPane(world, focusPolity, focusContext, layout.RecordsContentWidth, layout.BodyHeight);
+        var situationLines = BuildSituationPane(focusPolity, focusContext, layout.SituationContentWidth, layout.BodyHeight, isSimulationRunning);
         var lines = new List<string>(layout.TotalHeight);
-        lines.AddRange(PlayerScreenShell.BuildHeader("Chronicle", focusGroup?.Name ?? "Unknown polity", FormatMonthYear(world.CurrentMonth, world.CurrentYear), isSimulationRunning, layout.InnerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Chronicle", focusPolity?.Name ?? "Unknown polity", FormatMonthYear(world.CurrentMonth, world.CurrentYear), isSimulationRunning, layout.InnerWidth));
         lines.Add(CombinePaneHeaders(layout.RecordsWidth, layout.SituationWidth));
 
         for (var row = 0; row < layout.BodyHeight; row++)
@@ -47,7 +49,7 @@ public static class ChronicleScreenRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static List<string> BuildRecordsPane(World world, PopulationGroup? focusGroup, int contentWidth, int availableHeight)
+    private static List<string> BuildRecordsPane(World world, Polity? focusPolity, PolityContext? focusContext, int contentWidth, int availableHeight)
     {
         var lines = new List<string>(availableHeight);
         if (availableHeight <= 0 || contentWidth <= 0)
@@ -56,12 +58,15 @@ public static class ChronicleScreenRenderer
         }
 
         var visibleEntries = world.Chronicle.GetVisibleFeedEntries()
-            .Where(entry => focusGroup is not null && string.Equals(entry.GroupId, focusGroup.Id, StringComparison.Ordinal))
+            .Where(entry =>
+                focusPolity is not null &&
+                (string.Equals(entry.GroupId, focusPolity.Id, StringComparison.Ordinal) ||
+                 (focusContext is not null && focusContext.MemberGroups.Any(group => string.Equals(group.Id, entry.GroupId, StringComparison.Ordinal)))))
             .ToArray();
         if (visibleEntries.Length == 0)
         {
             AppendWrappedText(lines, availableHeight, contentWidth, "No visible records yet.", Dim);
-            AppendWrappedText(lines, availableHeight, contentWidth, focusGroup is null ? "No focal polity is active yet." : "Advance time to let this polity's history unfold.", Dim);
+            AppendWrappedText(lines, availableHeight, contentWidth, focusPolity is null ? "No focal polity is active yet." : "Advance time to let this polity's history unfold.", Dim);
             return lines;
         }
 
@@ -189,7 +194,8 @@ public static class ChronicleScreenRenderer
     }
 
     private static List<string> BuildSituationPane(
-        PopulationGroup? focusGroup,
+        Polity? focusPolity,
+        PolityContext? focusContext,
         int contentWidth,
         int availableHeight,
         bool isSimulationRunning)
@@ -205,7 +211,7 @@ public static class ChronicleScreenRenderer
 
         TryAddLine(lines, PadVisible($"{Dim}Status:{Reset} {stateColor}{stateText}{Reset}", contentWidth), availableHeight);
 
-        if (focusGroup is null)
+        if (focusPolity is null || focusContext is null)
         {
             TryAddLine(lines, string.Empty, availableHeight);
             TryAddLine(lines, PadVisible($"{PaneTitle}Pressure State{Reset}", contentWidth), availableHeight);
@@ -216,11 +222,11 @@ public static class ChronicleScreenRenderer
             return lines;
         }
 
-        TryAddLine(lines, PadVisible($"{Dim}Polity:{Reset} {Blue}{focusGroup.Name}{Reset}", contentWidth), availableHeight);
+        TryAddLine(lines, PadVisible($"{Dim}Polity:{Reset} {Blue}{focusPolity.Name}{Reset}", contentWidth), availableHeight);
         TryAddLine(lines, string.Empty, availableHeight);
         TryAddLine(lines, PadVisible($"{PaneTitle}Pressure State{Reset}", contentWidth), availableHeight);
 
-        foreach (var line in BuildPressureLines(focusGroup, contentWidth))
+        foreach (var line in BuildPressureLines(focusContext, contentWidth))
         {
             if (!TryAddLine(lines, line, availableHeight))
             {
@@ -233,7 +239,7 @@ public static class ChronicleScreenRenderer
             TryAddLine(lines, PadVisible($"{PaneTitle}Top Alerts{Reset}", contentWidth), availableHeight);
         }
 
-        foreach (var line in BuildAlertLines(focusGroup, contentWidth))
+        foreach (var line in BuildAlertLines(focusContext, contentWidth))
         {
             if (!TryAddLine(lines, line, availableHeight))
             {
@@ -244,15 +250,15 @@ public static class ChronicleScreenRenderer
         return lines;
     }
 
-    private static IReadOnlyList<string> BuildPressureLines(PopulationGroup focusGroup, int contentWidth)
+    private static IReadOnlyList<string> BuildPressureLines(PolityContext focusContext, int contentWidth)
     {
         var pressureRows = new (string Label, int Value)[]
         {
-            ("Food", focusGroup.Pressures.FoodPressure),
-            ("Water", focusGroup.Pressures.WaterPressure),
-            ("Threat", focusGroup.Pressures.ThreatPressure),
-            ("Crowding", focusGroup.Pressures.OvercrowdingPressure),
-            ("Migration", focusGroup.Pressures.MigrationPressure)
+            ("Food", focusContext.Pressures.FoodPressure),
+            ("Water", focusContext.Pressures.WaterPressure),
+            ("Threat", focusContext.Pressures.ThreatPressure),
+            ("Crowding", focusContext.Pressures.OvercrowdingPressure),
+            ("Migration", focusContext.Pressures.MigrationPressure)
         };
         var lines = new List<string>(pressureRows.Length * 2);
         var labelWidth = Math.Min(9, pressureRows.Max(row => row.Label.Length));
@@ -279,9 +285,9 @@ public static class ChronicleScreenRenderer
         return lines;
     }
 
-    private static IReadOnlyList<string> BuildAlertLines(PopulationGroup focusGroup, int contentWidth)
+    private static IReadOnlyList<string> BuildAlertLines(PolityContext focusContext, int contentWidth)
     {
-        var alerts = BuildAlerts(focusGroup).Take(3).ToArray();
+        var alerts = BuildAlerts(focusContext).Take(3).ToArray();
         if (alerts.Length == 0)
         {
             return [PadVisible($"{Dim}No urgent developments.{Reset}", contentWidth)];
@@ -296,15 +302,15 @@ public static class ChronicleScreenRenderer
         return lines;
     }
 
-    private static IReadOnlyList<(string Text, string Color)> BuildAlerts(PopulationGroup focusGroup)
+    private static IReadOnlyList<(string Text, string Color)> BuildAlerts(PolityContext focusContext)
     {
         var alertCandidates = new List<(string Text, string Color, int Severity)>
         {
-            BuildAlert("Food strain is worsening", focusGroup.Pressures.FoodPressure),
-            BuildAlert("Water access is under pressure", focusGroup.Pressures.WaterPressure),
-            BuildAlert("Threats near the polity are rising", focusGroup.Pressures.ThreatPressure),
-            BuildAlert("Crowding is tightening around the core", focusGroup.Pressures.OvercrowdingPressure),
-            BuildAlert("Movement toward safer ground is increasing", focusGroup.Pressures.MigrationPressure)
+            BuildAlert("Food strain is worsening", focusContext.Pressures.FoodPressure),
+            BuildAlert("Water access is under pressure", focusContext.Pressures.WaterPressure),
+            BuildAlert("Threats near the polity are rising", focusContext.Pressures.ThreatPressure),
+            BuildAlert("Crowding is tightening around the core", focusContext.Pressures.OvercrowdingPressure),
+            BuildAlert("Movement toward safer ground is increasing", focusContext.Pressures.MigrationPressure)
         };
 
         return alertCandidates

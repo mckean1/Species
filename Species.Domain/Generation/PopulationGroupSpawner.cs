@@ -9,7 +9,7 @@ public static class PopulationGroupSpawner
 {
     private const string DefaultSpeciesId = "species-human";
 
-    public static IReadOnlyList<PopulationGroup> Spawn(World world, int groupCount, Random random)
+    public static (IReadOnlyList<PopulationGroup> Groups, IReadOnlyList<Polity> Polities) Spawn(World world, int groupCount, Random random)
     {
         var viableRegions = world.Regions
             .Select(region => new
@@ -26,10 +26,11 @@ public static class PopulationGroupSpawner
 
         if (viableRegions.Length == 0)
         {
-            return Array.Empty<PopulationGroup>();
+            return (Array.Empty<PopulationGroup>(), Array.Empty<Polity>());
         }
 
         var groups = new List<PopulationGroup>(groupCount);
+        var polities = new List<Polity>(groupCount);
 
         for (var index = 0; index < groupCount; index++)
         {
@@ -42,18 +43,20 @@ public static class PopulationGroupSpawner
                 PopulationGroupSpawningConstants.MaximumStartingStoredFood + 1);
             var subsistenceMode = ResolveSubsistenceMode(region);
             var governmentForm = ResolveGovernmentForm(region, subsistenceMode, index);
+            var polityId = $"polity-{index + 1:D2}";
+            var name = BuildGroupName(region, index);
 
             groups.Add(new PopulationGroup
             {
                 Id = $"group-{index + 1:D2}",
-                Name = BuildGroupName(region, index),
+                Name = name,
                 SpeciesId = DefaultSpeciesId,
+                PolityId = polityId,
                 CurrentRegionId = region.Id,
                 OriginRegionId = region.Id,
                 Population = population,
                 StoredFood = storedFood,
                 SubsistenceMode = subsistenceMode,
-                GovernmentForm = governmentForm,
                 Pressures = new PressureState(),
                 LastRegionId = string.Empty,
                 MonthsSinceLastMove = 0,
@@ -61,7 +64,15 @@ public static class PopulationGroupSpawner
                 KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal),
                 DiscoveryEvidence = new DiscoveryEvidenceState(),
                 LearnedAdvancementIds = new HashSet<string>(StringComparer.Ordinal),
-                AdvancementEvidence = new AdvancementEvidenceState(),
+                AdvancementEvidence = new AdvancementEvidenceState()
+            });
+
+            polities.Add(new Polity
+            {
+                Id = polityId,
+                Name = name,
+                GovernmentForm = governmentForm,
+                MemberGroupIds = [$"group-{index + 1:D2}"],
                 ActiveLawProposal = null,
                 LawProposalHistory = [],
                 EnactedLaws = [],
@@ -69,7 +80,7 @@ public static class PopulationGroupSpawner
             });
         }
 
-        return groups;
+        return (groups, polities);
     }
 
     private static int CalculateViabilityScore(Region region)

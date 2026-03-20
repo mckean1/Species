@@ -3,8 +3,8 @@ using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
 
-// Enacted laws stay deliberately simple in this phase: each month they refresh
-// enforcement/compliance from current conditions, then apply scaled pressure effects.
+// Enacted laws are polity-owned, but their monthly effects still route through
+// member population groups because groups remain the pressure-bearing units.
 public sealed class EnactedLawSystem
 {
     private readonly IReadOnlyDictionary<string, EnactedLawEffect> effectsByDefinitionId =
@@ -34,53 +34,66 @@ public sealed class EnactedLawSystem
 
     public World Run(World world)
     {
-        if (world.PopulationGroups.Count == 0)
+        if (world.PopulationGroups.Count == 0 || world.Polities.Count == 0)
         {
             return world;
         }
 
-        var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
-        foreach (var group in world.PopulationGroups)
+        var updatedPolities = new List<Polity>(world.Polities.Count);
+        var effectsByPolityId = new Dictionary<string, EnactedLawEffect>(StringComparer.Ordinal);
+
+        foreach (var polity in world.Polities)
         {
-            if (group.EnactedLaws.Count == 0)
+            var updatedPolity = polity.Clone();
+            var context = PolityData.BuildContext(world, updatedPolity);
+            if (context is null || updatedPolity.EnactedLaws.Count == 0)
             {
-                updatedGroups.Add(CloneGroup(group));
+                updatedPolities.Add(updatedPolity);
+                effectsByPolityId[updatedPolity.Id] = new EnactedLawEffect(0, 0, 0, 0, 0);
                 continue;
             }
 
-            var updatedGroup = CloneGroup(group);
-            UpdateLawEffectiveness(updatedGroup);
-            var combinedEffect = CombineEffects(updatedGroup);
-            updatedGroup.Pressures = new PressureState
-            {
-                FoodPressure = Clamp(updatedGroup.Pressures.FoodPressure + combinedEffect.FoodPressureModifier),
-                WaterPressure = Clamp(updatedGroup.Pressures.WaterPressure + combinedEffect.WaterPressureModifier),
-                ThreatPressure = Clamp(updatedGroup.Pressures.ThreatPressure + combinedEffect.ThreatPressureModifier),
-                OvercrowdingPressure = Clamp(updatedGroup.Pressures.OvercrowdingPressure + combinedEffect.OvercrowdingPressureModifier),
-                MigrationPressure = Clamp(updatedGroup.Pressures.MigrationPressure + combinedEffect.MigrationPressureModifier)
-            };
-
-            updatedGroups.Add(updatedGroup);
+            UpdateLawEffectiveness(updatedPolity, context);
+            effectsByPolityId[updatedPolity.Id] = CombineEffects(updatedPolity);
+            updatedPolities.Add(updatedPolity);
         }
 
-        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle);
+        var updatedGroups = world.PopulationGroups
+            .Select(group =>
+            {
+                var updatedGroup = CloneGroup(group);
+                var combinedEffect = effectsByPolityId.GetValueOrDefault(group.PolityId, new EnactedLawEffect(0, 0, 0, 0, 0));
+                updatedGroup.Pressures = new PressureState
+                {
+                    FoodPressure = Clamp(updatedGroup.Pressures.FoodPressure + combinedEffect.FoodPressureModifier),
+                    WaterPressure = Clamp(updatedGroup.Pressures.WaterPressure + combinedEffect.WaterPressureModifier),
+                    ThreatPressure = Clamp(updatedGroup.Pressures.ThreatPressure + combinedEffect.ThreatPressureModifier),
+                    OvercrowdingPressure = Clamp(updatedGroup.Pressures.OvercrowdingPressure + combinedEffect.OvercrowdingPressureModifier),
+                    MigrationPressure = Clamp(updatedGroup.Pressures.MigrationPressure + combinedEffect.MigrationPressureModifier)
+                };
+
+                return updatedGroup;
+            })
+            .ToArray();
+
+        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle, updatedPolities, world.FocalPolityId);
     }
 
-    private void UpdateLawEffectiveness(PopulationGroup group)
+    private void UpdateLawEffectiveness(Polity polity, PolityContext context)
     {
-        foreach (var enactedLaw in group.EnactedLaws.Where(law => law.IsActive))
+        foreach (var enactedLaw in polity.EnactedLaws.Where(law => law.IsActive))
         {
-            var targetEnforcement = ResolveTargetEnforcement(group, enactedLaw);
-            var targetCompliance = ResolveTargetCompliance(group, enactedLaw, targetEnforcement);
+            var targetEnforcement = ResolveTargetEnforcement(polity, context.Pressures, enactedLaw);
+            var targetCompliance = ResolveTargetCompliance(polity, context.Pressures, enactedLaw, targetEnforcement);
             enactedLaw.EnforcementStrength = DriftToward(enactedLaw.EnforcementStrength, targetEnforcement);
             enactedLaw.ComplianceLevel = DriftToward(enactedLaw.ComplianceLevel, targetCompliance);
         }
     }
 
-    private EnactedLawEffect CombineEffects(PopulationGroup group)
+    private EnactedLawEffect CombineEffects(Polity polity)
     {
         var total = new EnactedLawEffect(0, 0, 0, 0, 0);
-        foreach (var enactedLaw in group.EnactedLaws.Where(law => law.IsActive))
+        foreach (var enactedLaw in polity.EnactedLaws.Where(law => law.IsActive))
         {
             if (!effectsByDefinitionId.TryGetValue(enactedLaw.DefinitionId, out var effect))
             {
@@ -88,7 +101,6 @@ public sealed class EnactedLawSystem
             }
 
             var scale = ResolveEffectScale(enactedLaw);
-
             total = new EnactedLawEffect(
                 total.FoodPressureModifier + Scale(effect.FoodPressureModifier, scale),
                 total.WaterPressureModifier + Scale(effect.WaterPressureModifier, scale),
@@ -100,9 +112,9 @@ public sealed class EnactedLawSystem
         return total;
     }
 
-    private static int ResolveTargetEnforcement(PopulationGroup group, EnactedLaw law)
+    private static int ResolveTargetEnforcement(Polity polity, PressureState pressures, EnactedLaw law)
     {
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(group.GovernmentForm);
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
         var baseline = behavior.EnforcementTendency;
 
         baseline += law.Category switch
@@ -110,26 +122,26 @@ public sealed class EnactedLawSystem
             LawProposalCategory.Order => 8,
             LawProposalCategory.Punishment => 10,
             LawProposalCategory.Military => 8,
-            LawProposalCategory.Faith => group.GovernmentForm == GovernmentForm.Theocracy ? 10 : 2,
-            LawProposalCategory.Custom => group.GovernmentForm is GovernmentForm.TribalClanRule or GovernmentForm.Confederation ? 6 : -2,
-            LawProposalCategory.Trade => group.GovernmentForm == GovernmentForm.MerchantRule ? 7 : -4,
-            LawProposalCategory.Movement => group.GovernmentForm == GovernmentForm.MerchantRule ? 5 : -3,
-            LawProposalCategory.Food => group.Pressures.FoodPressure >= 60 ? -6 : 2,
+            LawProposalCategory.Faith => polity.GovernmentForm == GovernmentForm.Theocracy ? 10 : 2,
+            LawProposalCategory.Custom => polity.GovernmentForm is GovernmentForm.TribalClanRule or GovernmentForm.Confederation ? 6 : -2,
+            LawProposalCategory.Trade => polity.GovernmentForm == GovernmentForm.MerchantRule ? 7 : -4,
+            LawProposalCategory.Movement => polity.GovernmentForm == GovernmentForm.MerchantRule ? 5 : -3,
+            LawProposalCategory.Food => pressures.FoodPressure >= 60 ? -6 : 2,
             _ => 0
         };
 
-        baseline += group.Pressures.ThreatPressure / 10;
-        baseline += group.Pressures.MigrationPressure / 16;
-        baseline -= group.Pressures.OvercrowdingPressure / 14;
+        baseline += pressures.ThreatPressure / 10;
+        baseline += pressures.MigrationPressure / 16;
+        baseline -= pressures.OvercrowdingPressure / 14;
         baseline += behavior.ExtremityAllowance;
 
-        if (group.GovernmentForm == GovernmentForm.ImperialBureaucracy &&
+        if (polity.GovernmentForm == GovernmentForm.ImperialBureaucracy &&
             law.Category is LawProposalCategory.Order or LawProposalCategory.Trade)
         {
             baseline += 8;
         }
 
-        if (group.GovernmentForm == GovernmentForm.FeudalRule &&
+        if (polity.GovernmentForm == GovernmentForm.FeudalRule &&
             law.Category is LawProposalCategory.Military or LawProposalCategory.Custom)
         {
             baseline += 6;
@@ -137,57 +149,57 @@ public sealed class EnactedLawSystem
 
         if (law.Category == LawProposalCategory.Faith)
         {
-            baseline += group.Pressures.MigrationPressure / 10;
+            baseline += pressures.MigrationPressure / 10;
         }
 
         if (law.Category is LawProposalCategory.Trade or LawProposalCategory.Movement)
         {
-            baseline -= group.Pressures.MigrationPressure / 8;
+            baseline -= pressures.MigrationPressure / 8;
         }
 
         return Clamp(baseline);
     }
 
-    private static int ResolveTargetCompliance(PopulationGroup group, EnactedLaw law, int enforcementStrength)
+    private static int ResolveTargetCompliance(Polity polity, PressureState pressures, EnactedLaw law, int enforcementStrength)
     {
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(group.GovernmentForm);
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
         var baseline = behavior.ComplianceTendency;
 
         baseline += law.Category switch
         {
-            LawProposalCategory.Custom => group.GovernmentForm is GovernmentForm.TribalClanRule or GovernmentForm.Confederation ? 14 : 6,
-            LawProposalCategory.Faith => group.GovernmentForm == GovernmentForm.Theocracy ? 12 : 2,
-            LawProposalCategory.Food => group.Pressures.FoodPressure >= 55 ? -12 : 3,
-            LawProposalCategory.Trade => group.GovernmentForm == GovernmentForm.MerchantRule ? 8 : group.Pressures.MigrationPressure >= 50 ? -6 : 2,
-            LawProposalCategory.Movement => group.Pressures.MigrationPressure >= 50 ? -8 : 0,
+            LawProposalCategory.Custom => polity.GovernmentForm is GovernmentForm.TribalClanRule or GovernmentForm.Confederation ? 14 : 6,
+            LawProposalCategory.Faith => polity.GovernmentForm == GovernmentForm.Theocracy ? 12 : 2,
+            LawProposalCategory.Food => pressures.FoodPressure >= 55 ? -12 : 3,
+            LawProposalCategory.Trade => polity.GovernmentForm == GovernmentForm.MerchantRule ? 8 : pressures.MigrationPressure >= 50 ? -6 : 2,
+            LawProposalCategory.Movement => pressures.MigrationPressure >= 50 ? -8 : 0,
             LawProposalCategory.Punishment => enforcementStrength >= 60 ? 4 : -4,
             LawProposalCategory.Order => enforcementStrength >= 55 ? 4 : 0,
             _ => 0
         };
 
         baseline += enforcementStrength / 8;
-        baseline -= group.Pressures.FoodPressure / 10;
-        baseline -= group.Pressures.OvercrowdingPressure / 12;
+        baseline -= pressures.FoodPressure / 10;
+        baseline -= pressures.OvercrowdingPressure / 12;
 
         if (law.Category == LawProposalCategory.Faith)
         {
-            baseline += group.Pressures.ThreatPressure / 16;
-            baseline += group.Pressures.MigrationPressure / 12;
+            baseline += pressures.ThreatPressure / 16;
+            baseline += pressures.MigrationPressure / 12;
         }
 
-        if (group.GovernmentForm == GovernmentForm.Republic &&
+        if (polity.GovernmentForm == GovernmentForm.Republic &&
             law.Category is LawProposalCategory.Order or LawProposalCategory.Custom)
         {
             baseline += 6;
         }
 
-        if (group.GovernmentForm == GovernmentForm.DespoticRule &&
+        if (polity.GovernmentForm == GovernmentForm.DespoticRule &&
             law.Category is LawProposalCategory.Order or LawProposalCategory.Punishment)
         {
             baseline -= 8;
         }
 
-        if (group.GovernmentForm == GovernmentForm.Confederation &&
+        if (polity.GovernmentForm == GovernmentForm.Confederation &&
             law.Category == LawProposalCategory.Custom)
         {
             baseline += 8;
@@ -220,12 +232,12 @@ public sealed class EnactedLawSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            GovernmentForm = group.GovernmentForm,
             Pressures = new PressureState
             {
                 FoodPressure = group.Pressures.FoodPressure,
@@ -240,11 +252,7 @@ public sealed class EnactedLawSystem
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
             LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
-            AdvancementEvidence = group.AdvancementEvidence.Clone(),
-            ActiveLawProposal = group.ActiveLawProposal?.Clone(),
-            LawProposalHistory = group.LawProposalHistory.Select(proposal => proposal.Clone()).ToList(),
-            EnactedLaws = group.EnactedLaws.Select(law => law.Clone()).ToList(),
-            PoliticalBlocs = group.PoliticalBlocs.Select(bloc => bloc.Clone()).ToList()
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
     }
 

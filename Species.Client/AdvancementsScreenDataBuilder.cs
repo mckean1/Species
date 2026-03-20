@@ -6,12 +6,12 @@ public static class AdvancementsScreenDataBuilder
 {
     public static AdvancementsScreenData Build(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         int selectedIndex)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var items = advancementCatalog.Definitions
             .Select(definition => BuildItem(definition, focusGroup, regionsById, discoveryCatalog))

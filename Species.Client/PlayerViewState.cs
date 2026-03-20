@@ -2,7 +2,7 @@ public sealed class PlayerViewState
 {
     public PlayerScreen CurrentScreen { get; private set; } = PlayerScreen.Chronicle;
 
-    public string FocalGroupId { get; private set; } = string.Empty;
+    public string FocalPolityId { get; private set; } = string.Empty;
 
     public int CurrentRegionIndex { get; private set; }
 
@@ -16,9 +16,9 @@ public sealed class PlayerViewState
 
     public bool IsSimulationRunning { get; private set; } = true;
 
-    public void EnsureFocalGroup(Species.Domain.Models.World world)
+    public void EnsureFocalPolity(Species.Domain.Models.World world)
     {
-        FocalGroupId = PlayerFocus.ResolveId(world, FocalGroupId);
+        FocalPolityId = PlayerFocus.ResolveId(world, FocalPolityId);
     }
 
     public void CycleScreen()

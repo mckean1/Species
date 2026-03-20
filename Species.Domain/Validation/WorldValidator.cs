@@ -19,6 +19,11 @@ public static class WorldValidator
             errors.Add("World month must be between 1 and 12.");
         }
 
+        if (world.Regions.Count == 0)
+        {
+            errors.Add("World must contain at least one region.");
+        }
+
         if (world.PopulationGroups is null)
         {
             errors.Add("World population groups collection cannot be null.");

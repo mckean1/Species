@@ -1,18 +1,20 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 public static class KnownPolitiesScreenDataBuilder
 {
     public static KnownPolitiesScreenData Build(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         int selectedPolityIndex,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
-        var knownPolities = GetKnownPolities(world, focusGroup, regionsById, discoveryCatalog, advancementCatalog);
+        var knownPolities = GetKnownPolities(world, focusPolity, focusContext, regionsById, discoveryCatalog, advancementCatalog);
         var clampedIndex = knownPolities.Count == 0
             ? 0
             : Math.Clamp(selectedPolityIndex, 0, knownPolities.Count - 1);
@@ -26,128 +28,116 @@ public static class KnownPolitiesScreenDataBuilder
 
     private static IReadOnlyList<KnownPolitySummary> GetKnownPolities(
         World world,
-        PopulationGroup? focusGroup,
+        Polity? focusPolity,
+        PolityContext? focusContext,
         IReadOnlyDictionary<string, Region> regionsById,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var knownRegionIds = focusGroup?.KnownRegionIds ?? new HashSet<string>(StringComparer.Ordinal);
+        var knownRegionIds = focusContext?.KnownRegionIds ?? new HashSet<string>(StringComparer.Ordinal);
 
-        var candidates = world.PopulationGroups
-            .Where(group => focusGroup is null || !string.Equals(group.Id, focusGroup.Id, StringComparison.Ordinal))
-            .Where(group =>
-                focusGroup is null ||
-                knownRegionIds.Contains(group.CurrentRegionId) ||
-                knownRegionIds.Contains(group.OriginRegionId) ||
-                (regionsById.TryGetValue(group.CurrentRegionId, out var region) &&
-                 region.NeighborIds.Contains(focusGroup.CurrentRegionId, StringComparer.Ordinal)))
-            .OrderBy(group => group.Name, StringComparer.Ordinal)
-            .Select(group => BuildSummary(group, focusGroup, regionsById, discoveryCatalog, advancementCatalog))
+        return world.Polities
+            .Where(polity => focusPolity is null || !string.Equals(polity.Id, focusPolity.Id, StringComparison.Ordinal))
+            .Select(polity => new { Polity = polity, Context = PolityData.BuildContext(world, polity) })
+            .Where(item => item.Context?.LeadGroup is not null)
+            .Where(item =>
+                focusContext is null ||
+                knownRegionIds.Contains(item.Context!.CurrentRegionId) ||
+                knownRegionIds.Contains(item.Context!.OriginRegionId) ||
+                (regionsById.TryGetValue(item.Context!.CurrentRegionId, out var region) &&
+                 region.NeighborIds.Contains(focusContext.CurrentRegionId, StringComparer.Ordinal)))
+            .OrderBy(item => item.Polity.Name, StringComparer.Ordinal)
+            .Select(item => BuildSummary(item.Polity, item.Context!, focusPolity, focusContext, regionsById, discoveryCatalog, advancementCatalog))
             .ToArray();
-
-        return candidates;
     }
 
     private static KnownPolitySummary BuildSummary(
-        PopulationGroup group,
-        PopulationGroup? focusGroup,
+        Polity polity,
+        PolityContext context,
+        Polity? focusPolity,
+        PolityContext? focusContext,
         IReadOnlyDictionary<string, Region> regionsById,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
-        var currentRegionKnown = focusGroup is null || focusGroup.KnownRegionIds.Contains(group.CurrentRegionId);
-        var originRegionKnown = focusGroup is null || focusGroup.KnownRegionIds.Contains(group.OriginRegionId);
-        var currentRegionName = currentRegionKnown && regionsById.TryGetValue(group.CurrentRegionId, out var currentRegion)
+        _ = discoveryCatalog;
+        _ = advancementCatalog;
+
+        var currentRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.CurrentRegionId);
+        var originRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.OriginRegionId);
+        var currentRegionName = currentRegionKnown && regionsById.TryGetValue(context.CurrentRegionId, out var currentRegion)
             ? currentRegion.Name
             : "Not yet known";
-        var coreRegionName = originRegionKnown && regionsById.TryGetValue(group.OriginRegionId, out var originRegion)
+        var coreRegionName = originRegionKnown && regionsById.TryGetValue(context.OriginRegionId, out var originRegion)
             ? originRegion.Name
             : currentRegionName;
 
-        var isNearby = focusGroup is not null &&
-            (string.Equals(group.CurrentRegionId, focusGroup.CurrentRegionId, StringComparison.Ordinal) ||
-             (regionsById.TryGetValue(group.CurrentRegionId, out var current) &&
-              current.NeighborIds.Contains(focusGroup.CurrentRegionId, StringComparer.Ordinal)));
-
-        var relationship = focusGroup is null
-            ? "Unknown"
-            : ResolveRelationship(group, focusGroup, isNearby);
-
-        var visiblePressureSummary = isNearby
-            ? BuildPressureSummary(group)
-            : "Pressures not clearly visible";
-
-        var traits = isNearby
-            ? BuildTraits(group, discoveryCatalog, advancementCatalog)
-            : ["No notable traits observed"];
-
-        var risks = isNearby
-            ? BuildRisks(group)
-            : ["No clear risks observed"];
-
-        var notes = BuildNotes(group, focusGroup, currentRegionName, isNearby);
+        var isNearby = focusContext is not null &&
+            (string.Equals(context.CurrentRegionId, focusContext.CurrentRegionId, StringComparison.Ordinal) ||
+             (regionsById.TryGetValue(context.CurrentRegionId, out var current) &&
+              current.NeighborIds.Contains(focusContext.CurrentRegionId, StringComparer.Ordinal)));
 
         return new KnownPolitySummary(
-            group.Id,
-            group.Name,
-            PolityPresentation.DescribeGovernmentForm(group.GovernmentForm),
+            polity.Id,
+            polity.Name,
+            PolityPresentation.DescribeGovernmentForm(polity.GovernmentForm),
             coreRegionName,
             currentRegionName,
-            KnowledgePresentation.ApproximatePopulation(group.Population, exactAllowed: isNearby),
-            relationship,
+            KnowledgePresentation.ApproximatePopulation(context.TotalPopulation, exactAllowed: isNearby),
+            ResolveRelationship(context, focusContext, isNearby),
             isNearby ? "Nearby" : "Distant",
-            visiblePressureSummary,
-            traits,
-            risks,
-            notes,
-            BuildKnownLaws(group));
+            BuildPressureSummary(context),
+            BuildTraits(context),
+            BuildRisks(context),
+            BuildNotes(context, focusPolity, focusContext, currentRegionName, isNearby),
+            BuildKnownLaws(polity));
     }
 
-    private static string ResolveRelationship(PopulationGroup group, PopulationGroup focusGroup, bool isNearby)
+    private static string ResolveRelationship(PolityContext context, PolityContext? focusContext, bool isNearby)
     {
-        if (string.Equals(group.CurrentRegionId, focusGroup.CurrentRegionId, StringComparison.Ordinal))
+        if (focusContext is null)
+        {
+            return "Unknown";
+        }
+
+        if (string.Equals(context.CurrentRegionId, focusContext.CurrentRegionId, StringComparison.Ordinal))
         {
             return "Competing nearby";
         }
 
-        if (string.Equals(group.OriginRegionId, focusGroup.OriginRegionId, StringComparison.Ordinal))
+        if (string.Equals(context.OriginRegionId, focusContext.OriginRegionId, StringComparison.Ordinal))
         {
             return "Shared homeland";
         }
 
-        if (isNearby)
-        {
-            return "Cautious";
-        }
-
-        return "Known contact";
+        return isNearby ? "Cautious" : "Known contact";
     }
 
-    private static string BuildPressureSummary(PopulationGroup group)
+    private static string BuildPressureSummary(PolityContext context)
     {
         var notable = new List<string>();
 
-        if (group.Pressures.FoodPressure >= 60)
+        if (context.Pressures.FoodPressure >= 60)
         {
             notable.Add("food stress");
         }
 
-        if (group.Pressures.WaterPressure >= 60)
+        if (context.Pressures.WaterPressure >= 60)
         {
             notable.Add("water strain");
         }
 
-        if (group.Pressures.OvercrowdingPressure >= 60)
+        if (context.Pressures.OvercrowdingPressure >= 60)
         {
             notable.Add("crowding");
         }
 
-        if (group.Pressures.MigrationPressure >= 60)
+        if (context.Pressures.MigrationPressure >= 60)
         {
             notable.Add("migration pressure");
         }
 
-        if (group.Pressures.ThreatPressure >= 60)
+        if (context.Pressures.ThreatPressure >= 60)
         {
             notable.Add("danger");
         }
@@ -157,36 +147,36 @@ public static class KnownPolitiesScreenDataBuilder
             : "No obvious distress is visible";
     }
 
-    private static IReadOnlyList<string> BuildTraits(
-        PopulationGroup group,
-        DiscoveryCatalog discoveryCatalog,
-        AdvancementCatalog advancementCatalog)
+    private static IReadOnlyList<string> BuildTraits(PolityContext context)
     {
-        _ = discoveryCatalog;
-        _ = advancementCatalog;
         var traits = new List<string>();
+        var leadGroup = context.LeadGroup;
+        if (leadGroup is null)
+        {
+            return ["No notable traits observed"];
+        }
 
-        if (group.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Gatherer)
+        if (leadGroup.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Gatherer)
         {
             traits.Add("Often seen foraging");
         }
 
-        if (group.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Hunter)
+        if (leadGroup.SubsistenceMode == Species.Domain.Enums.SubsistenceMode.Hunter)
         {
             traits.Add("Often seen hunting");
         }
 
-        if (group.Pressures.MigrationPressure >= 60)
+        if (context.Pressures.MigrationPressure >= 60)
         {
             traits.Add("Frequently on the move");
         }
 
-        if (group.StoredFood > group.Population)
+        if (context.TotalStoredFood > context.TotalPopulation)
         {
             traits.Add("Carries visible provisions");
         }
 
-        if (group.Pressures.ThreatPressure < 40)
+        if (context.Pressures.ThreatPressure < 40)
         {
             traits.Add("Moves with some confidence");
         }
@@ -194,26 +184,26 @@ public static class KnownPolitiesScreenDataBuilder
         return traits.Count > 0 ? traits.Take(3).ToArray() : ["No notable traits observed"];
     }
 
-    private static IReadOnlyList<string> BuildRisks(PopulationGroup group)
+    private static IReadOnlyList<string> BuildRisks(PolityContext context)
     {
         var risks = new List<string>();
 
-        if (group.Pressures.OvercrowdingPressure >= 60)
+        if (context.Pressures.OvercrowdingPressure >= 60)
         {
             risks.Add("Crowded conditions");
         }
 
-        if (group.Pressures.WaterPressure >= 60)
+        if (context.Pressures.WaterPressure >= 60)
         {
             risks.Add("Limited water sources");
         }
 
-        if (group.Pressures.FoodPressure >= 60)
+        if (context.Pressures.FoodPressure >= 60)
         {
             risks.Add("Food pressure is visible");
         }
 
-        if (group.Pressures.ThreatPressure >= 60)
+        if (context.Pressures.ThreatPressure >= 60)
         {
             risks.Add("Threat pressure is high");
         }
@@ -222,8 +212,9 @@ public static class KnownPolitiesScreenDataBuilder
     }
 
     private static IReadOnlyList<string> BuildNotes(
-        PopulationGroup group,
-        PopulationGroup? focusGroup,
+        PolityContext context,
+        Polity? focusPolity,
+        PolityContext? focusContext,
         string currentRegionName,
         bool isNearby)
     {
@@ -234,22 +225,27 @@ public static class KnownPolitiesScreenDataBuilder
             notes.Add("This polity is operating near the player polity");
         }
 
-        if (focusGroup is not null && string.Equals(group.CurrentRegionId, focusGroup.CurrentRegionId, StringComparison.Ordinal))
+        if (focusContext is not null && string.Equals(context.CurrentRegionId, focusContext.CurrentRegionId, StringComparison.Ordinal))
         {
             notes.Add("Competes for the same local space");
         }
 
-        if (focusGroup is not null && string.Equals(group.OriginRegionId, focusGroup.OriginRegionId, StringComparison.Ordinal))
+        if (focusContext is not null && string.Equals(context.OriginRegionId, focusContext.OriginRegionId, StringComparison.Ordinal))
         {
             notes.Add("Shares the same homeland");
+        }
+
+        if (focusPolity is not null && string.Equals(context.Polity.Id, focusPolity.Id, StringComparison.Ordinal))
+        {
+            notes.Add("This is the player polity");
         }
 
         return notes;
     }
 
-    private static IReadOnlyList<string> BuildKnownLaws(PopulationGroup group)
+    private static IReadOnlyList<string> BuildKnownLaws(Polity polity)
     {
-        var activeEnacted = group.EnactedLaws
+        var activeEnacted = polity.EnactedLaws
             .Where(law => law.IsActive)
             .OrderByDescending(law => law.EnactedOnYear)
             .ThenByDescending(law => law.EnactedOnMonth)

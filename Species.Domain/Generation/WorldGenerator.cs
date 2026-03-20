@@ -70,12 +70,20 @@ public static class WorldGenerator
         }
 
         var provisionalWorld = new World(worldSeed, 1, 1, regions);
-        var populationGroups = PopulationGroupSpawner.Spawn(
+        var spawnResult = PopulationGroupSpawner.Spawn(
             provisionalWorld,
             PopulationGroupSpawningConstants.DefaultGroupCount,
             random);
+        var groupsByPolityId = spawnResult.Groups
+            .GroupBy(group => group.PolityId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Population), StringComparer.Ordinal);
+        var focalPolityId = spawnResult.Polities
+            .OrderByDescending(polity => groupsByPolityId.GetValueOrDefault(polity.Id))
+            .ThenBy(polity => polity.Name, StringComparer.Ordinal)
+            .Select(polity => polity.Id)
+            .FirstOrDefault() ?? string.Empty;
 
-        return new World(worldSeed, 1, 1, regions, populationGroups, provisionalWorld.Chronicle);
+        return new World(worldSeed, 1, 1, regions, spawnResult.Groups, provisionalWorld.Chronicle, spawnResult.Polities, focalPolityId);
     }
 
     private static Dictionary<int, HashSet<int>> BuildNeighborMap(int regionCount, Random random)

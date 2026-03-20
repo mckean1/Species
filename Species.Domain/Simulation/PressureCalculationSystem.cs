@@ -67,7 +67,7 @@ public sealed class PressureCalculationSystem
         }
 
         return new PressureCalculationResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle, world.Polities, world.FocalPolityId),
             changes);
     }
 
@@ -78,12 +78,12 @@ public sealed class PressureCalculationSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            GovernmentForm = group.GovernmentForm,
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
@@ -91,10 +91,6 @@ public sealed class PressureCalculationSystem
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
             LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
             AdvancementEvidence = group.AdvancementEvidence.Clone(),
-            ActiveLawProposal = group.ActiveLawProposal?.Clone(),
-            LawProposalHistory = group.LawProposalHistory.Select(proposal => proposal.Clone()).ToList(),
-            EnactedLaws = group.EnactedLaws.Select(law => law.Clone()).ToList(),
-            PoliticalBlocs = group.PoliticalBlocs.Select(bloc => bloc.Clone()).ToList(),
             Pressures = pressures
         };
     }

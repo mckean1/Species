@@ -1,37 +1,68 @@
 # Species
 
-MVP simulation prototype for a region-based world model.
+Species is a simulation-first command-line fantasy world prototype.
 
-Current MVP structure:
+The simulation is now split between `PopulationGroup` constituents and explicit `Polity` actors.
+
+- `PopulationGroup` remains the demographic, ecological, migration, discovery, and advancement-bearing unit.
+- `Polity` is now the player-guided political actor that owns government form, law state, political blocs, and player-facing political identity.
+- Larger later-phase polity architecture such as settlements, territorial control, economy, diplomacy, and scaling beyond the current MVP remains deferred.
+
+## Current Prototype Truths
 
 - `SimulationEngine` is the canonical monthly orchestrator.
 - Chronicle is the main/default player-facing screen.
-- Region Viewer is the supporting current-state player screen.
-- `TAB` cycles between screens and wraps.
-- `SPACE` toggles pause/unpause in the console client.
-- Simulation auto-advances while running.
+- Region Viewer is a supporting player-facing screen.
+- Additional player-facing screens currently exist for `Polity`, `Laws`, `Advancements`, `Known Polities`, and `Known Species`.
+- `TAB` cycles screens and wraps.
+- `SPACE` pauses or unpauses the simulation.
+- Simulation auto-advances while unpaused.
 - `ENTER` advances one month only while paused.
-- Discoveries are knowledge and affect decision-making through knowledge-safe views.
-- Player-facing screens respect focal-polity knowledge limits instead of global world truth.
-- Advancements are capability and affect execution.
-- The old player-facing raw log/output model has been replaced by Chronicle-first presentation.
-- The removed MVP adaptation layer has not been reintroduced.
-- Long-term biological change remains deferred to a later mutation / inheritance / evolution system.
+- Tick delay is `1000ms`.
+- Player-facing screens are focal-polity knowledge-aware rather than omniscient.
+- Discoveries remain knowledge.
+- Advancements remain capability.
+- Laws, enacted-law monthly effects, political blocs, and polity-facing governance presentation are already implemented on explicit polity state.
 
-Canonical monthly flow:
+## Canonical Monthly Flow
 
 1. Advance month
 2. Flora simulation
 3. Fauna simulation
 4. Group pressure recalculation
-5. Group survival and consumption
-6. Migration decision and movement
-7. Discovery evaluation
-8. Advancement evaluation
-9. Chronicle update and feed progression
-10. End-of-tick finalization
+5. Enacted law monthly effects
+6. Group survival and consumption
+7. Migration decision and movement
+8. Discovery evaluation
+9. Advancement evaluation
+10. Political bloc monthly update
+11. Law proposal update
+12. Chronicle update and feed progression
+13. End-of-tick finalization
 
-Main tuning hotspots:
+`SimulationEngine` remains the canonical orchestrator for this flow.
+
+## Scope Notes
+
+Implemented prototype layers already include:
+
+- Chronicle-first presentation
+- knowledge-aware region and polity screens
+- explicit `Polity` actors in `World`
+- law proposals and player pass/veto decisions
+- enacted laws with monthly effects
+- lightweight political blocs backing proposals
+
+Still deferred:
+
+- settlements / territorial control
+- trade / economy
+- diplomacy and war overhauls
+- kingdom / empire scaling
+- full faction / institution simulation
+- mutation / inheritance / evolution
+
+## Main Tuning Hotspots
 
 - flora growth/decline tuning
 - fauna food consumption and depletion pressure
@@ -39,18 +70,22 @@ Main tuning hotspots:
 - migration thresholds and score margins
 - discovery and advancement pacing
 - Chronicle hardship-event noisiness
+- law/bloc weight tuning
 - starting group viability
-- Phase 1 details are documented in [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md).
-- Phase 2 details are documented in [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md).
-- Phase 3 details are documented in [docs/phase-3-region-ecology-state.md](docs/phase-3-region-ecology-state.md).
-- Phase 4 details are documented in [docs/phase-4-flora-simulation-and-engine.md](docs/phase-4-flora-simulation-and-engine.md).
-- Phase 5 details are documented in [docs/phase-5-fauna-simulation.md](docs/phase-5-fauna-simulation.md).
-- Phase 6 details are documented in [docs/phase-6-population-groups.md](docs/phase-6-population-groups.md).
-- Phase 7 details are documented in [docs/phase-7-group-pressure-framework.md](docs/phase-7-group-pressure-framework.md).
-- Phase 8 details are documented in [docs/phase-8-group-survival-and-consumption.md](docs/phase-8-group-survival-and-consumption.md).
-- Phase 9 details are documented in [docs/phase-9-movement-and-migration.md](docs/phase-9-movement-and-migration.md).
-- Phase 10 details are documented in [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md).
-- Phase 11 details are documented in [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md).
-- Phase 12 details are documented in [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md).
-- Phase 13 details are documented in [docs/phase-13-region-viewer-and-screen-navigation.md](docs/phase-13-region-viewer-and-screen-navigation.md).
-- MVP integration / cleanup notes are documented in [docs/mvp-integration-balance-cleanup-pass.md](docs/mvp-integration-balance-cleanup-pass.md).
+
+## Docs
+
+- [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md)
+- [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md)
+- [docs/phase-3-region-ecology-state.md](docs/phase-3-region-ecology-state.md)
+- [docs/phase-4-flora-simulation-and-engine.md](docs/phase-4-flora-simulation-and-engine.md)
+- [docs/phase-5-fauna-simulation.md](docs/phase-5-fauna-simulation.md)
+- [docs/phase-6-population-groups.md](docs/phase-6-population-groups.md)
+- [docs/phase-7-group-pressure-framework.md](docs/phase-7-group-pressure-framework.md)
+- [docs/phase-8-group-survival-and-consumption.md](docs/phase-8-group-survival-and-consumption.md)
+- [docs/phase-9-movement-and-migration.md](docs/phase-9-movement-and-migration.md)
+- [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md)
+- [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md)
+- [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md)
+- [docs/phase-13-region-viewer-and-screen-navigation.md](docs/phase-13-region-viewer-and-screen-navigation.md)
+- [docs/mvp-integration-balance-cleanup-pass.md](docs/mvp-integration-balance-cleanup-pass.md)

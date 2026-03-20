@@ -8,9 +8,9 @@ The current MVP screen set is:
 
 1. Chronicle
 2. Polity
-3. Advancements
+3. Region Viewer
 4. Laws
-5. Region Viewer
+5. Advancements
 6. Known Polities
 7. Known Species
 
@@ -26,14 +26,16 @@ The MVP screen set is intentionally small and wraps when cycling:
 
 - Chronicle
 - Polity
-- Advancements
-- Laws
 - Region Viewer
+- Laws
+- Advancements
 - Known Polities
 - Known Species
 
 `TAB` cycles forward through the screen set and wraps back to Chronicle.
-`1-7` jump directly to the matching screen.
+`1-7` jump directly to the matching screen in that order.
+
+The screen set is broader than the original phase scope now, but the same Chronicle-first navigation model remains in place.
 
 ## Default Screen
 

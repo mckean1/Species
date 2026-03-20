@@ -4,11 +4,14 @@ namespace Species.Domain.Models;
 
 public sealed class PopulationGroup
 {
+    // PopulationGroup remains the ecological and demographic actor that supports a polity.
     public string Id { get; init; } = string.Empty;
 
     public string Name { get; init; } = string.Empty;
 
     public string SpeciesId { get; init; } = string.Empty;
+
+    public string PolityId { get; init; } = string.Empty;
 
     public string CurrentRegionId { get; set; } = string.Empty;
 
@@ -19,8 +22,6 @@ public sealed class PopulationGroup
     public int StoredFood { get; set; }
 
     public SubsistenceMode SubsistenceMode { get; set; }
-
-    public GovernmentForm GovernmentForm { get; set; }
 
     public PressureState Pressures { get; set; } = new();
 
@@ -37,12 +38,4 @@ public sealed class PopulationGroup
     public HashSet<string> LearnedAdvancementIds { get; init; } = new(StringComparer.Ordinal);
 
     public AdvancementEvidenceState AdvancementEvidence { get; set; } = new();
-
-    public LawProposal? ActiveLawProposal { get; set; }
-
-    public List<LawProposal> LawProposalHistory { get; init; } = [];
-
-    public List<EnactedLaw> EnactedLaws { get; init; } = [];
-
-    public List<PoliticalBloc> PoliticalBlocs { get; init; } = [];
 }

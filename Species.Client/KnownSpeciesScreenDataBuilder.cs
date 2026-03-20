@@ -4,9 +4,9 @@ using Species.Domain.Models;
 
 public static class KnownSpeciesScreenDataBuilder
 {
-    public static KnownSpeciesScreenData Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalGroupId, int selectedIndex)
+    public static KnownSpeciesScreenData Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var items = BuildSpecies(world, focusGroup, faunaCatalog);
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
 

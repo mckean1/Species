@@ -17,14 +17,14 @@ public static class AdvancementsScreenRenderer
 
     public static string Render(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
         int selectedIndex,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = AdvancementsScreenDataBuilder.Build(world, focalGroupId, discoveryCatalog, advancementCatalog, selectedIndex);
+        var data = AdvancementsScreenDataBuilder.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(36, ((innerWidth - 3) * 10) / 21);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
@@ -34,7 +34,7 @@ public static class AdvancementsScreenRenderer
         var detailLines = BuildDetailPanel(data.SelectedItem, detailWidth, bodyHeight, isSimulationRunning);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Advancements", PlayerScreenShell.ResolvePolityName(world, focalGroupId), data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Advancements", PlayerScreenShell.ResolvePolityName(world, focalPolityId), data.CurrentDate, isSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {

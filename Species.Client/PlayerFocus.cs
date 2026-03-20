@@ -1,34 +1,27 @@
 using Species.Domain.Models;
+using Species.Domain.Simulation;
 
 public static class PlayerFocus
 {
-    public static PopulationGroup? Resolve(World world, string focalGroupId)
+    public static Polity? Resolve(World world, string focalPolityId)
     {
-        if (!string.IsNullOrWhiteSpace(focalGroupId))
-        {
-            var matchingGroup = world.PopulationGroups.FirstOrDefault(group =>
-                string.Equals(group.Id, focalGroupId, StringComparison.Ordinal));
-
-            if (matchingGroup is not null)
-            {
-                return matchingGroup;
-            }
-        }
-
-        return SelectDefault(world);
+        return PolityData.Resolve(world, focalPolityId);
     }
 
-    public static string ResolveId(World world, string focalGroupId)
+    public static string ResolveId(World world, string focalPolityId)
     {
-        return Resolve(world, focalGroupId)?.Id ?? string.Empty;
+        return Resolve(world, focalPolityId)?.Id ?? string.Empty;
     }
 
-    private static PopulationGroup? SelectDefault(World world)
+    public static PopulationGroup? ResolveLeadGroup(World world, string focalPolityId)
     {
-        return world.PopulationGroups
-            .OrderByDescending(group => group.Population)
-            .ThenBy(group => group.Name, StringComparer.Ordinal)
-            .ThenBy(group => group.Id, StringComparer.Ordinal)
-            .FirstOrDefault();
+        var polity = Resolve(world, focalPolityId);
+        return polity is null ? null : PolityData.BuildContext(world, polity)?.LeadGroup;
+    }
+
+    public static PolityContext? ResolveContext(World world, string focalPolityId)
+    {
+        var polity = Resolve(world, focalPolityId);
+        return polity is null ? null : PolityData.BuildContext(world, polity);
     }
 }

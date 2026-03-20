@@ -1,5 +1,6 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Generation;
+using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Domain.Validation;
 using System.Diagnostics;
@@ -12,15 +13,7 @@ var faunaCatalog = FaunaSpeciesCatalog.CreateStarterSet();
 var world = WorldGenerator.Create(floraCatalog, faunaCatalog);
 var discoveryCatalog = DiscoveryCatalog.CreateForWorld(world);
 var advancementCatalog = AdvancementCatalog.CreateStarterSet();
-var validationErrors = WorldValidator.Validate(world)
-    .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
-    .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
-    .Concat(DiscoveryCatalogValidator.Validate(discoveryCatalog))
-    .Concat(AdvancementCatalogValidator.Validate(advancementCatalog))
-    .Concat(ChronicleValidator.Validate(world))
-    .Concat(RegionEcologyValidator.Validate(world, floraCatalog, faunaCatalog))
-    .Concat(PopulationGroupValidator.Validate(world))
-    .ToArray();
+var validationErrors = CollectStartupValidationErrors(world);
 
 if (validationErrors.Length > 0)
 {
@@ -36,8 +29,8 @@ if (validationErrors.Length > 0)
 
 var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
 var viewState = new PlayerViewState();
-viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
-simulationEngine.PlayerPolityId = viewState.FocalGroupId;
+viewState.EnsureFocalPolity(simulationEngine.CurrentWorld);
+simulationEngine.PlayerPolityId = viewState.FocalPolityId;
 var chronicleFrameRenderer = new ConsoleFrameRenderer();
 var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog).ToArray();
 if (viewErrors.Length > 0)
@@ -119,7 +112,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownPolities)
         {
-            var polityCount = KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
+            var polityCount = KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
@@ -144,7 +137,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.Advancements)
         {
-            var advancementCount = AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
+            var advancementCount = AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
@@ -169,7 +162,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.Laws)
         {
-            var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentLawIndex).Laws.Count;
+            var lawCount = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count;
             switch (key.Key)
             {
                 case ConsoleKey.P:
@@ -205,7 +198,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownSpecies)
         {
-            var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalGroupId, viewState.CurrentKnownSpeciesIndex).Species.Count;
+            var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
             switch (key.Key)
             {
                 case ConsoleKey.RightArrow:
@@ -242,13 +235,13 @@ while (true)
         shouldRender = true;
     }
 
-    viewState.EnsureFocalGroup(simulationEngine.CurrentWorld);
-    simulationEngine.PlayerPolityId = viewState.FocalGroupId;
-    viewState.ClampRegionIndex(RegionsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
-    viewState.ClampKnownPolityIndex(KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
-    viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
-    viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalGroupId, viewState.CurrentLawIndex).Laws.Count);
-    viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalGroupId, viewState.CurrentKnownSpeciesIndex).Species.Count);
+    viewState.EnsureFocalPolity(simulationEngine.CurrentWorld);
+    simulationEngine.PlayerPolityId = viewState.FocalPolityId;
+    viewState.ClampRegionIndex(RegionsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
+    viewState.ClampKnownPolityIndex(KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
+    viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
+    viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count);
+    viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count);
 
     if (shouldRender)
     {
@@ -262,17 +255,7 @@ bool AdvanceOneMonth()
 {
     var previousWorld = simulationEngine.CurrentWorld;
     var tickResult = simulationEngine.Tick();
-    var postTickValidationErrors = WorldValidator.Validate(simulationEngine.CurrentWorld)
-        .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
-        .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
-        .Concat(SimulationTickValidator.Validate(previousWorld, tickResult))
-        .Concat(GroupSurvivalValidator.Validate(previousWorld, tickResult))
-        .Concat(MigrationValidator.Validate(previousWorld, tickResult))
-        .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
-        .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
-        .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
-        .Concat(PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog))
-        .ToArray();
+    var postTickValidationErrors = CollectPostTickValidationErrors(previousWorld, tickResult);
 
     if (postTickValidationErrors.Length == 0)
     {
@@ -313,4 +296,34 @@ void RenderCurrentScreen()
         viewport);
 
     chronicleFrameRenderer.Render(frame, viewport);
+}
+
+string[] CollectStartupValidationErrors(World currentWorld)
+{
+    return WorldValidator.Validate(currentWorld)
+        .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
+        .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
+        .Concat(DiscoveryCatalogValidator.Validate(discoveryCatalog))
+        .Concat(AdvancementCatalogValidator.Validate(advancementCatalog))
+        .Concat(ChronicleValidator.Validate(currentWorld))
+        .Concat(RegionEcologyValidator.Validate(currentWorld, floraCatalog, faunaCatalog))
+        .Concat(PolityValidator.Validate(currentWorld))
+        .Concat(PopulationGroupValidator.Validate(currentWorld))
+        .ToArray();
+}
+
+string[] CollectPostTickValidationErrors(World previousWorld, SimulationTickResult tickResult)
+{
+    return WorldValidator.Validate(simulationEngine.CurrentWorld)
+        .Concat(RegionEcologyValidator.Validate(simulationEngine.CurrentWorld, floraCatalog, faunaCatalog))
+        .Concat(PolityValidator.Validate(simulationEngine.CurrentWorld))
+        .Concat(PopulationGroupValidator.Validate(simulationEngine.CurrentWorld))
+        .Concat(SimulationTickValidator.Validate(previousWorld, tickResult))
+        .Concat(GroupSurvivalValidator.Validate(previousWorld, tickResult))
+        .Concat(MigrationValidator.Validate(previousWorld, tickResult))
+        .Concat(DiscoveryStateValidator.Validate(simulationEngine.CurrentWorld, discoveryCatalog, tickResult))
+        .Concat(AdvancementStateValidator.Validate(simulationEngine.CurrentWorld, advancementCatalog, tickResult))
+        .Concat(ChronicleValidator.Validate(simulationEngine.CurrentWorld, tickResult))
+        .Concat(PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog))
+        .ToArray();
 }

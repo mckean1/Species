@@ -16,12 +16,12 @@ public static class LawsScreenRenderer
 
     public static string Render(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         int selectedIndex,
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = LawsScreenDataBuilder.Build(world, focalGroupId, selectedIndex);
+        var data = LawsScreenDataBuilder.Build(world, focalPolityId, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var leftWidth = Math.Max(32, ((innerWidth - 3) * 9) / 20);
         var rightWidth = Math.Max(30, innerWidth - leftWidth - 3);

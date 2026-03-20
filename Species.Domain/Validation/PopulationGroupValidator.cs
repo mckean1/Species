@@ -31,6 +31,11 @@ public static class PopulationGroupValidator
                 errors.Add($"Population group {group.Id} is missing a SpeciesId.");
             }
 
+            if (string.IsNullOrWhiteSpace(group.PolityId))
+            {
+                errors.Add($"Population group {group.Id} is missing a PolityId.");
+            }
+
             if (!regionIds.Contains(group.CurrentRegionId))
             {
                 errors.Add($"Population group {group.Id} references invalid CurrentRegionId {group.CurrentRegionId}.");
@@ -72,82 +77,6 @@ public static class PopulationGroupValidator
                 ValidatePressureRange(group.Id, nameof(group.Pressures.ThreatPressure), group.Pressures.ThreatPressure, errors);
                 ValidatePressureRange(group.Id, nameof(group.Pressures.OvercrowdingPressure), group.Pressures.OvercrowdingPressure, errors);
                 ValidatePressureRange(group.Id, nameof(group.Pressures.MigrationPressure), group.Pressures.MigrationPressure, errors);
-            }
-
-            if (group.ActiveLawProposal is not null)
-            {
-                if (string.IsNullOrWhiteSpace(group.ActiveLawProposal.Title))
-                {
-                    errors.Add($"Population group {group.Id} has an active law proposal without a title.");
-                }
-
-                if (group.ActiveLawProposal.Status != Species.Domain.Enums.LawProposalStatus.Active)
-                {
-                    errors.Add($"Population group {group.Id} has a non-active active law proposal.");
-                }
-            }
-
-            if (group.LawProposalHistory is null)
-            {
-                errors.Add($"Population group {group.Id} has null LawProposalHistory.");
-            }
-
-            if (group.EnactedLaws is null)
-            {
-                errors.Add($"Population group {group.Id} has null EnactedLaws.");
-            }
-            else
-            {
-                var activeConflictSlots = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var enactedLaw in group.EnactedLaws.Where(law => law.IsActive))
-                {
-                    if (string.IsNullOrWhiteSpace(enactedLaw.Title))
-                    {
-                        errors.Add($"Population group {group.Id} has an active enacted law without a title.");
-                    }
-
-                    if (enactedLaw.EnforcementStrength is < 0 or > 100)
-                    {
-                        errors.Add($"Population group {group.Id} has enacted law {enactedLaw.Title} with invalid EnforcementStrength.");
-                    }
-
-                    if (enactedLaw.ComplianceLevel is < 0 or > 100)
-                    {
-                        errors.Add($"Population group {group.Id} has enacted law {enactedLaw.Title} with invalid ComplianceLevel.");
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(enactedLaw.ConflictSlot) &&
-                        !activeConflictSlots.Add(enactedLaw.ConflictSlot))
-                    {
-                        errors.Add($"Population group {group.Id} has multiple active enacted laws in conflict slot {enactedLaw.ConflictSlot}.");
-                    }
-                }
-            }
-
-            if (group.PoliticalBlocs is null)
-            {
-                errors.Add($"Population group {group.Id} has null PoliticalBlocs.");
-            }
-            else
-            {
-                var blocSources = new HashSet<Species.Domain.Enums.ProposalBackingSource>();
-                foreach (var bloc in group.PoliticalBlocs)
-                {
-                    if (!blocSources.Add(bloc.Source))
-                    {
-                        errors.Add($"Population group {group.Id} has duplicate political bloc {bloc.Source}.");
-                    }
-
-                    if (bloc.Influence is < 0 or > 100)
-                    {
-                        errors.Add($"Population group {group.Id} has political bloc {bloc.Source} with invalid Influence.");
-                    }
-
-                    if (bloc.Satisfaction is < 0 or > 100)
-                    {
-                        errors.Add($"Population group {group.Id} has political bloc {bloc.Source} with invalid Satisfaction.");
-                    }
-                }
             }
 
             if (group.KnownRegionIds is null)

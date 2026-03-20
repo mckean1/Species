@@ -3,116 +3,120 @@ using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
 
-// Political blocs stay polity-level and lightweight in this phase. They refresh
-// monthly from current laws, conditions, and government form, then feed proposal pressure.
+// Political blocs remain lightweight and polity-owned. Monthly updates react to
+// polity law state plus the aggregate condition of member population groups.
 public sealed class PoliticalBlocSystem
 {
     public World Run(World world)
     {
-        if (world.PopulationGroups.Count == 0)
+        if (world.Polities.Count == 0)
         {
             return world;
         }
 
-        var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
-        foreach (var group in world.PopulationGroups)
+        var updatedPolities = world.Polities.Select(polity =>
         {
-            var updatedGroup = CloneGroup(group);
-            EnsureBlocs(updatedGroup);
-            UpdateBlocs(updatedGroup);
-            updatedGroups.Add(updatedGroup);
-        }
+            var updatedPolity = polity.Clone();
+            EnsureBlocs(updatedPolity);
+            var context = PolityData.BuildContext(world, updatedPolity);
+            if (context is not null)
+            {
+                UpdateBlocs(updatedPolity, context);
+            }
 
-        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, updatedGroups, world.Chronicle);
+            return updatedPolity;
+        }).ToArray();
+
+        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, world.Chronicle, updatedPolities, world.FocalPolityId);
     }
 
-    public static void EnsureBlocs(PopulationGroup group)
+    public static void EnsureBlocs(Polity polity)
     {
-        if (group.PoliticalBlocs.Count == Enum.GetValues<ProposalBackingSource>().Length)
+        if (polity.PoliticalBlocs.Count == Enum.GetValues<ProposalBackingSource>().Length)
         {
             return;
         }
 
-        var existing = group.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
-        var fallbackBlocs = PoliticalBlocCatalog.CreateInitialBlocs(group.GovernmentForm)
+        var existing = polity.PoliticalBlocs.ToDictionary(bloc => bloc.Source);
+        var fallbackBlocs = PoliticalBlocCatalog.CreateInitialBlocs(polity.GovernmentForm)
             .ToDictionary(bloc => bloc.Source);
-        group.PoliticalBlocs.Clear();
+        polity.PoliticalBlocs.Clear();
 
         foreach (var source in Enum.GetValues<ProposalBackingSource>())
         {
             if (existing.TryGetValue(source, out var bloc))
             {
-                group.PoliticalBlocs.Add(bloc);
+                polity.PoliticalBlocs.Add(bloc);
                 continue;
             }
 
-            group.PoliticalBlocs.Add(fallbackBlocs[source]);
+            polity.PoliticalBlocs.Add(fallbackBlocs[source]);
         }
     }
 
-    private static void UpdateBlocs(PopulationGroup group)
+    private static void UpdateBlocs(Polity polity, PolityContext context)
     {
-        foreach (var bloc in group.PoliticalBlocs)
+        foreach (var bloc in polity.PoliticalBlocs)
         {
-            var targetInfluence = ResolveTargetInfluence(group, bloc.Source);
-            var targetSatisfaction = ResolveTargetSatisfaction(group, bloc.Source);
+            var targetInfluence = ResolveTargetInfluence(polity, context, bloc.Source);
+            var targetSatisfaction = ResolveTargetSatisfaction(polity, context, bloc.Source);
             bloc.Influence = DriftToward(bloc.Influence, targetInfluence);
             bloc.Satisfaction = DriftToward(bloc.Satisfaction, targetSatisfaction);
         }
     }
 
-    private static int ResolveTargetInfluence(PopulationGroup group, ProposalBackingSource source)
+    private static int ResolveTargetInfluence(Polity polity, PolityContext context, ProposalBackingSource source)
     {
-        var behavior = GovernmentFormLawBehaviorCatalog.Get(group.GovernmentForm);
-        var activeLaws = group.EnactedLaws.Where(law => law.IsActive).ToArray();
+        var behavior = GovernmentFormLawBehaviorCatalog.Get(polity.GovernmentForm);
+        var activeLaws = polity.EnactedLaws.Where(law => law.IsActive).ToArray();
         var baseline = 16 + (behavior.GetBackingSourceWeight(source) * 6);
 
         baseline += source switch
         {
-            ProposalBackingSource.Priests => CountAlignment(activeLaws, source) * 3 + (group.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0) + group.Pressures.MigrationPressure / 12,
-            ProposalBackingSource.Warriors => CountAlignment(activeLaws, source) * 3 + group.Pressures.ThreatPressure / 8,
-            ProposalBackingSource.Merchants => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - group.Pressures.FoodPressure) / 10 + (group.StoredFood > group.Population ? 6 : 0),
-            ProposalBackingSource.Elders => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - group.Pressures.MigrationPressure) / 10,
-            ProposalBackingSource.CommonFolk => CountAlignment(activeLaws, source) * 2 + group.Pressures.FoodPressure / 10 + group.Pressures.OvercrowdingPressure / 14,
-            ProposalBackingSource.FrontierSettlers => CountAlignment(activeLaws, source) * 3 + group.Pressures.ThreatPressure / 12 + group.Pressures.MigrationPressure / 9,
+            ProposalBackingSource.Priests => CountAlignment(activeLaws, source) * 3 + (polity.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0) + context.Pressures.MigrationPressure / 12,
+            ProposalBackingSource.Warriors => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 8,
+            ProposalBackingSource.Merchants => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.FoodPressure) / 10 + (context.TotalStoredFood > context.TotalPopulation ? 6 : 0),
+            ProposalBackingSource.Elders => CountAlignment(activeLaws, source) * 3 + Math.Max(0, 55 - context.Pressures.MigrationPressure) / 10,
+            ProposalBackingSource.CommonFolk => CountAlignment(activeLaws, source) * 2 + context.Pressures.FoodPressure / 10 + context.Pressures.OvercrowdingPressure / 14,
+            ProposalBackingSource.FrontierSettlers => CountAlignment(activeLaws, source) * 3 + context.Pressures.ThreatPressure / 12 + context.Pressures.MigrationPressure / 9,
             _ => 0
         };
 
         return Math.Clamp(baseline, 10, 95);
     }
 
-    private static int ResolveTargetSatisfaction(PopulationGroup group, ProposalBackingSource source)
+    private static int ResolveTargetSatisfaction(Polity polity, PolityContext context, ProposalBackingSource source)
     {
-        var activeLaws = group.EnactedLaws.Where(law => law.IsActive).ToArray();
+        var activeLaws = polity.EnactedLaws.Where(law => law.IsActive).ToArray();
         var baseline = 50 + (CountAlignment(activeLaws, source) * 2);
 
         baseline += source switch
         {
-            ProposalBackingSource.Priests => ResolvePriestSatisfaction(group, activeLaws),
-            ProposalBackingSource.Warriors => ResolveWarriorSatisfaction(group, activeLaws),
-            ProposalBackingSource.Merchants => ResolveMerchantSatisfaction(group, activeLaws),
-            ProposalBackingSource.Elders => ResolveElderSatisfaction(group, activeLaws),
-            ProposalBackingSource.CommonFolk => ResolveCommonSatisfaction(group, activeLaws),
-            ProposalBackingSource.FrontierSettlers => ResolveFrontierSatisfaction(group, activeLaws),
+            ProposalBackingSource.Priests => ResolvePriestSatisfaction(polity, context, activeLaws),
+            ProposalBackingSource.Warriors => ResolveWarriorSatisfaction(context, activeLaws),
+            ProposalBackingSource.Merchants => ResolveMerchantSatisfaction(context, activeLaws),
+            ProposalBackingSource.Elders => ResolveElderSatisfaction(context, activeLaws),
+            ProposalBackingSource.CommonFolk => ResolveCommonSatisfaction(context, activeLaws),
+            ProposalBackingSource.FrontierSettlers => ResolveFrontierSatisfaction(context, activeLaws),
             _ => 0
         };
 
         return Math.Clamp(baseline, 5, 95);
     }
 
-    private static int ResolvePriestSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolvePriestSatisfaction(Polity polity, PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
-        var score = group.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0;
+        var score = polity.GovernmentForm == GovernmentForm.Theocracy ? 8 : 0;
         score += CountByCategory(activeLaws, LawProposalCategory.Faith) * 6;
         score += CountByCategory(activeLaws, LawProposalCategory.Symbolic) * 4;
         score -= activeLaws.Count(law => law.DefinitionId == "permit-foreign-worship") * 10;
-        score += group.Pressures.ThreatPressure / 20;
+        score += context.Pressures.ThreatPressure / 20;
         return score;
     }
 
-    private static int ResolveWarriorSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolveWarriorSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
-        var score = group.Pressures.ThreatPressure / 8;
+        var score = context.Pressures.ThreatPressure / 8;
         score += CountByCategory(activeLaws, LawProposalCategory.Military) * 6;
         score += CountByCategory(activeLaws, LawProposalCategory.Order) * 3;
         score += CountByCategory(activeLaws, LawProposalCategory.Punishment) * 2;
@@ -120,41 +124,41 @@ public sealed class PoliticalBlocSystem
         return score;
     }
 
-    private static int ResolveMerchantSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolveMerchantSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Trade) * 6;
         score += CountByCategory(activeLaws, LawProposalCategory.Movement) * 4;
-        score += Math.Max(0, 50 - group.Pressures.ThreatPressure) / 10;
+        score += Math.Max(0, 50 - context.Pressures.ThreatPressure) / 10;
         score -= activeLaws.Count(law => law.DefinitionId is "close-city-gates" or "initiate-curfew") * 10;
-        score -= group.Pressures.MigrationPressure / 16;
+        score -= context.Pressures.MigrationPressure / 16;
         return score;
     }
 
-    private static int ResolveElderSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolveElderSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Custom) * 6;
         score += CountByCategory(activeLaws, LawProposalCategory.Order) * 3;
         score -= CountDisruptiveReforms(activeLaws) * 6;
-        score -= group.Pressures.MigrationPressure / 14;
+        score -= context.Pressures.MigrationPressure / 14;
         return score;
     }
 
-    private static int ResolveCommonSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolveCommonSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Food) * 5;
         score += activeLaws.Count(law => law.DefinitionId is "open-grain-stores" or "grant-market-rights" or "expand-civic-assembly") * 8;
         score -= activeLaws.Count(law => law.DefinitionId is "raise-war-levy" or "establish-public-executions" or "authorize-secret-arrests" or "impose-emergency-rule") * 8;
-        score -= group.Pressures.FoodPressure / 6;
-        score -= group.Pressures.OvercrowdingPressure / 12;
+        score -= context.Pressures.FoodPressure / 6;
+        score -= context.Pressures.OvercrowdingPressure / 12;
         return score;
     }
 
-    private static int ResolveFrontierSatisfaction(PopulationGroup group, IReadOnlyList<EnactedLaw> activeLaws)
+    private static int ResolveFrontierSatisfaction(PolityContext context, IReadOnlyList<EnactedLaw> activeLaws)
     {
         var score = CountByCategory(activeLaws, LawProposalCategory.Movement) * 5;
         score += CountByCategory(activeLaws, LawProposalCategory.Military) * 4;
-        score += group.Pressures.ThreatPressure / 12;
-        score += group.Pressures.MigrationPressure / 12;
+        score += context.Pressures.ThreatPressure / 12;
+        score += context.Pressures.MigrationPressure / 12;
         score -= activeLaws.Count(law => law.DefinitionId is "close-city-gates" or "ban-hunting") * 7;
         return score;
     }
@@ -177,40 +181,5 @@ public sealed class PoliticalBlocSystem
     private static int DriftToward(int current, int target)
     {
         return Math.Clamp((current * 2 + target) / 3, 0, 100);
-    }
-
-    private static PopulationGroup CloneGroup(PopulationGroup group)
-    {
-        return new PopulationGroup
-        {
-            Id = group.Id,
-            Name = group.Name,
-            SpeciesId = group.SpeciesId,
-            CurrentRegionId = group.CurrentRegionId,
-            OriginRegionId = group.OriginRegionId,
-            Population = group.Population,
-            StoredFood = group.StoredFood,
-            SubsistenceMode = group.SubsistenceMode,
-            GovernmentForm = group.GovernmentForm,
-            Pressures = new PressureState
-            {
-                FoodPressure = group.Pressures.FoodPressure,
-                WaterPressure = group.Pressures.WaterPressure,
-                ThreatPressure = group.Pressures.ThreatPressure,
-                OvercrowdingPressure = group.Pressures.OvercrowdingPressure,
-                MigrationPressure = group.Pressures.MigrationPressure
-            },
-            LastRegionId = group.LastRegionId,
-            MonthsSinceLastMove = group.MonthsSinceLastMove,
-            KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
-            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
-            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
-            LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
-            AdvancementEvidence = group.AdvancementEvidence.Clone(),
-            ActiveLawProposal = group.ActiveLawProposal?.Clone(),
-            LawProposalHistory = group.LawProposalHistory.Select(proposal => proposal.Clone()).ToList(),
-            EnactedLaws = group.EnactedLaws.Select(law => law.Clone()).ToList(),
-            PoliticalBlocs = group.PoliticalBlocs.Select(bloc => bloc.Clone()).ToList()
-        };
     }
 }

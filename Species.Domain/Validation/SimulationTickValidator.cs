@@ -1,5 +1,6 @@
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Domain.Enums;
 
 namespace Species.Domain.Validation;
 
@@ -64,6 +65,17 @@ public static class SimulationTickValidator
             {
                 errors.Add($"MigrationPressure for {change.GroupId} is inconsistent with component pressures.");
             }
+        }
+
+        if (tickResult.LawProposalChanges.Any(change => change.Status is not (LawProposalStatus.Passed or LawProposalStatus.Vetoed)))
+        {
+            errors.Add("Simulation tick reported a law proposal change that was not passed or vetoed.");
+        }
+
+        var recordedLawEntries = tickResult.RecordedChronicleEntries.Count(entry => entry.Category == ChronicleEventCategory.Law);
+        if (recordedLawEntries != tickResult.LawProposalChanges.Count)
+        {
+            errors.Add("Recorded Chronicle law entries do not match resolved law proposal changes for the tick.");
         }
 
         return errors;

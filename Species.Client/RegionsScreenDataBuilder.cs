@@ -7,13 +7,13 @@ public static class RegionsScreenDataBuilder
 {
     public static RegionsScreenData Build(
         World world,
-        string focalGroupId,
+        string focalPolityId,
         int selectedRegionIndex,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
+        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var regionCandidates = GetKnownRegions(world, focusGroup);
         var selectedIndex = regionCandidates.Count == 0
             ? 0

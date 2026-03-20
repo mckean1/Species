@@ -2,11 +2,11 @@ using Species.Domain.Models;
 
 public static class LawsScreenDataBuilder
 {
-    public static LawsScreenData Build(World world, string focalGroupId, int selectedIndex)
+    public static LawsScreenData Build(World world, string focalPolityId, int selectedIndex)
     {
-        var focusGroup = PlayerFocus.Resolve(world, focalGroupId);
-        var polityName = focusGroup?.Name ?? "Unknown polity";
-        var items = BuildItems(focusGroup);
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var polityName = focusPolity?.Name ?? "Unknown polity";
+        var items = BuildItems(focusPolity);
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
         var selected = items.Count == 0 ? null : items[clampedIndex];
 
@@ -16,8 +16,8 @@ public static class LawsScreenDataBuilder
             items,
             selected,
             clampedIndex,
-            focusGroup is not null && focusGroup.ActiveLawProposal is not null,
-            BuildEnactedLaws(focusGroup),
+            focusPolity is not null && focusPolity.ActiveLawProposal is not null,
+            BuildEnactedLaws(focusPolity),
             [
                 "Only one active proposal can exist at a time.",
                 "Proposal backing reflects current internal political blocs.",
@@ -29,20 +29,20 @@ public static class LawsScreenDataBuilder
                 : ["Recent law outcomes remain listed after they resolve."]);
     }
 
-    private static IReadOnlyList<LawScreenItem> BuildItems(PopulationGroup? focusGroup)
+    private static IReadOnlyList<LawScreenItem> BuildItems(Polity? focusPolity)
     {
-        if (focusGroup is null)
+        if (focusPolity is null)
         {
             return Array.Empty<LawScreenItem>();
         }
 
         var items = new List<LawScreenItem>();
-        if (focusGroup.ActiveLawProposal is not null)
+        if (focusPolity.ActiveLawProposal is not null)
         {
-            items.Add(ToItem(focusGroup.ActiveLawProposal));
+            items.Add(ToItem(focusPolity.ActiveLawProposal));
         }
 
-        items.AddRange(focusGroup.LawProposalHistory
+        items.AddRange(focusPolity.LawProposalHistory
             .TakeLast(4)
             .Reverse<LawProposal>()
             .Select(ToItem));
@@ -67,14 +67,14 @@ public static class LawsScreenDataBuilder
             proposal.ImpactScale);
     }
 
-    private static IReadOnlyList<EnactedLawScreenItem> BuildEnactedLaws(PopulationGroup? focusGroup)
+    private static IReadOnlyList<EnactedLawScreenItem> BuildEnactedLaws(Polity? focusPolity)
     {
-        if (focusGroup is null)
+        if (focusPolity is null)
         {
             return Array.Empty<EnactedLawScreenItem>();
         }
 
-        return focusGroup.EnactedLaws
+        return focusPolity.EnactedLaws
             .Where(law => law.IsActive)
             .OrderByDescending(law => law.EnactedOnYear)
             .ThenByDescending(law => law.EnactedOnMonth)

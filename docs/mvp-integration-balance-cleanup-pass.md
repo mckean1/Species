@@ -26,8 +26,10 @@ The MVP now preserves this monthly order:
 7. Migration decision and movement
 8. Discovery evaluation
 9. Advancement evaluation
-10. Chronicle update and feed progression
-11. End-of-tick finalization
+10. Political bloc monthly update
+11. Law proposal update
+12. Chronicle update and feed progression
+13. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -37,6 +39,8 @@ The MVP player-facing structure is now:
 
 - Chronicle as the main/default screen
 - Region Viewer and supporting knowledge/polity screens for current state
+- player-facing polity presentation backed by explicit `Polity` state
+- Laws, Advancements, Known Polities, and Known Species screens in the current console client
 - `TAB` cycles between screens and wraps
 - `SPACE` toggles run/pause
 - simulation advances automatically while running
@@ -45,6 +49,7 @@ The MVP player-facing structure is now:
 Chronicle remains the main player-facing history view.
 Region Viewer remains a player-facing state view, not a debug console.
 Player-facing screens respect focal-polity knowledge limits instead of exposing global truth.
+The player now controls a real `Polity` actor, while `PopulationGroup` remains the constituent demographic/ecological layer underneath it.
 
 ## Discoveries Versus Advancements
 
@@ -114,7 +119,10 @@ The cleanup pass also replaces stable-ID first-come food contention with explici
 Still intentionally deferred after this pass:
 
 - mutation / inheritance / evolution
-- settlements and polity systems
+- settlements and territorial control
+- trade / economy
+- diplomacy and warfare overhauls
+- kingdom / empire scaling
 - new large UI frameworks
 - new screen families beyond Chronicle and Region Viewer
 - broad feature expansion beyond cleanup/integration

@@ -18,7 +18,7 @@ public sealed class ChronicleSystem
         var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, revealedChronicle),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, revealedChronicle, world.Polities, world.FocalPolityId),
             recordedEntries,
             revealedEntries);
     }
@@ -151,7 +151,7 @@ public sealed class ChronicleSystem
             message,
             "law");
         var chronicle = RecordEntries(world.Chronicle, [entry], world.CurrentYear, world.CurrentMonth);
-        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, chronicle);
+        return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, chronicle, world.Polities, world.FocalPolityId);
     }
 
     private static void AddEntry(ICollection<ChronicleEntry> entries, ISet<string> seenKeys, ChronicleEntry entry)

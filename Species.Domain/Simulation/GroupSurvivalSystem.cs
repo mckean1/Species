@@ -110,7 +110,7 @@ public sealed class GroupSurvivalSystem
             .ToArray();
 
         return new GroupSurvivalResult(
-            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle),
+            new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle, world.Polities, world.FocalPolityId),
             changes);
     }
 
@@ -372,12 +372,12 @@ public sealed class GroupSurvivalSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
             SubsistenceMode = group.SubsistenceMode,
-            GovernmentForm = group.GovernmentForm,
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
             Pressures = new PressureState
@@ -392,11 +392,7 @@ public sealed class GroupSurvivalSystem
             KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
             DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
             LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
-            AdvancementEvidence = group.AdvancementEvidence.Clone(),
-            ActiveLawProposal = group.ActiveLawProposal?.Clone(),
-            LawProposalHistory = group.LawProposalHistory.Select(proposal => proposal.Clone()).ToList(),
-            EnactedLaws = group.EnactedLaws.Select(law => law.Clone()).ToList(),
-            PoliticalBlocs = group.PoliticalBlocs.Select(bloc => bloc.Clone()).ToList()
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
     }
 
