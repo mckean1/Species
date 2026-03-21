@@ -73,6 +73,7 @@ public static class PolityScreenRenderer
         lines.Add($"Food State: {data.FoodState}");
         lines.Add($"Living Conditions: {data.LivingConditions}");
         lines.Add($"Materials: {data.MaterialStores}");
+        lines.Add($"Support: {data.SupportSummary}");
         lines.Add($"Runtime: {runningText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
 

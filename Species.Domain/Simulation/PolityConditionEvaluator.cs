@@ -345,13 +345,7 @@ public sealed class PolityConditionEvaluator
         var band = isGovernanceCollapse
             ? GovernanceConditionBand.Collapsing
             : ResolveGovernanceBand(aggregate, context.Governance.Governability);
-        var summary = band switch
-        {
-            GovernanceConditionBand.Functional => "Governance remains functionally intact.",
-            GovernanceConditionBand.Strained => "Governance is under growing strain.",
-            GovernanceConditionBand.Failing => "Governance is failing as living conditions worsen.",
-            _ => "Governance is collapsing as living conditions and political integrity break down."
-        };
+        var summary = DescribeGovernanceSummary(context, material, integrity, governance, band);
 
         return new GovernanceConditionAssessment(
             governance,
@@ -528,7 +522,7 @@ public sealed class PolityConditionEvaluator
 
         if (governance.Band >= GovernanceConditionBand.Failing)
         {
-            issues.Add((72, "Governance is failing under current conditions."));
+            issues.Add((72, governance.Summary));
         }
 
         if (material.MaterialFragilityCondition >= PolityConditionSeverity.Critical)
@@ -631,7 +625,7 @@ public sealed class PolityConditionEvaluator
 
         if (governance.Band >= GovernanceConditionBand.Failing)
         {
-            problems.Add("Governance is no longer operating effectively.");
+            problems.Add(DescribeGovernanceProblem(governance, context, material, integrity));
         }
 
         if (material.MaterialFragilityCondition >= PolityConditionSeverity.Strained)
@@ -814,6 +808,58 @@ public sealed class PolityConditionEvaluator
         return values.Max();
     }
 
+    private static string DescribeGovernanceSummary(
+        PolityContext context,
+        MaterialSurvivalAssessment material,
+        PolityIntegrityAssessment integrity,
+        GovernanceState governance,
+        GovernanceConditionBand band)
+    {
+        if (band == GovernanceConditionBand.Functional)
+        {
+            return "Governance remains functionally intact.";
+        }
+
+        if (band == GovernanceConditionBand.Strained)
+        {
+            return context.ScaleState.FragmentationRisk >= 60 || context.Governance.PeripheralStrain >= 65
+                ? "Governance is under strain as fragmentation pressure builds."
+                : "Governance is under growing strain.";
+        }
+
+        if (context.ScaleState.FragmentationRisk >= 68 || context.Governance.PeripheralStrain >= 72)
+        {
+            return band == GovernanceConditionBand.Collapsing
+                ? "Governance is collapsing as fragmentation overwhelms cohesion and authority."
+                : "Governance is faltering because fragmentation is undermining cohesion and authority.";
+        }
+
+        if (integrity.Band >= PolityIntegrityBand.Unstable)
+        {
+            return band == GovernanceConditionBand.Collapsing
+                ? "Governance is collapsing as integrity fails and rule no longer holds together."
+                : "Governance is failing as living conditions worsen and political integrity breaks down.";
+        }
+
+        if (material.MaterialFragilityCondition >= PolityConditionSeverity.Critical || context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold)
+        {
+            return band == GovernanceConditionBand.Collapsing
+                ? "Governance is collapsing as practical support fails across the polity."
+                : "Governance is weakening as practical support falls behind the polity's needs.";
+        }
+
+        if (governance.Cohesion < 35 || governance.Authority < 35)
+        {
+            return band == GovernanceConditionBand.Collapsing
+                ? "Governance is collapsing as cohesion and authority break down."
+                : "Governance is faltering as cohesion and authority weaken.";
+        }
+
+        return band == GovernanceConditionBand.Collapsing
+            ? "Governance is collapsing under combined political strain."
+            : "Governance is failing under mounting political strain.";
+    }
+
     private static PolityConditionSeverity ClassifyFoodCondition(PolityContext context, out string reason)
     {
         var accounting = context.FoodAccounting;
@@ -932,10 +978,36 @@ public sealed class PolityConditionEvaluator
     {
         if (context is not null && context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold)
         {
-            return "Persistent material shortages are worsening living conditions.";
+            return "Weak practical support has been worsening living conditions.";
         }
 
         return $"Living conditions are {DescribeLivingConditions(material.MaterialFragilityCondition)}.";
+    }
+
+    private static string DescribeGovernanceProblem(
+        GovernanceConditionAssessment governance,
+        PolityContext context,
+        MaterialSurvivalAssessment material,
+        PolityIntegrityAssessment integrity)
+    {
+        if (context.ScaleState.FragmentationRisk >= 68 || context.Governance.PeripheralStrain >= 72)
+        {
+            return "Fragmentation is undermining governance.";
+        }
+
+        if (integrity.Band >= PolityIntegrityBand.Unstable)
+        {
+            return "Political integrity is breaking down.";
+        }
+
+        if (material.MaterialFragilityCondition >= PolityConditionSeverity.Critical)
+        {
+            return "Weak practical support is dragging governance down.";
+        }
+
+        return governance.Band == GovernanceConditionBand.Collapsing
+            ? "Governance is no longer holding together."
+            : "Governance is no longer operating effectively.";
     }
 
     private static string DescribeLivingConditions(PolityConditionSeverity severity)

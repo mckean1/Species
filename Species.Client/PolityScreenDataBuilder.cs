@@ -30,6 +30,7 @@ public static class PolityScreenDataBuilder
                 "Unknown",
                 "Unknown",
                 "Unknown",
+                "Unknown",
                 "None",
                 "None",
                 Array.Empty<PolityPressureItem>(),
@@ -75,6 +76,7 @@ public static class PolityScreenDataBuilder
             DescribeFoodState(context.FoodAccounting, snapshot.MaterialSurvival),
             DescribeLivingConditions(snapshot.MaterialSurvival),
             BuildMaterialSummary(context),
+            BuildSupportSummary(context.MaterialProduction),
             pressures,
             snapshot.CurrentIssues,
             snapshot.Strengths,
@@ -208,7 +210,7 @@ public static class PolityScreenDataBuilder
 
         if (context.MaterialProduction.SurplusScore >= 25)
         {
-            strengths.Add("Local materials are reinforcing stability");
+            strengths.Add("Practical support is reinforcing stability");
         }
 
         return strengths.Count > 0
@@ -240,7 +242,7 @@ public static class PolityScreenDataBuilder
 
         if (context.MaterialProduction.DeficitScore >= 60 && problems.Count < 3)
         {
-            problems.Add("Material shortages are weakening local durability");
+            problems.Add("Weak practical support is eroding local durability");
         }
 
         return problems.Count > 0
@@ -364,23 +366,26 @@ public static class PolityScreenDataBuilder
         return $"Timber {stores.Timber} | Stone {stores.Stone} | Fiber {stores.Fiber} | Clay {stores.Clay} | Hides {stores.Hides}";
     }
 
+    private static string BuildSupportSummary(MaterialProductionState production)
+    {
+        return $"Shelter {production.ShelterSupport} | Storage {production.StorageSupport} | Tools {production.ToolSupport} | Textile {production.TextileSupport}";
+    }
+
     private static IReadOnlyList<string> BuildMaterialNotes(PolityContext context)
     {
         var notes = new List<string>
         {
-            $"Condition: {context.MaterialProduction.ConditionSummary}",
-            $"Support [Shelter {context.MaterialProduction.ShelterSupport} | Storage {context.MaterialProduction.StorageSupport} | Tools {context.MaterialProduction.ToolSupport} | Goods {context.MaterialProduction.TextileSupport}]",
-            $"Deficit score: {context.MaterialProduction.DeficitScore} | Surplus score: {context.MaterialProduction.SurplusScore}"
+            $"Condition: {context.MaterialProduction.ConditionSummary}"
         };
 
         if (context.MaterialSurplusMonths > 0)
         {
-            notes.Add($"Material surplus sustained for {context.MaterialSurplusMonths} month(s)");
+            notes.Add($"Strong practical support has held for {context.MaterialSurplusMonths} month(s)");
         }
 
         if (context.MaterialShortageMonths > 0)
         {
-            notes.Add($"Material shortages sustained for {context.MaterialShortageMonths} month(s)");
+            notes.Add($"Weak practical support has persisted for {context.MaterialShortageMonths} month(s)");
         }
 
         return notes;
@@ -506,6 +511,7 @@ public sealed record PolityScreenData(
     string FoodState,
     string LivingConditions,
     string MaterialStores,
+    string SupportSummary,
     IReadOnlyList<PolityPressureItem> Pressures,
     IReadOnlyList<string> Alerts,
     IReadOnlyList<string> Strengths,

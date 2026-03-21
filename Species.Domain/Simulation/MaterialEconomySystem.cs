@@ -84,10 +84,9 @@ public sealed class MaterialEconomySystem
             updatedPolity.MaterialProduction = BuildProductionState(updatedPolity, memberGroups, activeLawIds);
             ApplyStoreDecay(updatedPolity.MaterialStores, updatedPolity.MaterialProduction);
 
-            var hasSurplus = updatedPolity.MaterialProduction.SurplusScore >= 20;
-            var hasDeficit = updatedPolity.MaterialProduction.DeficitScore >= 25;
-            updatedPolity.MaterialSurplusMonths = hasSurplus ? updatedPolity.MaterialSurplusMonths + 1 : 0;
-            updatedPolity.MaterialShortageMonths = hasDeficit ? updatedPolity.MaterialShortageMonths + 1 : 0;
+            var hasDeficit = HasPolityWideSupportShortage(updatedPolity.MaterialProduction, activeSettlements);
+            var hasSurplus = !hasDeficit && HasPolityWideSupportSurplus(updatedPolity.MaterialProduction, activeSettlements);
+            ApplyPolitySupportHistory(updatedPolity, hasDeficit, hasSurplus);
 
             if (polityExtraction.Total >= 8 && activeSettlements.Length > 0)
             {
@@ -129,7 +128,7 @@ public sealed class MaterialEconomySystem
                     site,
                     site is null ? null : regionsById.GetValueOrDefault(site.RegionId),
                     MaterialEconomyChangeKind.Shortage,
-                    $"{(site?.Name ?? updatedPolity.Name)} weakened under material shortages.",
+                    $"{(site?.Name ?? updatedPolity.Name)} weakened as practical support fell behind local needs.",
                     polityExtraction,
                     updatedPolity.MaterialProduction));
             }
@@ -158,7 +157,7 @@ public sealed class MaterialEconomySystem
                     site,
                     regionsById.GetValueOrDefault(site.RegionId),
                     MaterialEconomyChangeKind.Contraction,
-                    $"Persistent shortages forced contraction at {site.Name}.",
+                    $"Persistent support weakness forced contraction at {site.Name}.",
                     polityExtraction,
                     updatedPolity.MaterialProduction));
             }
@@ -431,11 +430,94 @@ public sealed class MaterialEconomySystem
             SurplusScore = surplusScore,
             DeficitScore = deficitScore,
             ConditionSummary = deficitScore >= 65
-                ? "Material shortages are straining living conditions."
+                ? "Practical support is falling behind the polity's needs."
                 : surplusScore >= 45
-                    ? "Local materials are helping keep living conditions stable."
-                    : "Living conditions are mixed but workable."
+                    ? "Practical support is helping hold living conditions steady."
+                    : "Practical support is mixed but still workable."
         };
+    }
+
+    private static bool HasPolityWideSupportShortage(MaterialProductionState production, IReadOnlyList<Settlement> activeSettlements)
+    {
+        var averageSupport = GetAverageSupport(production);
+        var weakSupportCategories = CountSupportsAtOrBelow(production, 40);
+        var severeSupportCategories = CountSupportsAtOrBelow(production, 30);
+        var weakSettlements = activeSettlements.Count(settlement => settlement.MaterialSupport <= 35);
+        var majorityWeakSettlements = activeSettlements.Count > 0 && weakSettlements >= Math.Max(1, (activeSettlements.Count + 1) / 2);
+
+        return production.DeficitScore >= 55 &&
+               (severeSupportCategories >= 1 ||
+                weakSupportCategories >= 2 ||
+                averageSupport <= 45 ||
+                majorityWeakSettlements);
+    }
+
+    private static bool HasPolityWideSupportSurplus(MaterialProductionState production, IReadOnlyList<Settlement> activeSettlements)
+    {
+        var averageSupport = GetAverageSupport(production);
+        var strongSupportCategories = CountSupportsAtOrAbove(production, 55);
+        var weakSupportCategories = CountSupportsAtOrBelow(production, 35);
+        var strongSettlements = activeSettlements.Count(settlement => settlement.MaterialSupport >= 60);
+        var majorityStrongSettlements = activeSettlements.Count == 0 || strongSettlements >= Math.Max(1, (activeSettlements.Count + 1) / 2);
+
+        return production.SurplusScore >= 30 &&
+               averageSupport >= 58 &&
+               strongSupportCategories >= 3 &&
+               weakSupportCategories == 0 &&
+               majorityStrongSettlements;
+    }
+
+    private static void ApplyPolitySupportHistory(Polity polity, bool hasDeficit, bool hasSurplus)
+    {
+        if (hasDeficit)
+        {
+            polity.MaterialShortageMonths++;
+            polity.MaterialSurplusMonths = 0;
+            return;
+        }
+
+        if (hasSurplus)
+        {
+            polity.MaterialSurplusMonths++;
+            polity.MaterialShortageMonths = 0;
+            return;
+        }
+
+        polity.MaterialShortageMonths = Math.Max(0, polity.MaterialShortageMonths - 1);
+        polity.MaterialSurplusMonths = Math.Max(0, polity.MaterialSurplusMonths - 1);
+    }
+
+    private static int GetAverageSupport(MaterialProductionState production)
+    {
+        return (int)Math.Round(
+            (production.ShelterSupport +
+             production.StorageSupport +
+             production.ToolSupport +
+             production.TextileSupport) / 4.0,
+            MidpointRounding.AwayFromZero);
+    }
+
+    private static int CountSupportsAtOrBelow(MaterialProductionState production, int threshold)
+    {
+        return CountSupports(production, value => value <= threshold);
+    }
+
+    private static int CountSupportsAtOrAbove(MaterialProductionState production, int threshold)
+    {
+        return CountSupports(production, value => value >= threshold);
+    }
+
+    private static int CountSupports(MaterialProductionState production, Func<int, bool> predicate)
+    {
+        var supports = new[]
+        {
+            production.ShelterSupport,
+            production.StorageSupport,
+            production.ToolSupport,
+            production.TextileSupport
+        };
+
+        return supports.Count(predicate);
     }
 
     private static void ApplyStoreDecay(MaterialStockpile stores, MaterialProductionState production)

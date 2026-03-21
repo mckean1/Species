@@ -106,7 +106,7 @@ public static class ChronicleScreenDataBuilder
         {
             items.Add(new ChronicleUrgentItem(
                 "governance-crisis",
-                "Governance is faltering under low legitimacy and cohesion.",
+                "Governance is faltering as legitimacy and cohesion weaken.",
                 $"Legitimacy {context.Governance.Legitimacy}, cohesion {context.Governance.Cohesion}, authority {context.Governance.Authority}.",
                 "Weak governability makes laws, enforcement, and coordinated recovery less reliable.",
                 PlayerScreen.Laws,
@@ -273,7 +273,7 @@ public static class ChronicleScreenDataBuilder
 
         if (context.MaterialSurplusMonths >= 3 && context.Pressures.Food.DisplayValue < ChronicleConstants.StablePressureDisplayThreshold)
         {
-            return "Material and food conditions are supporting stability.";
+            return "Support conditions and food are supporting stability.";
         }
 
         if (context.Pressures.Migration.DisplayValue >= ChronicleConstants.PressureConcernDisplayThreshold)

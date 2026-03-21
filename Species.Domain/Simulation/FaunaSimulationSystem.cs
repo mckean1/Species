@@ -155,6 +155,11 @@ public sealed class FaunaSimulationSystem
     {
         if (state.FaunaProfiles.TryGetValue(species.Id, out var existing))
         {
+            if (state.FaunaPopulations.GetValueOrDefault(species.Id) > 0)
+            {
+                existing.IsExtinct = false;
+            }
+
             return existing;
         }
 
@@ -929,6 +934,7 @@ public sealed class FaunaSimulationSystem
                 RegionId = targetState.Region.Id,
                 Traits = sourceProfile.Traits.Clone(),
                 ViabilityScore = sourceProfile.ViabilityScore,
+                IsExtinct = false,
                 LastPopulation = plan.MigratedPopulation,
                 HungerPressure = Math.Max(0.0f, sourceProfile.HungerPressure * 0.70f),
                 ShortageMonths = Math.Max(0, sourceProfile.ShortageMonths - 1),
@@ -938,6 +944,7 @@ public sealed class FaunaSimulationSystem
         }
         else
         {
+            targetProfile.IsExtinct = false;
             targetProfile.LastPopulation = targetState.FaunaPopulations[species.Id];
             targetProfile.HungerPressure = Math.Max(targetProfile.HungerPressure, sourceProfile.HungerPressure * 0.60f);
             targetProfile.ShortageMonths = Math.Max(targetProfile.ShortageMonths, sourceProfile.ShortageMonths - 1);
