@@ -683,7 +683,7 @@ public sealed class GroupSurvivalSystem
             KnownGatheringSupport = ResolveKnownGatheringSupport(region, floraPopulations, floraCatalog);
             KnownHuntingSupport = ResolveKnownHuntingSupport(region, faunaPopulations, faunaCatalog);
 
-            var plan = ResolveExtractionPlan(Group, KnownGatheringSupport, KnownHuntingSupport);
+            var plan = NormalizeExtractionPlan(ResolveExtractionPlan(Group, KnownGatheringSupport, KnownHuntingSupport));
             PrimaryAction = plan.PrimaryAction;
             FallbackAction = plan.FallbackAction;
             PlanKind = plan.PlanKind;
@@ -780,6 +780,13 @@ public sealed class GroupSurvivalSystem
                     group.SubsistencePreference == SubsistencePreference.HunterLeaning ? "Gather" : "Hunt",
                     "KnownSourceLimited")
             };
+        }
+
+        private static ExtractionPlan NormalizeExtractionPlan(ExtractionPlan plan)
+        {
+            return plan.PrimaryAction == plan.FallbackAction && plan.PlanKind != "KnownSourceLimited"
+                ? plan with { PlanKind = "KnownSourceLimited" }
+                : plan;
         }
     }
 
