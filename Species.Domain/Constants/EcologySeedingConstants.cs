@@ -18,4 +18,5 @@ public static class EcologySeedingConstants
     public const float CarnivorePreySupportMultiplier = 0.75f;
     public const float WeakFloraSupportThreshold = 0.20f;
     public const float WeakPreySupportThreshold = 0.12f;
+    public const float FaunaSeedingSupportBuffer = 1.80f;
 }

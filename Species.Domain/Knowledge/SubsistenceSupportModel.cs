@@ -28,7 +28,7 @@ public static class SubsistenceSupportModel
                 continue;
             }
 
-            total += flora.Value * ResolveFoodPerUnit(ResolveFloraFoodPerPopulation(region, species), multiplier);
+            total += (float)((double)flora.Value * ResolveFoodPerUnit(ResolveFloraFoodPerPopulation(region, species), multiplier));
         }
 
         return total;
@@ -69,7 +69,7 @@ public static class SubsistenceSupportModel
                 continue;
             }
 
-            total += fauna.Value * ResolveFoodPerUnit(species.FoodYield, multiplier);
+            total += (float)((double)fauna.Value * ResolveFoodPerUnit(species.FoodYield, multiplier));
         }
 
         return total;
@@ -105,9 +105,9 @@ public static class SubsistenceSupportModel
     {
         return waterAvailability switch
         {
-            WaterAvailability.Low => 25,
-            WaterAvailability.Medium => 60,
-            WaterAvailability.High => 100,
+            WaterAvailability.Low => 42,
+            WaterAvailability.Medium => 74,
+            WaterAvailability.High => 96,
             _ => 50
         };
     }

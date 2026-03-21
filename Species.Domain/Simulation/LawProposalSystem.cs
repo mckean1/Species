@@ -760,6 +760,7 @@ public sealed class LawProposalSystem
             OriginRegionId = context.OriginRegionId,
             Population = context.TotalPopulation,
             StoredFood = context.TotalStoredFood,
+            FoodAccounting = context.FoodAccounting.Clone(),
             HungerPressure = context.LeadGroup?.HungerPressure ?? 0.0f,
             ShortageMonths = context.LeadGroup?.ShortageMonths ?? 0,
             FoodStressState = context.LeadGroup?.FoodStressState ?? Species.Domain.Enums.FoodStressState.FedStable,

@@ -18,6 +18,10 @@ public sealed class GroupSurvivalSystem
         var updatedPolities = world.Polities
             .Select(polity => polity.Clone())
             .ToArray();
+        var startingReserveStoresByPolityId = updatedPolities.ToDictionary(
+            polity => polity.Id,
+            polity => polity.Settlements.Where(settlement => settlement.IsActive).Sum(settlement => settlement.StoredFood),
+            StringComparer.Ordinal);
         var settlementLookup = updatedPolities
             .SelectMany(polity => polity.Settlements
                 .Where(settlement => settlement.IsActive)
@@ -47,6 +51,10 @@ public sealed class GroupSurvivalSystem
             .GroupBy(group => group.CurrentRegionId, StringComparer.Ordinal)
             .ToDictionary(grouping => grouping.Key, grouping => grouping.ToArray(), StringComparer.Ordinal);
         var survivalStates = new Dictionary<string, GroupSurvivalState>(StringComparer.Ordinal);
+        var polityFoodStates = updatedPolities.ToDictionary(
+            polity => polity.Id,
+            polity => new PolityFoodAccountingState(polity.Id, startingReserveStoresByPolityId.GetValueOrDefault(polity.Id)),
+            StringComparer.Ordinal);
 
         foreach (var group in world.PopulationGroups)
         {
@@ -93,27 +101,43 @@ public sealed class GroupSurvivalSystem
             var totalFoodAcquired = state.PrimaryAcquisition.FoodGained + state.FallbackAcquisition.FoodGained;
             var storedFoodUsabilityMultiplier = ResolveStoredFoodUsabilityMultiplier(group);
             var usableStoredFoodAvailable = (int)MathF.Round(state.StoredFoodBefore * storedFoodUsabilityMultiplier, MidpointRounding.AwayFromZero);
+            var startingReserveFood = ResolveReserveStores(settlementLookup, group);
             var consumedFromActions = Math.Min(state.MonthlyFoodNeed, totalFoodAcquired);
+            var surplusFoodFromActions = Math.Max(0, totalFoodAcquired - consumedFromActions);
             var remainingNeedAfterActions = Math.Max(0, state.MonthlyFoodNeed - consumedFromActions);
             var consumedFromStoredFood = Math.Min(remainingNeedAfterActions, usableStoredFoodAvailable);
             var remainingNeedAfterStoredFood = Math.Max(0, remainingNeedAfterActions - consumedFromStoredFood);
-            var settlementFoodUsed = ConsumeSettlementReserve(settlementLookup, group, remainingNeedAfterStoredFood);
+            var settlementUsage = ConsumeSettlementReserve(settlementLookup, group, remainingNeedAfterStoredFood);
             // "Usable food" is the amount this actor can actually convert into survival this month,
             // after subsistence access, Knowledge gating, storage access, and local reserve access are resolved.
-            var usableFoodConsumed = consumedFromActions + consumedFromStoredFood + settlementFoodUsed;
+            var usableFoodConsumed = consumedFromActions + consumedFromStoredFood + settlementUsage.UsableFoodConsumed;
             var usableFoodRatio = state.MonthlyFoodNeed <= 0
                 ? 1.0f
                 : Math.Clamp(usableFoodConsumed / (float)state.MonthlyFoodNeed, 0.0f, 1.0f);
             var shortage = Math.Max(0, state.MonthlyFoodNeed - usableFoodConsumed);
             var rawStoredFoodConsumed = ResolveRawFoodConsumed(consumedFromStoredFood, storedFoodUsabilityMultiplier);
-            var storedFoodAfter = Math.Max(0, state.StoredFoodBefore - rawStoredFoodConsumed);
+            var foodConsumption = consumedFromActions + rawStoredFoodConsumed + settlementUsage.RawFoodConsumed;
+            var foodLosses = 0;
+            var netFoodChange = totalFoodAcquired - foodConsumption - foodLosses;
+            var storedFoodAfter = Math.Max(0, state.StoredFoodBefore - rawStoredFoodConsumed + surplusFoodFromActions);
+            var endingReserveFood = settlementUsage.EndingReserveStores;
+            var endingTotalFoodStores = storedFoodAfter + endingReserveFood;
             var hardshipPressure = Math.Max(group.Pressures.Food.EffectiveValue, group.Pressures.Water.EffectiveValue);
             var hardshipSeverity = ResolveHardshipSeverity(group);
             var hungerPressure = FoodStressModel.ResolveHungerPressure(group.HungerPressure, usableFoodRatio, GroupSurvivalConstants.HungerRiseRate, GroupSurvivalConstants.HungerDecayRate);
             var shortageMonths = FoodStressModel.ResolveShortageMonths(group.ShortageMonths, usableFoodRatio);
             var foodStressState = FoodStressModel.ResolveState(usableFoodRatio, hungerPressure, shortageMonths);
-            var starvationLoss = CalculateStarvationLoss(group.Population, usableFoodRatio, shortageMonths, hungerPressure, hardshipPressure, foodStressState);
-            var finalPopulation = Math.Max(0, group.Population - starvationLoss);
+            var populationChange = ResolvePopulationChange(
+                world,
+                group,
+                state.MonthlyFoodNeed,
+                endingTotalFoodStores,
+                usableFoodRatio,
+                hungerPressure,
+                shortageMonths,
+                hardshipPressure,
+                foodStressState);
+            var finalPopulation = populationChange.FinalPopulation;
 
             changes.Add(new GroupSurvivalChange
             {
@@ -126,8 +150,8 @@ public sealed class GroupSurvivalSystem
                 ExtractionPlan = state.PlanKind,
                 StartingPopulation = group.Population,
                 MonthlyFoodNeed = state.MonthlyFoodNeed,
-                KnownGatheringSupport = (int)MathF.Round((float)state.KnownGatheringSupport, MidpointRounding.AwayFromZero),
-                KnownHuntingSupport = (int)MathF.Round((float)state.KnownHuntingSupport, MidpointRounding.AwayFromZero),
+                KnownGatheringSupport = checked((long)Math.Round(state.KnownGatheringSupport, MidpointRounding.AwayFromZero)),
+                KnownHuntingSupport = checked((long)Math.Round(state.KnownHuntingSupport, MidpointRounding.AwayFromZero)),
                 PrimaryAction = state.PrimaryAction,
                 PrimaryFoodGained = state.PrimaryAcquisition.FoodGained,
                 PrimarySummary = state.PrimaryAcquisition.BuildSummary(),
@@ -137,9 +161,17 @@ public sealed class GroupSurvivalSystem
                 FallbackSummary = state.FallbackAcquisition.BuildSummary(),
                 FallbackConsumedSourceUnits = state.FallbackAcquisition.ConsumedSourceUnits,
                 TotalFoodAcquired = totalFoodAcquired,
+                StartingReserveFood = startingReserveFood,
+                StartingTotalFoodStores = state.StoredFoodBefore + startingReserveFood,
                 StoredFoodBefore = state.StoredFoodBefore,
                 StoredFoodAfter = storedFoodAfter,
-                SettlementFoodUsed = settlementFoodUsed,
+                SettlementFoodUsed = settlementUsage.UsableFoodConsumed,
+                SettlementFoodConsumedRaw = settlementUsage.RawFoodConsumed,
+                EndingReserveFood = endingReserveFood,
+                EndingTotalFoodStores = endingTotalFoodStores,
+                FoodConsumption = foodConsumption,
+                FoodLosses = foodLosses,
+                NetFoodChange = netFoodChange,
                 UsableFoodConsumed = usableFoodConsumed,
                 FoodPressureEffective = group.Pressures.Food.EffectiveValue,
                 WaterPressureEffective = group.Pressures.Water.EffectiveValue,
@@ -148,16 +180,57 @@ public sealed class GroupSurvivalSystem
                 ShortageMonths = shortageMonths,
                 FoodStressState = foodStressState.ToString(),
                 Shortage = shortage,
-                StarvationLoss = starvationLoss,
+                Births = populationChange.Births,
+                NaturalDeaths = populationChange.NaturalDeaths,
+                HardshipDeaths = populationChange.HardshipDeaths,
+                WaterStressDeaths = populationChange.WaterStressDeaths,
+                StarvationLoss = populationChange.StarvationLoss,
+                TotalDeaths = populationChange.TotalDeaths,
+                NetPopulationChange = populationChange.NetPopulationChange,
                 FinalPopulation = finalPopulation,
                 Outcome = ResolveOutcome(group.Population, finalPopulation),
-                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, usableFoodConsumed, state.StoredFoodBefore, settlementFoodUsed, shortage, starvationLoss, hardshipPressure, hardshipSeverity, foodStressState)
+                PopulationChangeSummary = populationChange.Summary,
+                SurvivalReason = ResolveSurvivalReason(state.MonthlyFoodNeed, totalFoodAcquired, usableFoodConsumed, state.StoredFoodBefore, settlementUsage.UsableFoodConsumed, shortage, populationChange.StarvationLoss, hardshipPressure, hardshipSeverity, foodStressState)
             });
+
+            if (polityFoodStates.TryGetValue(group.PolityId, out var polityFoodState))
+            {
+                polityFoodState.Accumulate(
+                    state.StoredFoodBefore,
+                    totalFoodAcquired,
+                    foodConsumption,
+                    foodLosses,
+                    storedFoodAfter,
+                    state.MonthlyFoodNeed,
+                    usableFoodConsumed,
+                    shortage,
+                    hungerPressure,
+                    shortageMonths,
+                    foodStressState,
+                    group.Population);
+            }
 
             if (finalPopulation > 0)
             {
                 var updatedGroup = CloneGroup(group);
                 updatedGroup.StoredFood = storedFoodAfter;
+                updatedGroup.FoodAccounting = new FoodAccountingSnapshot
+                {
+                    StartingCarriedStores = state.StoredFoodBefore,
+                    StartingReserveStores = startingReserveFood,
+                    FoodInflow = totalFoodAcquired,
+                    FoodConsumption = foodConsumption,
+                    FoodLosses = foodLosses,
+                    NetFoodChange = netFoodChange,
+                    EndingCarriedStores = storedFoodAfter,
+                    EndingReserveStores = endingReserveFood,
+                    MonthlyDemand = state.MonthlyFoodNeed,
+                    UsableFoodConsumed = usableFoodConsumed,
+                    UnresolvedDeficit = shortage,
+                    HungerPressure = MathF.Round(hungerPressure, 2),
+                    ShortageMonths = shortageMonths,
+                    FoodStressState = foodStressState
+                };
                 updatedGroup.Population = finalPopulation;
                 updatedGroup.HungerPressure = hungerPressure;
                 updatedGroup.ShortageMonths = shortageMonths;
@@ -169,6 +242,16 @@ public sealed class GroupSurvivalSystem
         var updatedRegions = world.Regions
             .Select(region => mutableRegions[region.Id].ToRegion())
             .ToArray();
+        foreach (var polity in updatedPolities)
+        {
+            if (!polityFoodStates.TryGetValue(polity.Id, out var polityFoodState))
+            {
+                continue;
+            }
+
+            var endingReserveStores = polity.Settlements.Where(settlement => settlement.IsActive).Sum(settlement => settlement.StoredFood);
+            polity.FoodAccounting = polityFoodState.ToSnapshot(endingReserveStores);
+        }
 
         return new GroupSurvivalResult(
             new World(world.Seed, world.CurrentYear, world.CurrentMonth, updatedRegions, updatedGroups, world.Chronicle, updatedPolities, world.FocalPolityId),
@@ -430,6 +513,216 @@ public sealed class GroupSurvivalSystem
             (int)MathF.Ceiling(startingPopulation * shortageRatio * starvationSeverity));
     }
 
+    // Monthly group demography stays aggregate and causal: healthy groups gain a few people,
+    // strained groups stall, and severe deprivation converts pressure into visible losses.
+    private static PopulationChangeBreakdown ResolvePopulationChange(
+        World world,
+        PopulationGroup group,
+        int monthlyFoodNeed,
+        int endingTotalFoodStores,
+        float usableFoodRatio,
+        float hungerPressure,
+        int shortageMonths,
+        int hardshipPressure,
+        FoodStressState foodStressState)
+    {
+        var startingPopulation = group.Population;
+        if (startingPopulation <= 0)
+        {
+            return new PopulationChangeBreakdown(0, 0, 0, 0, 0, 0, 0, 0, "Group has no remaining population.");
+        }
+
+        var foodPressure = group.Pressures.Food.EffectiveValue;
+        var waterPressure = group.Pressures.Water.EffectiveValue;
+        var threatPressure = group.Pressures.Threat.EffectiveValue;
+        var overcrowdingPressure = group.Pressures.Overcrowding.EffectiveValue;
+        var reserveCoverageMonths = monthlyFoodNeed <= 0
+            ? PressureCalculationConstants.StoredFoodMonthsSafe
+            : endingTotalFoodStores / (float)monthlyFoodNeed;
+        var reserveCoverageFactor = Math.Clamp(reserveCoverageMonths / PressureCalculationConstants.StoredFoodMonthsSafe, 0.0f, 1.0f);
+        var stabilityFactor = 1.0f - Math.Clamp(
+            ((foodPressure * 0.45f) + (waterPressure * 0.25f) + (threatPressure * 0.15f) + (overcrowdingPressure * 0.15f)) / 100.0f,
+            0.0f,
+            1.0f);
+        var birthSupport = Math.Clamp((usableFoodRatio * 0.55f) + (reserveCoverageFactor * 0.25f) + (stabilityFactor * 0.20f), 0.0f, 1.0f);
+        var birthRate = Interpolate(GroupSurvivalConstants.MinimumBirthRate, GroupSurvivalConstants.MaximumBirthRate, birthSupport) * ResolveBirthModifier(foodStressState);
+        var births = ResolveExpectedPopulationChange(world, group.Id, "births", startingPopulation * birthRate);
+
+        var strainFactor = Math.Clamp(
+            ((foodPressure * 0.35f) + (waterPressure * 0.30f) + (threatPressure * 0.20f) + (overcrowdingPressure * 0.15f)) / 100.0f,
+            0.0f,
+            1.0f);
+        var naturalDeathRate = Interpolate(GroupSurvivalConstants.MinimumNaturalDeathRate, GroupSurvivalConstants.MaximumNaturalDeathRate, strainFactor);
+        if (foodStressState == FoodStressState.FedStable && usableFoodRatio >= 0.95f && waterPressure < 45)
+        {
+            naturalDeathRate *= GroupSurvivalConstants.StableNaturalDeathReliefMultiplier;
+        }
+
+        var naturalDeaths = ResolveExpectedPopulationChange(world, group.Id, "natural-deaths", startingPopulation * naturalDeathRate);
+        var hardshipLossRate = ResolveHardshipLossRate(hardshipPressure, threatPressure, overcrowdingPressure, foodStressState, shortageMonths);
+        var hardshipDeaths = ResolveExpectedPopulationChange(world, group.Id, "hardship-deaths", startingPopulation * hardshipLossRate);
+        var waterLossRate = ResolveWaterLossRate(waterPressure, usableFoodRatio, shortageMonths);
+        var waterStressDeaths = ResolveExpectedPopulationChange(world, group.Id, "water-deaths", startingPopulation * waterLossRate);
+        var starvationLoss = CalculateStarvationLoss(startingPopulation, usableFoodRatio, shortageMonths, hungerPressure, hardshipPressure, foodStressState);
+
+        CapDeathsToPopulation(startingPopulation + births, ref naturalDeaths, ref hardshipDeaths, ref waterStressDeaths, ref starvationLoss);
+
+        var totalDeaths = naturalDeaths + hardshipDeaths + waterStressDeaths + starvationLoss;
+        var finalPopulation = Math.Max(0, startingPopulation + births - totalDeaths);
+        var netPopulationChange = finalPopulation - startingPopulation;
+
+        return new PopulationChangeBreakdown(
+            births,
+            naturalDeaths,
+            hardshipDeaths,
+            waterStressDeaths,
+            starvationLoss,
+            totalDeaths,
+            netPopulationChange,
+            finalPopulation,
+            BuildPopulationChangeSummary(startingPopulation, finalPopulation, births, naturalDeaths, hardshipDeaths, waterStressDeaths, starvationLoss, usableFoodRatio, reserveCoverageMonths, foodStressState, waterPressure));
+    }
+
+    private static void CapDeathsToPopulation(int maximumPopulationLoss, ref int naturalDeaths, ref int hardshipDeaths, ref int waterStressDeaths, ref int starvationLoss)
+    {
+        var overflow = (naturalDeaths + hardshipDeaths + waterStressDeaths + starvationLoss) - maximumPopulationLoss;
+        if (overflow <= 0)
+        {
+            return;
+        }
+
+        overflow = ReduceLoss(ref naturalDeaths, overflow);
+        overflow = ReduceLoss(ref hardshipDeaths, overflow);
+        overflow = ReduceLoss(ref waterStressDeaths, overflow);
+        _ = ReduceLoss(ref starvationLoss, overflow);
+    }
+
+    private static int ReduceLoss(ref int value, int overflow)
+    {
+        if (overflow <= 0 || value <= 0)
+        {
+            return overflow;
+        }
+
+        var reduction = Math.Min(value, overflow);
+        value -= reduction;
+        return overflow - reduction;
+    }
+
+    private static float ResolveHardshipLossRate(int hardshipPressure, int threatPressure, int overcrowdingPressure, FoodStressState foodStressState, int shortageMonths)
+    {
+        var hardshipFactor = Math.Max(0.0f, (hardshipPressure - GroupSurvivalConstants.HardshipLossPressureThreshold) / (100.0f - GroupSurvivalConstants.HardshipLossPressureThreshold));
+        var threatFactor = Math.Max(0.0f, (threatPressure - GroupSurvivalConstants.ThreatLossPressureThreshold) / (100.0f - GroupSurvivalConstants.ThreatLossPressureThreshold));
+        var overcrowdingFactor = Math.Max(0.0f, (overcrowdingPressure - GroupSurvivalConstants.OvercrowdingLossPressureThreshold) / (100.0f - GroupSurvivalConstants.OvercrowdingLossPressureThreshold));
+        var collapseFactor = Math.Max(hardshipFactor, Math.Max(threatFactor, overcrowdingFactor));
+        if (foodStressState == FoodStressState.SevereShortage)
+        {
+            collapseFactor = Math.Max(collapseFactor, Math.Min(0.75f, 0.20f + (shortageMonths * 0.08f)));
+        }
+
+        return collapseFactor * GroupSurvivalConstants.MaximumHardshipLossRate;
+    }
+
+    private static float ResolveWaterLossRate(int waterPressure, float usableFoodRatio, int shortageMonths)
+    {
+        if (waterPressure < GroupSurvivalConstants.SevereWaterLossPressureThreshold)
+        {
+            return 0.0f;
+        }
+
+        var waterFactor = Math.Clamp(
+            (waterPressure - GroupSurvivalConstants.SevereWaterLossPressureThreshold) / (100.0f - GroupSurvivalConstants.SevereWaterLossPressureThreshold),
+            0.0f,
+            1.0f);
+        var modifier = usableFoodRatio < 0.75f || shortageMonths >= 2 ? 1.25f : 1.0f;
+        return Math.Min(GroupSurvivalConstants.MaximumWaterLossRate * 1.5f, waterFactor * GroupSurvivalConstants.MaximumWaterLossRate * modifier);
+    }
+
+    private static float ResolveBirthModifier(FoodStressState foodStressState)
+    {
+        return foodStressState switch
+        {
+            FoodStressState.HungerPressure => 0.65f,
+            FoodStressState.SevereShortage => 0.25f,
+            FoodStressState.Starvation => 0.0f,
+            _ => 1.0f
+        };
+    }
+
+    private static int ResolveExpectedPopulationChange(World world, string groupId, string category, float expectedCount)
+    {
+        if (expectedCount <= 0.0f)
+        {
+            return 0;
+        }
+
+        var whole = (int)MathF.Floor(expectedCount);
+        var fractional = expectedCount - whole;
+        return whole + (ResolveMonthlyFraction(world, groupId, category) < fractional ? 1 : 0);
+    }
+
+    private static float ResolveMonthlyFraction(World world, string groupId, string category)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var value in $"{world.Seed}|{world.CurrentYear}|{world.CurrentMonth}|{groupId}|{category}")
+            {
+                hash ^= value;
+                hash *= 16777619;
+            }
+
+            return (hash & 0x00FFFFFFu) / 16777215.0f;
+        }
+    }
+
+    private static float Interpolate(float minimum, float maximum, float factor)
+    {
+        return minimum + ((maximum - minimum) * Math.Clamp(factor, 0.0f, 1.0f));
+    }
+
+    private static string BuildPopulationChangeSummary(
+        int startingPopulation,
+        int finalPopulation,
+        int births,
+        int naturalDeaths,
+        int hardshipDeaths,
+        int waterStressDeaths,
+        int starvationLoss,
+        float usableFoodRatio,
+        float reserveCoverageMonths,
+        FoodStressState foodStressState,
+        int waterPressure)
+    {
+        var netPopulationChange = finalPopulation - startingPopulation;
+        if (netPopulationChange > 0)
+        {
+            return $"Births exceeded deaths (+{netPopulationChange}) with food coverage at {usableFoodRatio:0%} and reserves ending near {reserveCoverageMonths:0.0} month(s).";
+        }
+
+        if (starvationLoss > 0)
+        {
+            return $"Population fell by {-netPopulationChange} after {starvationLoss} starvation losses and {hardshipDeaths + waterStressDeaths} other hardship deaths under {DescribeFoodStressState(foodStressState)}.";
+        }
+
+        if (waterStressDeaths > 0)
+        {
+            return $"Population fell by {-netPopulationChange} as severe water strain caused {waterStressDeaths} deaths while births stayed limited.";
+        }
+
+        if (hardshipDeaths > 0)
+        {
+            return $"Population fell by {-netPopulationChange} as hardship deaths ({hardshipDeaths}) pushed losses above births.";
+        }
+
+        if (netPopulationChange < 0)
+        {
+            return $"Population eased down by {-netPopulationChange} because births ({births}) stayed below routine deaths ({naturalDeaths}) under ongoing pressure and water strain {waterPressure}.";
+        }
+
+        return $"Population held steady as births ({births}) and deaths ({naturalDeaths + hardshipDeaths + waterStressDeaths + starvationLoss}) balanced out this month.";
+    }
+
     private static string ResolveOutcome(int startingPopulation, int finalPopulation)
     {
         if (finalPopulation <= 0 && startingPopulation > 0)
@@ -437,28 +730,44 @@ public sealed class GroupSurvivalSystem
             return "WentExtinct";
         }
 
+        if (finalPopulation > startingPopulation)
+        {
+            return "Grew";
+        }
+
         if (finalPopulation < startingPopulation)
         {
             return "Declined";
         }
 
-        return "Survived";
+        return "Stable";
     }
 
-    private static int ConsumeSettlementReserve(
+    private static int ResolveReserveStores(
+        IReadOnlyDictionary<string, Settlement> settlementLookup,
+        PopulationGroup group)
+    {
+        var key = BuildSettlementLookupKey(group.PolityId, group.CurrentRegionId);
+        return settlementLookup.TryGetValue(key, out var settlement) && settlement.IsActive
+            ? Math.Max(0, settlement.StoredFood)
+            : 0;
+    }
+
+    private static SettlementReserveUsage ConsumeSettlementReserve(
         IReadOnlyDictionary<string, Settlement> settlementLookup,
         PopulationGroup group,
         int remainingNeed)
     {
+        var startingReserveStores = ResolveReserveStores(settlementLookup, group);
         if (remainingNeed <= 0)
         {
-            return 0;
+            return new SettlementReserveUsage(0, 0, startingReserveStores, startingReserveStores);
         }
 
         var key = BuildSettlementLookupKey(group.PolityId, group.CurrentRegionId);
         if (!settlementLookup.TryGetValue(key, out var settlement) || !settlement.IsActive || settlement.StoredFood <= 0)
         {
-            return 0;
+            return new SettlementReserveUsage(0, 0, startingReserveStores, 0);
         }
 
         var usabilityMultiplier = ResolveSettlementReserveUsabilityMultiplier(group);
@@ -466,7 +775,7 @@ public sealed class GroupSurvivalSystem
         var usableFoodUsed = Math.Min(usableReserveAvailable, remainingNeed);
         var rawFoodConsumed = ResolveRawFoodConsumed(usableFoodUsed, usabilityMultiplier);
         settlement.StoredFood = Math.Max(0, settlement.StoredFood - rawFoodConsumed);
-        return usableFoodUsed;
+        return new SettlementReserveUsage(usableFoodUsed, rawFoodConsumed, startingReserveStores, settlement.StoredFood);
     }
 
     private static string ResolveSurvivalReason(int monthlyFoodNeed, int acquiredFood, int usableFoodConsumed, int storedFoodBefore, int settlementFoodUsed, int shortage, int starvationLoss, int hardshipPressure, string hardshipSeverity, FoodStressState foodStressState)
@@ -532,6 +841,7 @@ public sealed class GroupSurvivalSystem
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            FoodAccounting = group.FoodAccounting.Clone(),
             HungerPressure = group.HungerPressure,
             ShortageMonths = group.ShortageMonths,
             FoodStressState = group.FoodStressState,
@@ -593,6 +903,102 @@ public sealed class GroupSurvivalSystem
             FoodStressState.Starvation => "starvation",
             _ => "food stress"
         };
+    }
+
+    private sealed record PopulationChangeBreakdown(
+        int Births,
+        int NaturalDeaths,
+        int HardshipDeaths,
+        int WaterStressDeaths,
+        int StarvationLoss,
+        int TotalDeaths,
+        int NetPopulationChange,
+        int FinalPopulation,
+        string Summary);
+
+    private sealed record SettlementReserveUsage(
+        int UsableFoodConsumed,
+        int RawFoodConsumed,
+        int StartingReserveStores,
+        int EndingReserveStores);
+
+    private sealed class PolityFoodAccountingState
+    {
+        private int startingCarriedStores;
+        private int foodInflow;
+        private int foodConsumption;
+        private int foodLosses;
+        private int endingCarriedStores;
+        private int monthlyDemand;
+        private int usableFoodConsumed;
+        private int unresolvedDeficit;
+        private long weightedPopulation;
+        private double weightedHungerPressure;
+        private double weightedShortageMonths;
+        private FoodStressState worstState = FoodStressState.FedStable;
+
+        public PolityFoodAccountingState(string polityId, int startingReserveStores)
+        {
+            PolityId = polityId;
+            StartingReserveStores = startingReserveStores;
+        }
+
+        public string PolityId { get; }
+
+        public int StartingReserveStores { get; }
+
+        public void Accumulate(
+            int carriedStoresStart,
+            int inflow,
+            int consumption,
+            int losses,
+            int carriedStoresEnd,
+            int demand,
+            int usableConsumed,
+            int deficit,
+            float hunger,
+            int shortageMonths,
+            FoodStressState state,
+            int populationWeight)
+        {
+            startingCarriedStores += carriedStoresStart;
+            foodInflow += inflow;
+            foodConsumption += consumption;
+            foodLosses += losses;
+            endingCarriedStores += carriedStoresEnd;
+            monthlyDemand += demand;
+            usableFoodConsumed += usableConsumed;
+            unresolvedDeficit += deficit;
+            weightedPopulation += Math.Max(1, populationWeight);
+            weightedHungerPressure += hunger * Math.Max(1, populationWeight);
+            weightedShortageMonths += shortageMonths * Math.Max(1, populationWeight);
+            if (state > worstState)
+            {
+                worstState = state;
+            }
+        }
+
+        public FoodAccountingSnapshot ToSnapshot(int endingReserveStores)
+        {
+            var totalWeight = Math.Max(1, weightedPopulation);
+            return new FoodAccountingSnapshot
+            {
+                StartingCarriedStores = startingCarriedStores,
+                StartingReserveStores = StartingReserveStores,
+                FoodInflow = foodInflow,
+                FoodConsumption = foodConsumption,
+                FoodLosses = foodLosses,
+                NetFoodChange = (endingCarriedStores + endingReserveStores) - (startingCarriedStores + StartingReserveStores),
+                EndingCarriedStores = endingCarriedStores,
+                EndingReserveStores = endingReserveStores,
+                MonthlyDemand = monthlyDemand,
+                UsableFoodConsumed = usableFoodConsumed,
+                UnresolvedDeficit = unresolvedDeficit,
+                HungerPressure = MathF.Round((float)(weightedHungerPressure / totalWeight), 2),
+                ShortageMonths = (int)Math.Round(weightedShortageMonths / totalWeight, MidpointRounding.AwayFromZero),
+                FoodStressState = worstState
+            };
+        }
     }
 
     private sealed class MutableRegionState
@@ -698,7 +1104,7 @@ public sealed class GroupSurvivalSystem
             }
 
             var acquisition = useFallback ? FallbackAcquisition : PrimaryAcquisition;
-            var foodGained = unitsTaken * foodPerUnit;
+            var foodGained = checked((int)Math.Min(int.MaxValue, (long)unitsTaken * foodPerUnit));
             acquisition.Add(sourceId, unitsTaken, foodGained);
             RemainingNeed = Math.Max(0, RemainingNeed - foodGained);
         }
@@ -716,7 +1122,7 @@ public sealed class GroupSurvivalSystem
                     var knowledgeMultiplier = KnowledgeContext.ResolveFloraUseMultiplier(region, entry.Key);
                     return species is null || knowledgeMultiplier <= 0.0f
                         ? 0.0
-                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
+                        : (double)entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
                             SubsistenceSupportModel.ResolveFloraFoodPerPopulation(region, species),
                             SubsistenceSupportModel.ResolveGatheringMultiplier(Group, region) * knowledgeMultiplier);
                 });
@@ -735,7 +1141,7 @@ public sealed class GroupSurvivalSystem
                     var knowledgeMultiplier = KnowledgeContext.ResolveFaunaUseMultiplier(region, entry.Key);
                     return species is null || knowledgeMultiplier <= 0.0f
                         ? 0.0
-                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
+                        : (double)entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
                             species.FoodYield,
                             SubsistenceSupportModel.ResolveHuntingMultiplier(Group, region) * knowledgeMultiplier);
                 });

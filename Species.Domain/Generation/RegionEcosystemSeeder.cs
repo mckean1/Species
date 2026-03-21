@@ -68,8 +68,8 @@ public static class RegionEcosystemSeeder
 
         var protoFloraCapacity = ClampNormalized((fertility * 0.55f) + (waterFactor * 0.30f) + (terrainFactor * 0.15f));
         var protoFaunaCapacity = ClampNormalized((protoFloraCapacity * 0.60f) + (terrainFactor * 0.25f) + (waterFactor * 0.15f));
-        var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(), protoFloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
-        var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(), protoFaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
+        var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(value => (long)value), protoFloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
+        var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(value => (long)value), protoFaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
         var floraOccupancyDeficit = ClampNormalized(1.0f - floraOccupancy);
         var faunaOccupancyDeficit = ClampNormalized(1.0f - faunaOccupancy);
         var floraSupportDeficit = ClampNormalized(Math.Max(0.0f, protoFloraCapacity - floraOccupancy));
@@ -218,6 +218,10 @@ public static class RegionEcosystemSeeder
         var support = ResolveSeedDietSupport(region, species, floraPopulations, floraCatalog, preySupportBySpeciesId);
 
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FaunaRandomVarianceRange);
+        var carryingSupport = Math.Clamp(
+            support / Math.Max(0.01f, species.RequiredIntake * EcologySeedingConstants.PopulationScale * EcologySeedingConstants.FaunaSeedingSupportBuffer),
+            0.0f,
+            1.0f);
         var abundance = (support * 0.42f) +
                         (fertilityFit * 0.14f) +
                         (species.ReproductionRate * 0.12f) +
@@ -228,6 +232,7 @@ public static class RegionEcosystemSeeder
                         (species.RegionalAbundance * 0.06f) +
                         (species.CoreBiomes.Contains(region.Biome) ? EcologySeedingConstants.FaunaBiomeMatchBonus : 0.0f);
 
+        abundance *= carryingSupport;
         abundance *= EcologySeedingConstants.FaunaWaterSupportMultiplier;
         abundance *= biomeMultiplier;
         abundance *= variance;

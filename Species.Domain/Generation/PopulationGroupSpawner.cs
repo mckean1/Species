@@ -60,6 +60,7 @@ public static class PopulationGroupSpawner
                 OriginRegionId = region.Id,
                 Population = population,
                 StoredFood = storedFood,
+                FoodAccounting = FoodAccountingSnapshot.CreateInitial(storedFood, 0),
                 SubsistencePreference = subsistencePreference,
                 HungerPressure = 0.0f,
                 ShortageMonths = 0,
@@ -100,6 +101,7 @@ public static class PopulationGroupSpawner
                 ScaleState = new PoliticalScaleState(),
                 SocialMemory = new SocialMemoryState(),
                 SocialIdentity = new SocialIdentityState(),
+                FoodAccounting = FoodAccountingSnapshot.CreateInitial(storedFood, 0),
                 SpeciesAwareness = BuildInitialSpeciesAwareness(region)
             });
         }
@@ -109,15 +111,15 @@ public static class PopulationGroupSpawner
 
     private static int CalculateViabilityScore(Region region)
     {
-        var floraScore = region.Ecosystem.FloraPopulations.Values.Sum();
-        var faunaScore = region.Ecosystem.FaunaPopulations.Values.Sum();
-        return floraScore + faunaScore + (int)Math.Round(region.Fertility * 100);
+        var floraScore = region.Ecosystem.FloraPopulations.Values.Sum(value => (long)value);
+        var faunaScore = region.Ecosystem.FaunaPopulations.Values.Sum(value => (long)value);
+        return (int)Math.Clamp(floraScore + faunaScore + (long)Math.Round(region.Fertility * 100), int.MinValue, int.MaxValue);
     }
 
     private static SubsistencePreference ResolveSubsistencePreference(Region region)
     {
-        var floraScore = region.Ecosystem.FloraPopulations.Values.Sum();
-        var faunaScore = region.Ecosystem.FaunaPopulations.Values.Sum();
+        var floraScore = region.Ecosystem.FloraPopulations.Values.Sum(value => (long)value);
+        var faunaScore = region.Ecosystem.FaunaPopulations.Values.Sum(value => (long)value);
 
         if (floraScore > faunaScore * 2)
         {

@@ -5,6 +5,7 @@ using Species.Domain.Simulation;
 public static class PolityScreenDataBuilder
 {
     private static readonly SocialTraditionCatalog SocialTraditionCatalog = new();
+    private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
     public static PolityScreenData Build(
         World world,
@@ -19,6 +20,9 @@ public static class PolityScreenDataBuilder
             return new PolityScreenData(
                 "Unknown",
                 FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+                "Unknown",
+                "Unknown",
+                "Unknown",
                 "Unknown",
                 "Unknown",
                 "Unknown",
@@ -49,28 +53,32 @@ public static class PolityScreenDataBuilder
         var currentRegionName = regionsById.GetValueOrDefault(context.CurrentRegionId)?.Name ?? "Unknown";
         var homeRegionName = regionsById.GetValueOrDefault(context.HomeRegionId)?.Name ?? currentRegionName;
         var coreRegionName = regionsById.GetValueOrDefault(context.CoreRegionId)?.Name ?? homeRegionName;
+        var snapshot = PolityConditionEvaluator.Evaluate(world, focusPolity);
         var pressures = BuildPressureItems(context.Pressures);
-        var primarySite = context.PrimarySettlement is null
-            ? "None"
-            : $"{context.PrimarySettlement.Name} ({PolityPresentation.DescribeSettlementType(context.PrimarySettlement.Type)})";
+        var primarySite = snapshot.SpatialStability.HasValidSeat && context.PrimarySettlement is not null
+            ? $"{context.PrimarySettlement.Name} ({PolityPresentation.DescribeSettlementType(context.PrimarySettlement.Type)})"
+            : "None";
 
         return new PolityScreenData(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
-            PolityPresentation.DescribeGovernmentForm(focusPolity.GovernmentForm),
+            PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm),
             BuildSpeciesLabel(context.SpeciesId),
-            PolityPresentation.DescribeAnchoringKind(context.AnchoringKind),
+            PolityPresentation.DescribeAnchoringKind(snapshot.AnchoringKind),
             homeRegionName,
             coreRegionName,
             primarySite,
             context.TotalPopulation.ToString("N0"),
+            BuildFoodStoresSummary(context.FoodAccounting),
+            BuildFoodBalanceSummary(context.FoodAccounting),
+            DescribeFoodCondition(context.FoodAccounting, snapshot.MaterialSurvival.FoodCondition),
             BuildMaterialSummary(context),
             pressures,
-            BuildAlerts(pressures),
-            BuildStrengths(context, pressures),
-            BuildProblems(context, pressures),
-            BuildGovernanceNotes(context),
-            BuildScaleNotes(world, focusPolity, context),
+            snapshot.CurrentIssues,
+            snapshot.Strengths,
+            snapshot.Problems,
+            snapshot.GovernanceNotes,
+            BuildScaleNotes(world, focusPolity, context, snapshot),
             BuildExternalNotes(world, focusPolity, context),
             BuildSocialIdentityNotes(context),
             BuildTraditions(context),
@@ -99,12 +107,40 @@ public static class PolityScreenDataBuilder
     {
         return
         [
-            new PolityPressureItem("Food Stores", pressures.Food.DisplayValue, pressures.Food.SeverityLabel),
+            new PolityPressureItem("Food Pressure", pressures.Food.DisplayValue, pressures.Food.SeverityLabel),
             new PolityPressureItem("Water", pressures.Water.DisplayValue, pressures.Water.SeverityLabel),
             new PolityPressureItem("Threat", pressures.Threat.DisplayValue, pressures.Threat.SeverityLabel),
             new PolityPressureItem("Crowding", pressures.Overcrowding.DisplayValue, pressures.Overcrowding.SeverityLabel),
             new PolityPressureItem("Migration", pressures.Migration.DisplayValue, pressures.Migration.SeverityLabel)
         ];
+    }
+
+    private static string BuildFoodStoresSummary(FoodAccountingSnapshot accounting)
+    {
+        return $"{accounting.EndingTotalStores:N0} [Carried {accounting.EndingCarriedStores:N0} | Reserve {accounting.EndingReserveStores:N0}]";
+    }
+
+    private static string BuildFoodBalanceSummary(FoodAccountingSnapshot accounting)
+    {
+        var sign = accounting.NetFoodChange >= 0 ? "+" : string.Empty;
+        return $"{sign}{accounting.NetFoodChange:N0} / month";
+    }
+
+    private static string DescribeFoodCondition(FoodAccountingSnapshot accounting, PolityConditionSeverity severity)
+    {
+        if (accounting.UnresolvedDeficit > 0)
+        {
+            return $"Deficit {accounting.UnresolvedDeficit:N0}";
+        }
+
+        return severity switch
+        {
+            PolityConditionSeverity.Stable => "Stable",
+            PolityConditionSeverity.Strained => "Strained",
+            PolityConditionSeverity.Critical => "Critical",
+            PolityConditionSeverity.Collapse => "Collapse",
+            _ => "Unknown"
+        };
     }
 
     private static IReadOnlyList<string> BuildAlerts(IReadOnlyList<PolityPressureItem> pressures)
@@ -114,7 +150,7 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food Stores" => $"Food stores are {item.SeverityLabel.ToLowerInvariant()}",
+                "Food Pressure" => $"Food pressure is {item.SeverityLabel.ToLowerInvariant()}",
                 "Water" => $"Water access is {item.SeverityLabel.ToLowerInvariant()}",
                 "Threat" => $"Threat pressure is {item.SeverityLabel.ToLowerInvariant()}",
                 "Crowding" => $"Crowding is {item.SeverityLabel.ToLowerInvariant()}",
@@ -131,7 +167,7 @@ public static class PolityScreenDataBuilder
     {
         var strengths = new List<string>();
 
-        if (pressures.First(item => item.Label == "Food Stores").Value < 40)
+        if (pressures.First(item => item.Label == "Food Pressure").Value < 40)
         {
             strengths.Add("Food stores remain manageable");
         }
@@ -173,7 +209,7 @@ public static class PolityScreenDataBuilder
             .OrderByDescending(item => item.Value)
             .Select(item => item.Label switch
             {
-                "Food Stores" => $"Food stress is {item.SeverityLabel.ToLowerInvariant()}",
+                "Food Pressure" => $"Food stress is {item.SeverityLabel.ToLowerInvariant()}",
                 "Water" => $"Reliable water is {item.SeverityLabel.ToLowerInvariant()}",
                 "Threat" => $"Threat pressure is {item.SeverityLabel.ToLowerInvariant()}",
                 "Crowding" => $"Crowding is {item.SeverityLabel.ToLowerInvariant()}",
@@ -223,16 +259,11 @@ public static class PolityScreenDataBuilder
         ];
     }
 
-    private static IReadOnlyList<string> BuildScaleNotes(World world, Polity polity, PolityContext context)
+    private static IReadOnlyList<string> BuildScaleNotes(World world, Polity polity, PolityContext context, PolityConditionSnapshot snapshot)
     {
         var polityNamesById = world.Polities.ToDictionary(item => item.Id, item => item.Name, StringComparer.Ordinal);
-        var notes = new List<string>
-        {
-            $"State form: {PolityPresentation.DescribePoliticalScaleForm(context.ScaleState.Form)}",
-            $"Integration {context.ScaleState.IntegrationDepth} | Centralization {context.ScaleState.Centralization} | Autonomy tolerance {context.ScaleState.AutonomyTolerance}",
-            $"Coordination {context.ScaleState.CoordinationStrain} | Distance {context.ScaleState.DistanceStrain} | Overreach {context.ScaleState.OverextensionPressure} | Fragmentation {context.ScaleState.FragmentationRisk}",
-            context.ScaleState.Summary
-        };
+        var notes = snapshot.ScaleNotes.ToList();
+        notes.Insert(1, $"Integration {context.ScaleState.IntegrationDepth} | Centralization {context.ScaleState.Centralization} | Autonomy tolerance {context.ScaleState.AutonomyTolerance}");
 
         if (!string.IsNullOrWhiteSpace(context.ParentPolityId))
         {
@@ -455,6 +486,9 @@ public sealed record PolityScreenData(
     string CoreRegion,
     string PrimarySite,
     string Population,
+    string FoodStores,
+    string FoodBalance,
+    string FoodAccess,
     string MaterialStores,
     IReadOnlyList<PolityPressureItem> Pressures,
     IReadOnlyList<string> Alerts,

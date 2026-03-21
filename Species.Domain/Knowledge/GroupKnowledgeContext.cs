@@ -130,7 +130,7 @@ public sealed class GroupKnowledgeContext
             routeKnowledge,
             EstimatePotential(floraKnowledge, actualGatheringPotential, baselineGatheringPotentialFood, monthlyFoodNeed),
             EstimatePotential(faunaKnowledge, actualHuntingPotential, baselineHuntingPotentialFood, monthlyFoodNeed),
-            EstimateScalar(waterKnowledge, actualWaterSupport, baselineWaterSupport),
+            EstimateWaterSupport(waterKnowledge, actualWaterSupport, baselineWaterSupport, isCurrentRegion),
             EstimateScalar(conditionsKnowledge == KnowledgeLevel.Unknown ? faunaKnowledge : conditionsKnowledge, actualThreatPressure, baselineThreatPressure),
             monthsSpent,
             gatheringEvidence,
@@ -263,6 +263,22 @@ public sealed class GroupKnowledgeContext
             KnowledgeLevel.Discovery => BucketScalar(actual),
             KnowledgeLevel.Encounter => baseline * EncounterBaselineMultiplier,
             _ => baseline * UnknownBaselineMultiplier
+        };
+    }
+
+    private static float EstimateWaterSupport(KnowledgeLevel level, float actual, float baseline, bool isCurrentRegion)
+    {
+        if (isCurrentRegion)
+        {
+            return actual;
+        }
+
+        return level switch
+        {
+            KnowledgeLevel.Knowledge => actual,
+            KnowledgeLevel.Discovery => Math.Clamp(actual - 4.0f, 0.0f, 100.0f),
+            KnowledgeLevel.Encounter => Math.Clamp(Math.Max(actual - 12.0f, baseline * 0.88f), 0.0f, 100.0f),
+            _ => Math.Clamp(baseline * UnknownBaselineMultiplier, 0.0f, 100.0f)
         };
     }
 

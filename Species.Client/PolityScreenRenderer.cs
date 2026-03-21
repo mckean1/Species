@@ -68,6 +68,9 @@ public static class PolityScreenRenderer
         lines.Add($"Core Region: {data.CoreRegion}");
         lines.Add($"Primary Site: {data.PrimarySite}");
         lines.Add($"Population: {data.Population}");
+        lines.Add($"Food Stores: {data.FoodStores}");
+        lines.Add($"Net Food Change: {data.FoodBalance}");
+        lines.Add($"Food Access: {data.FoodAccess}");
         lines.Add($"Materials: {data.MaterialStores}");
         lines.Add($"Runtime: {runningText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");

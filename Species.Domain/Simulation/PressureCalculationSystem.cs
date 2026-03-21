@@ -34,7 +34,7 @@ public sealed class PressureCalculationSystem
                 regionKnowledge.GatheringPotentialFood,
                 regionKnowledge.HuntingPotentialFood);
             var visibleFoodSupport = SubsistenceSupportModel.NormalizeFoodSupport(weightedFoodPotential, monthlyFoodNeed);
-            var foodContribution = CalculateFoodPressure(group, visibleFoodSupport);
+            var foodContribution = CalculateFoodPressure(group);
             var waterContribution = CalculateWaterPressure(regionKnowledge.WaterSupport);
             var threatContribution = CalculateThreatPressure(regionKnowledge.ThreatPressure);
             var overcrowdingContribution = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
@@ -90,6 +90,17 @@ public sealed class PressureCalculationSystem
                 CurrentRegionName = region.Name,
                 Population = group.Population,
                 StoredFood = group.StoredFood,
+                StartingFoodStores = group.FoodAccounting.StartingTotalStores,
+                EndingFoodStores = group.FoodAccounting.EndingTotalStores,
+                FoodInflow = group.FoodAccounting.FoodInflow,
+                FoodConsumption = group.FoodAccounting.FoodConsumption,
+                FoodLosses = group.FoodAccounting.FoodLosses,
+                NetFoodChange = group.FoodAccounting.NetFoodChange,
+                UnresolvedFoodDeficit = group.FoodAccounting.UnresolvedDeficit,
+                FinalFoodCondition = group.FoodAccounting.FoodStressState.ToString(),
+                VisibleFoodSupport = visibleFoodSupport,
+                VisibleWaterSupport = regionKnowledge.WaterSupport,
+                WaterKnowledgeLevel = regionKnowledge.WaterKnowledge.ToString(),
                 Pressures = pressures,
                 Food = foodDetail,
                 Water = waterDetail,
@@ -117,6 +128,7 @@ public sealed class PressureCalculationSystem
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            FoodAccounting = group.FoodAccounting.Clone(),
             HungerPressure = group.HungerPressure,
             ShortageMonths = group.ShortageMonths,
             FoodStressState = group.FoodStressState,
@@ -133,38 +145,60 @@ public sealed class PressureCalculationSystem
         };
     }
 
-    private static int CalculateFoodPressure(PopulationGroup group, int visibleFoodSupport)
+    private static int CalculateFoodPressure(PopulationGroup group)
     {
-        var foodReserveMonths = group.Population == 0
+        var accounting = group.FoodAccounting;
+        var monthlyDemand = accounting.MonthlyDemand > 0
+            ? accounting.MonthlyDemand
+            : SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
+        var endingStores = accounting.EndingTotalStores > 0 ? accounting.EndingTotalStores : group.StoredFood;
+        var foodReserveMonths = monthlyDemand <= 0
             ? PressureCalculationConstants.StoredFoodMonthsSafe
-            : (float)group.StoredFood / Math.Max(1, group.Population);
+            : endingStores / (float)Math.Max(1, monthlyDemand);
         var storedFoodSafety = MathF.Min(1.0f, foodReserveMonths / PressureCalculationConstants.StoredFoodMonthsSafe);
-        var ecologySupport = visibleFoodSupport / PressureCalculationConstants.PressureScaleMaximum;
-        var hungerCarryover = group.HungerPressure * 25.0f;
+        var deficitRatio = monthlyDemand <= 0
+            ? 0.0f
+            : Math.Clamp(accounting.UnresolvedDeficit / (float)Math.Max(1, monthlyDemand), 0.0f, 1.5f);
+        var usableCoverage = monthlyDemand <= 0
+            ? 1.0f
+            : Math.Clamp(accounting.UsableFoodConsumed / (float)Math.Max(1, monthlyDemand), 0.0f, 1.0f);
+        var hungerCarryover = group.HungerPressure * PressureCalculationConstants.FoodHungerCarryoverWeight;
         var stressBonus = group.FoodStressState switch
         {
-            FoodStressState.HungerPressure => 8.0f,
-            FoodStressState.SevereShortage => 18.0f,
-            FoodStressState.Starvation => 32.0f,
+            FoodStressState.HungerPressure => 6.0f,
+            FoodStressState.SevereShortage => 16.0f,
+            FoodStressState.Starvation => 28.0f,
             _ => 0.0f
         };
 
-        var pressure = (1.0f - storedFoodSafety) * 45.0f +
-                       (1.0f - ecologySupport) * 55.0f +
+        var pressure = (1.0f - storedFoodSafety) * PressureCalculationConstants.FoodReserveWeight +
+                       deficitRatio * PressureCalculationConstants.FoodEcologyWeight +
+                       (1.0f - usableCoverage) * PressureCalculationConstants.FoodShortageMonthWeight * 4.0f +
+                       (group.ShortageMonths * PressureCalculationConstants.FoodShortageMonthWeight) +
                        hungerCarryover +
-                       stressBonus;
+                       stressBonus -
+                       PressureCalculationConstants.FoodMonthlyRelief;
 
-        return ClampPressure(pressure);
+        if (accounting.NetFoodChange > 0 && accounting.UnresolvedDeficit == 0)
+        {
+            pressure -= Math.Min(10.0f, accounting.NetFoodChange / (float)Math.Max(1, monthlyDemand) * 12.0f);
+        }
+
+        return ClampPressure(MathF.Max(0.0f, pressure));
     }
 
     private static int CalculateWaterPressure(float waterSupport)
     {
-        return ClampPressure(100.0f - waterSupport);
+        var shortfall = Math.Max(0.0f, PressureCalculationConstants.WaterStableSupportThreshold - waterSupport);
+        var criticalShortfall = Math.Max(0.0f, PressureCalculationConstants.WaterCriticalSupportThreshold - waterSupport);
+        var strain = (shortfall * PressureCalculationConstants.WaterScarcityWeight) +
+                     (criticalShortfall * PressureCalculationConstants.WaterCriticalWeight);
+        return ComputePressureImpulse(strain, PressureCalculationConstants.WaterMonthlyRelief);
     }
 
     private static int CalculateThreatPressure(float threatPressure)
     {
-        return ClampPressure(threatPressure);
+        return ComputePressureImpulse(threatPressure, PressureCalculationConstants.ThreatMonthlyRelief);
     }
 
     private static int CalculateOvercrowdingPressure(int population, float weightedFoodPotential, int monthlyFoodNeed)
@@ -181,7 +215,7 @@ public sealed class PressureCalculationSystem
 
         var supportCapacity = weightedFoodPotential / monthlyFoodNeed;
         var ratio = population / Math.Max(1.0f, supportCapacity * population * PressureCalculationConstants.OvercrowdingSupportScale);
-        return ClampPressure(MathF.Max(0.0f, (ratio - 0.5f) * 100.0f));
+        return ComputePressureImpulse(MathF.Max(0.0f, (ratio - 0.5f) * 100.0f), PressureCalculationConstants.OvercrowdingMonthlyRelief);
     }
 
     private static int CalculateMigrationPressure(int foodPressure, int waterPressure, int threatPressure, int overcrowdingPressure)
@@ -191,22 +225,23 @@ public sealed class PressureCalculationSystem
                        threatPressure * PressureCalculationConstants.MigrationThreatWeight +
                        overcrowdingPressure * PressureCalculationConstants.MigrationOvercrowdingWeight;
 
-        return ClampPressure(pressure);
+        return ComputePressureImpulse(pressure, PressureCalculationConstants.MigrationMonthlyRelief);
     }
 
     private static string BuildFoodPressureReason(PopulationGroup group, RegionKnowledgeSnapshot knowledge, int visibleFoodSupport, int pressure)
     {
+        var accounting = group.FoodAccounting;
         if (pressure >= 70)
         {
-            return $"High because stored food is thin, only {DescribeKnowledge(knowledge.OverallKnowledge)} food support is visible, and visible food is not guaranteed to be usable food.";
+            return $"High because ending stores are {accounting.EndingTotalStores}, unresolved deficit is {accounting.UnresolvedDeficit}, and the final food state is {accounting.FoodStressState}.";
         }
 
         if (pressure >= 40)
         {
-            return $"Moderate because the polity can account for about {visibleFoodSupport}% of current food need from what it knows, before actor-specific usable access losses.";
+            return $"Moderate because ending stores are {accounting.EndingTotalStores}, net food changed by {accounting.NetFoodChange:+#;-#;0}, and final coverage remains strained.";
         }
 
-        return $"Low because stored food and known local support look manageable, and recent usable-food stress is limited.";
+        return $"Low because ending stores are {accounting.EndingTotalStores}, net food changed by {accounting.NetFoodChange:+#;-#;0}, and unresolved deficit is {accounting.UnresolvedDeficit}.";
     }
 
     private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
@@ -292,6 +327,11 @@ public sealed class PressureCalculationSystem
     private static int ClampPressure(float value)
     {
         return (int)MathF.Round(Math.Clamp(value, 0.0f, PressureCalculationConstants.PressureScaleMaximum), MidpointRounding.AwayFromZero);
+    }
+
+    private static int ComputePressureImpulse(float rawPressure, float monthlyRelief)
+    {
+        return ClampPressure(MathF.Max(0.0f, rawPressure - monthlyRelief));
     }
 
     private static string DescribeKnowledge(KnowledgeLevel level)

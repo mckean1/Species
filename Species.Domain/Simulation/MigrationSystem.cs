@@ -338,6 +338,7 @@ public sealed class MigrationSystem
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            FoodAccounting = group.FoodAccounting.Clone(),
             HungerPressure = group.HungerPressure,
             ShortageMonths = group.ShortageMonths,
             FoodStressState = group.FoodStressState,

@@ -26,6 +26,26 @@ public static class GroupSurvivalValidator
                 errors.Add($"Group survival produced an invalid shortage or starvation value for {change.GroupId}.");
             }
 
+            if (change.Births < 0 || change.NaturalDeaths < 0 || change.HardshipDeaths < 0 || change.WaterStressDeaths < 0 || change.TotalDeaths < 0)
+            {
+                errors.Add($"Group survival produced an invalid demographic breakdown for {change.GroupId}.");
+            }
+
+            if (change.TotalDeaths != change.NaturalDeaths + change.HardshipDeaths + change.WaterStressDeaths + change.StarvationLoss)
+            {
+                errors.Add($"Group survival death totals do not reconcile for {change.GroupId}.");
+            }
+
+            if (change.FinalPopulation != Math.Max(0, change.StartingPopulation + change.Births - change.TotalDeaths))
+            {
+                errors.Add($"Group survival population accounting does not reconcile for {change.GroupId}.");
+            }
+
+            if (change.NetPopulationChange != change.FinalPopulation - change.StartingPopulation)
+            {
+                errors.Add($"Group survival net change does not reconcile for {change.GroupId}.");
+            }
+
             if (change.PrimaryAction is not ("Gather" or "Hunt") || change.FallbackAction is not ("Gather" or "Hunt"))
             {
                 errors.Add($"Group {change.GroupId} has an invalid extraction action.");

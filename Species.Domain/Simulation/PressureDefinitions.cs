@@ -1,3 +1,4 @@
+using Species.Domain.Constants;
 using Species.Domain.Enums;
 
 namespace Species.Domain.Simulation;
@@ -11,7 +12,7 @@ public static class PressureDefinitions
         PressureShape.OneSided,
         PressureCurveType.Persistent,
         PressureDecayMode.PassiveTowardZero,
-        1,
+        PressureCalculationConstants.PersistentPressureDecayRate,
         DefaultSafetyBound);
 
     public static readonly PressureDefinition Water = new(
@@ -19,7 +20,7 @@ public static class PressureDefinitions
         PressureShape.OneSided,
         PressureCurveType.Persistent,
         PressureDecayMode.PassiveTowardZero,
-        1,
+        PressureCalculationConstants.PersistentPressureDecayRate,
         DefaultSafetyBound);
 
     public static readonly PressureDefinition Threat = new(
@@ -27,7 +28,7 @@ public static class PressureDefinitions
         PressureShape.OneSided,
         PressureCurveType.Transient,
         PressureDecayMode.PassiveTowardZero,
-        2,
+        PressureCalculationConstants.TransientPressureDecayRate,
         DefaultSafetyBound);
 
     public static readonly PressureDefinition Overcrowding = new(
@@ -35,7 +36,7 @@ public static class PressureDefinitions
         PressureShape.OneSided,
         PressureCurveType.Persistent,
         PressureDecayMode.PassiveTowardZero,
-        1,
+        PressureCalculationConstants.PersistentPressureDecayRate,
         DefaultSafetyBound);
 
     public static readonly PressureDefinition Migration = new(
@@ -43,7 +44,7 @@ public static class PressureDefinitions
         PressureShape.OneSided,
         PressureCurveType.Transient,
         PressureDecayMode.PassiveTowardZero,
-        2,
+        PressureCalculationConstants.MigrationPressureDecayRate,
         DefaultSafetyBound);
 
     public static PressureDefinition Get(PressureCategory category)

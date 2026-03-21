@@ -16,8 +16,8 @@ public sealed class ProtoPressureSystem
             var substrate = region.Ecosystem.ProtoLifeSubstrate;
             var floraCapacity = ClampNormalized(substrate.ProtoFloraCapacity);
             var faunaCapacity = ClampNormalized(substrate.ProtoFaunaCapacity);
-            var floraOccupancy = NormalizePopulation(region.Ecosystem.FloraPopulations.Values.Sum(), floraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
-            var faunaOccupancy = NormalizePopulation(region.Ecosystem.FaunaPopulations.Values.Sum(), faunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
+            var floraOccupancy = NormalizePopulation(region.Ecosystem.FloraPopulations.Values.Sum(value => (long)value), floraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
+            var faunaOccupancy = NormalizePopulation(region.Ecosystem.FaunaPopulations.Values.Sum(value => (long)value), faunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
             var floraOccupancyDeficit = ClampNormalized(1.0f - floraOccupancy);
             var faunaOccupancyDeficit = ClampNormalized(1.0f - faunaOccupancy);
             var floraEnvironmentalSuitability = ResolveFloraEnvironmentalSuitability(region);
@@ -220,14 +220,14 @@ public sealed class ProtoPressureSystem
         return freshness * 0.28f;
     }
 
-    private static float NormalizePopulation(int totalPopulation, float capacity, float scale)
+    private static float NormalizePopulation(double totalPopulation, float capacity, float scale)
     {
         if (capacity <= 0.0f || scale <= 0.0f)
         {
             return 0.0f;
         }
 
-        return ClampNormalized(totalPopulation / Math.Max(1.0f, capacity * scale));
+        return ClampNormalized((float)(totalPopulation / Math.Max(1.0f, capacity * scale)));
     }
 
     private static float MovePressure(float current, float target, float riseRate, float decayRate)

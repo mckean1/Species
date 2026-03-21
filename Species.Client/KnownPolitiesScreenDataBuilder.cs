@@ -4,6 +4,8 @@ using Species.Domain.Simulation;
 
 public static class KnownPolitiesScreenDataBuilder
 {
+    private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
+
     public static KnownPolitiesScreenData Build(
         World world,
         string focalPolityId,
@@ -47,11 +49,12 @@ public static class KnownPolitiesScreenDataBuilder
                 (regionsById.TryGetValue(item.Context!.CurrentRegionId, out var region) &&
                  region.NeighborIds.Contains(focusContext.CurrentRegionId, StringComparer.Ordinal)))
             .OrderBy(item => item.Polity.Name, StringComparer.Ordinal)
-            .Select(item => BuildSummary(item.Polity, item.Context!, focusPolity, focusContext, regionsById, discoveryCatalog, advancementCatalog))
+            .Select(item => BuildSummary(world, item.Polity, item.Context!, focusPolity, focusContext, regionsById, discoveryCatalog, advancementCatalog))
             .ToArray();
     }
 
     private static KnownPolitySummary BuildSummary(
+        World world,
         Polity polity,
         PolityContext context,
         Polity? focusPolity,
@@ -62,6 +65,7 @@ public static class KnownPolitiesScreenDataBuilder
     {
         _ = discoveryCatalog;
         _ = advancementCatalog;
+        var snapshot = PolityConditionEvaluator.Evaluate(world, polity);
 
         var currentRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.CurrentRegionId);
         var coreRegionKnown = focusContext is null || focusContext.KnownRegionIds.Contains(context.CoreRegionId);
@@ -82,16 +86,16 @@ public static class KnownPolitiesScreenDataBuilder
         return new KnownPolitySummary(
             polity.Id,
             polity.Name,
-            $"{PolityPresentation.DescribeGovernmentForm(polity.GovernmentForm)} / {PolityPresentation.DescribePoliticalScaleForm(polity.ScaleState.Form)}",
+            $"{PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm)} / {PolityPresentation.DescribePoliticalScaleForm(snapshot.ScaleForm)}",
             coreRegionName,
             currentRegionName,
             KnowledgePresentation.ApproximatePopulation(context.TotalPopulation, exactAllowed: isNearby),
             ResolveRelationship(context, focusContext, isNearby, relation),
             isNearby ? "Nearby" : "Distant",
-            BuildPressureSummary(context, relation),
-            BuildTraits(context),
-            BuildRisks(context),
-            BuildNotes(context, focusPolity, focusContext, currentRegionName, coreRegionName, isNearby, relation),
+            snapshot.Summary,
+            BuildTraits(context, snapshot),
+            BuildRisks(snapshot),
+            BuildNotes(context, snapshot, focusPolity, focusContext, currentRegionName, coreRegionName, isNearby, relation),
             BuildKnownLaws(polity));
     }
 
@@ -175,7 +179,7 @@ public static class KnownPolitiesScreenDataBuilder
             : "No obvious distress is visible";
     }
 
-    private static IReadOnlyList<string> BuildTraits(PolityContext context)
+    private static IReadOnlyList<string> BuildTraits(PolityContext context, PolityConditionSnapshot snapshot)
     {
         var traits = new List<string>();
         var leadGroup = context.LeadGroup;
@@ -194,11 +198,11 @@ public static class KnownPolitiesScreenDataBuilder
             traits.Add("Often seen hunting");
         }
 
-        if (context.Pressures.Migration.DisplayValue >= 60)
+        if (snapshot.MaterialSurvival.MigrationCondition >= PolityConditionSeverity.Critical)
         {
             traits.Add("Frequently on the move");
         }
-        else if (context.AnchoringKind == Species.Domain.Enums.PolityAnchoringKind.Anchored)
+        else if (snapshot.AnchoringKind == Species.Domain.Enums.PolityAnchoringKind.Anchored)
         {
             traits.Add("Clearly anchored to a core site");
         }
@@ -208,7 +212,7 @@ public static class KnownPolitiesScreenDataBuilder
             traits.Add("Carries visible provisions");
         }
 
-        if (context.Pressures.Threat.DisplayValue < 40)
+        if (snapshot.MaterialSurvival.ThreatCondition == PolityConditionSeverity.Stable)
         {
             traits.Add("Moves with some confidence");
         }
@@ -216,26 +220,26 @@ public static class KnownPolitiesScreenDataBuilder
         return traits.Count > 0 ? traits.Take(3).ToArray() : ["No notable traits observed"];
     }
 
-    private static IReadOnlyList<string> BuildRisks(PolityContext context)
+    private static IReadOnlyList<string> BuildRisks(PolityConditionSnapshot snapshot)
     {
         var risks = new List<string>();
 
-        if (context.Pressures.Overcrowding.DisplayValue >= 60)
+        if (snapshot.MaterialSurvival.CrowdingCondition >= PolityConditionSeverity.Strained)
         {
             risks.Add("Crowded conditions");
         }
 
-        if (context.Pressures.Water.DisplayValue >= 60)
+        if (snapshot.MaterialSurvival.WaterCondition >= PolityConditionSeverity.Strained)
         {
             risks.Add("Limited water sources");
         }
 
-        if (context.Pressures.Food.DisplayValue >= 60)
+        if (snapshot.MaterialSurvival.FoodCondition >= PolityConditionSeverity.Strained)
         {
             risks.Add("Food pressure is visible");
         }
 
-        if (context.Pressures.Threat.DisplayValue >= 60)
+        if (snapshot.MaterialSurvival.ThreatCondition >= PolityConditionSeverity.Strained)
         {
             risks.Add("Threat pressure is high");
         }
@@ -245,6 +249,7 @@ public static class KnownPolitiesScreenDataBuilder
 
     private static IReadOnlyList<string> BuildNotes(
         PolityContext context,
+        PolityConditionSnapshot snapshot,
         Polity? focusPolity,
         PolityContext? focusContext,
         string currentRegionName,
@@ -259,14 +264,19 @@ public static class KnownPolitiesScreenDataBuilder
             notes.Add($"Core region: {coreRegionName}");
         }
 
-        notes.Add($"Anchoring: {PolityPresentation.DescribeAnchoringKind(context.AnchoringKind)}");
+        notes.Add($"Anchoring: {PolityPresentation.DescribeAnchoringKind(snapshot.AnchoringKind)}");
 
-        if (context.PrimarySettlement is not null)
+        if (snapshot.SpatialStability.HasValidSeat && context.PrimarySettlement is not null)
         {
             notes.Add($"Primary site: {context.PrimarySettlement.Name}");
         }
+        else
+        {
+            notes.Add("Primary site: none");
+        }
 
-        notes.Add($"State form: {PolityPresentation.DescribePoliticalScaleForm(context.ScaleState.Form)}");
+        notes.Add($"State form: {PolityPresentation.DescribePoliticalScaleForm(snapshot.ScaleForm)}");
+        notes.Add(snapshot.Summary);
 
         if (isNearby)
         {

@@ -16,6 +16,28 @@ public sealed class GroupPressureChange
 
     public required int StoredFood { get; init; }
 
+    public required int StartingFoodStores { get; init; }
+
+    public required int EndingFoodStores { get; init; }
+
+    public required int FoodInflow { get; init; }
+
+    public required int FoodConsumption { get; init; }
+
+    public required int FoodLosses { get; init; }
+
+    public required int NetFoodChange { get; init; }
+
+    public required int UnresolvedFoodDeficit { get; init; }
+
+    public required string FinalFoodCondition { get; init; }
+
+    public required int VisibleFoodSupport { get; init; }
+
+    public required float VisibleWaterSupport { get; init; }
+
+    public required string WaterKnowledgeLevel { get; init; }
+
     public required PressureState Pressures { get; init; }
 
     public required PressureChangeDetail Food { get; init; }

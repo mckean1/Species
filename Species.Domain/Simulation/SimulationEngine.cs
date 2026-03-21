@@ -25,6 +25,7 @@ public sealed class SimulationEngine
     private readonly PoliticalScalingSystem politicalScalingSystem;
     private readonly SettlementSystem settlementSystem;
     private readonly MaterialEconomySystem materialEconomySystem;
+    private readonly PolityConditionEvaluator polityConditionEvaluator;
     private readonly PoliticalBlocSystem politicalBlocSystem;
     private readonly LawProposalSystem lawProposalSystem;
     private readonly EnactedLawSystem enactedLawSystem;
@@ -58,6 +59,7 @@ public sealed class SimulationEngine
         politicalScalingSystem = new PoliticalScalingSystem();
         settlementSystem = new SettlementSystem();
         materialEconomySystem = new MaterialEconomySystem();
+        polityConditionEvaluator = new PolityConditionEvaluator();
         politicalBlocSystem = new PoliticalBlocSystem();
         lawProposalSystem = new LawProposalSystem();
         enactedLawSystem = new EnactedLawSystem();
@@ -87,10 +89,10 @@ public sealed class SimulationEngine
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
         var biologicalEvolutionResult = biologicalEvolutionSystem.Run(faunaResult.World, floraCatalog, faunaCatalog, sapientCatalog, floraResult.Changes, faunaResult.Changes);
         var protoPressureResult = protoPressureSystem.Run(biologicalEvolutionResult.World);
-        var pressureResult = pressureCalculationSystem.Run(protoPressureResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
-        var enactedLawWorld = enactedLawSystem.Run(pressureResult.World);
+        var enactedLawWorld = enactedLawSystem.Run(protoPressureResult.World);
         var survivalResult = groupSurvivalSystem.Run(enactedLawWorld, floraCatalog, faunaCatalog, advancementCatalog);
-        var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
+        var pressureResult = pressureCalculationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
+        var migrationResult = migrationSystem.Run(pressureResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
         var settlementResult = settlementSystem.Run(migrationResult.World);
         var materialEconomyResult = materialEconomySystem.Run(settlementResult.World);
         var discoveryResult = discoverySystem.Run(materialEconomyResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes, migrationResult.Changes);
@@ -98,7 +100,8 @@ public sealed class SimulationEngine
         var socialIdentityResult = socialIdentitySystem.Run(advancementResult.World);
         var interPolityResult = interPolityInteractionSystem.Run(socialIdentityResult.World);
         var politicalScaleResult = politicalScalingSystem.Run(interPolityResult.World);
-        var politicalBlocWorld = politicalBlocSystem.Run(politicalScaleResult.World);
+        var polityConditionWorld = polityConditionEvaluator.FinalizePolities(politicalScaleResult.World);
+        var politicalBlocWorld = politicalBlocSystem.Run(polityConditionWorld);
         var lawProposalResult = lawProposalSystem.Run(politicalBlocWorld, PlayerPolityId);
         var chronicleResult = chronicleSystem.Run(lawProposalResult.World, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, settlementResult.Changes, materialEconomyResult.Changes);
         var finalizedWorld = FinalizeTick(chronicleResult.World);
@@ -151,6 +154,12 @@ public sealed class SimulationEngine
                 return updatedPolity;
             })
             .ToArray();
+        var activePolityIds = updatedPolities
+            .Select(polity => polity.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var updatedGroups = world.PopulationGroups
+            .Select(group => CloneGroup(group, activePolityIds))
+            .ToArray();
         var focalPolityId = updatedPolities.Any(polity => string.Equals(polity.Id, world.FocalPolityId, StringComparison.Ordinal))
             ? world.FocalPolityId
             : updatedPolities
@@ -164,10 +173,49 @@ public sealed class SimulationEngine
             world.CurrentYear,
             world.CurrentMonth,
             world.Regions,
-            world.PopulationGroups,
+            updatedGroups,
             world.Chronicle,
             updatedPolities,
             focalPolityId);
+    }
+
+    private static PopulationGroup CloneGroup(PopulationGroup group, IReadOnlySet<string> activePolityIds)
+    {
+        var cloned = new PopulationGroup
+        {
+            Id = group.Id,
+            Name = group.Name,
+            SpeciesId = group.SpeciesId,
+            SpeciesClass = group.SpeciesClass,
+            PolityId = group.PolityId,
+            CurrentRegionId = group.CurrentRegionId,
+            OriginRegionId = group.OriginRegionId,
+            Population = group.Population,
+            StoredFood = group.StoredFood,
+            FoodAccounting = group.FoodAccounting.Clone(),
+            HungerPressure = group.HungerPressure,
+            ShortageMonths = group.ShortageMonths,
+            FoodStressState = group.FoodStressState,
+            SubsistencePreference = group.SubsistencePreference,
+            SubsistenceMode = group.SubsistenceMode,
+            LastRegionId = group.LastRegionId,
+            MonthsSinceLastMove = group.MonthsSinceLastMove,
+            Pressures = group.Pressures.Clone(),
+            KnownRegionIds = new HashSet<string>(group.KnownRegionIds, StringComparer.Ordinal),
+            KnownDiscoveryIds = new HashSet<string>(group.KnownDiscoveryIds, StringComparer.Ordinal),
+            DiscoveryEvidence = group.DiscoveryEvidence.Clone(),
+            LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
+            AdvancementEvidence = group.AdvancementEvidence.Clone()
+        };
+
+        foreach (var polityId in cloned.DiscoveryEvidence.ContactMonthsByPolityId.Keys
+                     .Where(polityId => !activePolityIds.Contains(polityId))
+                     .ToArray())
+        {
+            cloned.DiscoveryEvidence.ContactMonthsByPolityId.Remove(polityId);
+        }
+
+        return cloned;
     }
 
     private bool ResolveActiveLawProposal(LawProposalStatus status)

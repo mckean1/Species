@@ -80,7 +80,7 @@ public sealed class ChronicleSystem
                     change.CurrentRegionId));
             }
 
-            if (change.StarvationLoss >= ChronicleConstants.MeaningfulDeclineThreshold && change.FinalPopulation > 0)
+            if (-change.NetPopulationChange >= ChronicleConstants.MeaningfulDeclineThreshold && change.FinalPopulation > 0)
             {
                 AddEntry(entries, seenKeys, BuildEntry(
                     world,
@@ -88,7 +88,7 @@ public sealed class ChronicleSystem
                     change.GroupId,
                     change.GroupName,
                     ChronicleEventCategory.Decline,
-                    $"{change.GroupName} declined after hunger and loss.",
+                    BuildDeclineMessage(change),
                     "decline",
                     change.CurrentRegionId));
             }
@@ -441,6 +441,26 @@ public sealed class ChronicleSystem
         }
 
         return $"{survivalChange.GroupName} suffered shortages under {severityText} {currentTop.Category.ToLowerInvariant()} pressure.";
+    }
+
+    private static string BuildDeclineMessage(GroupSurvivalChange change)
+    {
+        if (change.StarvationLoss > 0)
+        {
+            return $"{change.GroupName} declined after hunger and loss.";
+        }
+
+        if (change.WaterStressDeaths > 0)
+        {
+            return $"{change.GroupName} declined under severe water stress.";
+        }
+
+        if (change.HardshipDeaths > 0)
+        {
+            return $"{change.GroupName} declined under mounting hardship.";
+        }
+
+        return $"{change.GroupName} declined as deaths outpaced births.";
     }
 
     private static PressureStatus ResolveTopPressure(GroupPressureChange pressureChange, bool useCurrent)

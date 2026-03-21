@@ -23,6 +23,8 @@ public sealed class PopulationGroup
 
     public int StoredFood { get; set; }
 
+    public FoodAccountingSnapshot FoodAccounting { get; set; } = new();
+
     public float HungerPressure { get; set; }
 
     public int ShortageMonths { get; set; }

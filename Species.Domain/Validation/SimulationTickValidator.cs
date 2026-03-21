@@ -1,6 +1,7 @@
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Domain.Enums;
+using Species.Domain.Constants;
 
 namespace Species.Domain.Validation;
 
@@ -55,10 +56,14 @@ public static class SimulationTickValidator
             }
 
             var synthesizedMigration = (int)Math.Round(
-                (change.Food.MonthlyContribution * 0.35) +
-                (change.Water.MonthlyContribution * 0.15) +
-                (change.Threat.MonthlyContribution * 0.20) +
-                (change.Overcrowding.MonthlyContribution * 0.30),
+                Math.Clamp(
+                    ((change.Food.MonthlyContribution * PressureCalculationConstants.MigrationFoodWeight) +
+                     (change.Water.MonthlyContribution * PressureCalculationConstants.MigrationWaterWeight) +
+                     (change.Threat.MonthlyContribution * PressureCalculationConstants.MigrationThreatWeight) +
+                     (change.Overcrowding.MonthlyContribution * PressureCalculationConstants.MigrationOvercrowdingWeight)) -
+                    PressureCalculationConstants.MigrationMonthlyRelief,
+                    0.0,
+                    PressureCalculationConstants.PressureScaleMaximum),
                 MidpointRounding.AwayFromZero);
 
             if (Math.Abs(change.Migration.MonthlyContribution - synthesizedMigration) > 1)

@@ -1,4 +1,6 @@
+using Species.Domain.Constants;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -9,6 +11,7 @@ public sealed record PolityContext(
     IReadOnlyList<PopulationGroup> MemberGroups,
     int TotalPopulation,
     int TotalStoredFood,
+    FoodAccountingSnapshot FoodAccounting,
     MaterialStockpile TotalMaterialStores,
     PressureState Pressures,
     IReadOnlySet<string> KnownRegionIds,
@@ -64,15 +67,26 @@ public static class PolityData
 
     public static PolityContext? BuildContext(World world, Polity polity)
     {
-        var groupsById = world.PopulationGroups.ToDictionary(group => group.Id, StringComparer.Ordinal);
-        var memberGroups = polity.MemberGroupIds
-            .Select(groupsById.GetValueOrDefault)
-            .Where(group => group is not null)
-            .Cast<PopulationGroup>()
+        // The polity view must always reflect live group truth, even before any cached member-id list is rebuilt.
+        var memberGroups = world.PopulationGroups
+            .Where(group => string.Equals(group.PolityId, polity.Id, StringComparison.Ordinal))
             .OrderByDescending(group => group.Population)
             .ThenBy(group => group.Name, StringComparer.Ordinal)
             .ThenBy(group => group.Id, StringComparer.Ordinal)
             .ToArray();
+
+        if (memberGroups.Length == 0 && polity.MemberGroupIds.Count > 0)
+        {
+            var groupsById = world.PopulationGroups.ToDictionary(group => group.Id, StringComparer.Ordinal);
+            memberGroups = polity.MemberGroupIds
+                .Select(groupsById.GetValueOrDefault)
+                .Where(group => group is not null)
+                .Cast<PopulationGroup>()
+                .OrderByDescending(group => group.Population)
+                .ThenBy(group => group.Name, StringComparer.Ordinal)
+                .ThenBy(group => group.Id, StringComparer.Ordinal)
+                .ToArray();
+        }
 
         if (memberGroups.Length == 0)
         {
@@ -82,6 +96,7 @@ public static class PolityData
         var leadGroup = memberGroups[0];
         var totalPopulation = memberGroups.Sum(group => group.Population);
         var totalStoredFood = memberGroups.Sum(group => group.StoredFood);
+        var foodAccounting = AggregateFoodAccounting(memberGroups, polity);
         var totalMaterialStores = polity.MaterialStores.Clone();
         foreach (var settlement in polity.Settlements.Where(settlement => settlement.IsActive))
         {
@@ -109,10 +124,11 @@ public static class PolityData
             memberGroups,
             totalPopulation,
             totalStoredFood,
+            foodAccounting,
             totalMaterialStores,
             new PressureState
             {
-                Food = WeightedPressure(memberGroups, group => group.Pressures.Food, PressureDefinitions.Food),
+                Food = AggregateFoodPressure(memberGroups),
                 Water = WeightedPressure(memberGroups, group => group.Pressures.Water, PressureDefinitions.Water),
                 Threat = WeightedPressure(memberGroups, group => group.Pressures.Threat, PressureDefinitions.Threat),
                 Overcrowding = WeightedPressure(memberGroups, group => group.Pressures.Overcrowding, PressureDefinitions.Overcrowding),
@@ -165,5 +181,68 @@ public static class PolityData
     {
         var rawAverage = WeightedAverage(groups, Math.Max(1, groups.Sum(group => group.Population)), group => selector(group).RawValue);
         return PressureMath.CreateValue(definition, rawAverage);
+    }
+
+    private static PressureValue AggregateFoodPressure(IReadOnlyList<PopulationGroup> groups)
+    {
+        if (groups.Count == 0)
+        {
+            return new PressureValue();
+        }
+
+        var totalPopulation = Math.Max(1, groups.Sum(group => group.Population));
+        var rawAverage = WeightedAverage(groups, totalPopulation, group => group.Pressures.Food.RawValue);
+        var totalStoredFood = groups.Sum(group => group.FoodAccounting.EndingTotalStores > 0 ? group.FoodAccounting.EndingTotalStores : group.StoredFood);
+        var totalMonthlyFoodNeed = groups.Sum(group => group.FoodAccounting.MonthlyDemand > 0 ? group.FoodAccounting.MonthlyDemand : SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population));
+        var reserveCoverage = totalMonthlyFoodNeed <= 0
+            ? PressureCalculationConstants.StoredFoodMonthsSafe
+            : totalStoredFood / (float)totalMonthlyFoodNeed;
+        var reserveSignal = (int)Math.Round(
+            Math.Max(0.0f, 1.0f - MathF.Min(1.0f, reserveCoverage / PressureCalculationConstants.StoredFoodMonthsSafe)) * 140.0f,
+            MidpointRounding.AwayFromZero);
+        var hungerSignal = WeightedAverage(
+            groups,
+            totalPopulation,
+            group => (int)Math.Round(group.HungerPressure * 160.0f, MidpointRounding.AwayFromZero));
+        var shortageSignal = WeightedAverage(
+            groups,
+            totalPopulation,
+            group => Math.Min(220, group.ShortageMonths * 36));
+        var collapseSignal = WeightedAverage(groups, totalPopulation, group => ResolveFoodStressSignal(group.FoodStressState));
+        var derivedRaw = (int)Math.Round(
+            (reserveSignal * 0.20f) +
+            (hungerSignal * 0.25f) +
+            (shortageSignal * 0.20f) +
+            (collapseSignal * 0.35f),
+            MidpointRounding.AwayFromZero);
+
+        // Polity food pressure is displayed as a current strain signal, so it must incorporate
+        // month-end food collapse states rather than only the pre-survival stored raw pressure average.
+        return PressureMath.CreateValue(PressureDefinitions.Food, Math.Max(rawAverage, derivedRaw));
+    }
+
+    private static FoodAccountingSnapshot AggregateFoodAccounting(IReadOnlyList<PopulationGroup> groups, Polity polity)
+    {
+        if (polity.FoodAccounting.EndingTotalStores > 0 ||
+            polity.FoodAccounting.StartingTotalStores > 0 ||
+            polity.FoodAccounting.MonthlyDemand > 0)
+        {
+            return polity.FoodAccounting.Clone();
+        }
+
+        var carriedStores = groups.Sum(group => group.StoredFood);
+        var reserveStores = polity.Settlements.Where(settlement => settlement.IsActive).Sum(settlement => settlement.StoredFood);
+        return FoodAccountingSnapshot.CreateInitial(carriedStores, reserveStores);
+    }
+
+    private static int ResolveFoodStressSignal(FoodStressState state)
+    {
+        return state switch
+        {
+            FoodStressState.HungerPressure => 70,
+            FoodStressState.SevereShortage => 150,
+            FoodStressState.Starvation => 240,
+            _ => 0
+        };
     }
 }

@@ -173,8 +173,8 @@ public sealed class MaterialEconomySystem
 
     public static RegionMaterialProfile BuildRegionMaterialProfile(Region region)
     {
-        var floraTotal = region.Ecosystem.FloraPopulations.Values.Sum();
-        var faunaTotal = region.Ecosystem.FaunaPopulations.Values.Sum();
+        var floraTotal = region.Ecosystem.FloraPopulations.Values.Sum(value => (long)value);
+        var faunaTotal = region.Ecosystem.FaunaPopulations.Values.Sum(value => (long)value);
         var waterModifier = region.WaterAvailability switch
         {
             WaterAvailability.High => 1.15,

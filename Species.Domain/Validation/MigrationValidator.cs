@@ -48,7 +48,7 @@ public static class MigrationValidator
                 errors.Add($"Group {change.GroupId} regressed MonthsSinceLastMove without moving.");
             }
 
-            if (change.WinningRegionScore < change.CurrentRegionScore + MigrationConstants.MinimumMoveMargin && change.Moved)
+            if (change.WinningRegionScore < change.CurrentRegionScore + change.RequiredMoveMargin && change.Moved)
             {
                 errors.Add($"Group {change.GroupId} moved without clearing the minimum migration margin.");
             }

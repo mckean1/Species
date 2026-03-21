@@ -18,6 +18,10 @@ public sealed class FaunaPopulationChange
 
     public required int Deaths { get; init; }
 
+    public required int AttritionDeaths { get; init; }
+
+    public required int StarvationDeaths { get; init; }
+
     public required float FoodNeeded { get; init; }
 
     public required float FoodConsumed { get; init; }
