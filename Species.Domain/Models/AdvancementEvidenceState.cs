@@ -22,6 +22,10 @@ public sealed class AdvancementEvidenceState
 
     public int ContactLearningMonths { get; set; }
 
+    public Dictionary<string, float> AdvancementProgressById { get; init; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, float> AdoptionProgressById { get; init; } = new(StringComparer.Ordinal);
+
     public AdvancementEvidenceState Clone()
     {
         return new AdvancementEvidenceState
@@ -35,7 +39,9 @@ public sealed class AdvancementEvidenceState
             StoragePressureMonths = StoragePressureMonths,
             ShelterReadinessMonths = ShelterReadinessMonths,
             StabilityMonths = StabilityMonths,
-            ContactLearningMonths = ContactLearningMonths
+            ContactLearningMonths = ContactLearningMonths,
+            AdvancementProgressById = new Dictionary<string, float>(AdvancementProgressById, StringComparer.Ordinal),
+            AdoptionProgressById = new Dictionary<string, float>(AdoptionProgressById, StringComparer.Ordinal)
         };
     }
 }

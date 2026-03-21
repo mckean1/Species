@@ -26,12 +26,27 @@ public static class GroupSurvivalValidator
                 errors.Add($"Group survival produced an invalid shortage or starvation value for {change.GroupId}.");
             }
 
-            if (change.PrimaryAction == "Gather" && change.FallbackAction != "Hunt" && change.SubsistenceMode is "Gatherer" or "Mixed")
+            if (change.PrimaryAction is not ("Gather" or "Hunt") || change.FallbackAction is not ("Gather" or "Hunt"))
+            {
+                errors.Add($"Group {change.GroupId} has an invalid extraction action.");
+            }
+
+            if (change.PrimaryAction == change.FallbackAction && change.ExtractionPlan != "KnownSourceLimited")
+            {
+                errors.Add($"Group {change.GroupId} should not repeat the same primary and fallback action outside source-limited behavior.");
+            }
+
+            if (change.UsableFoodConsumed < 0)
+            {
+                errors.Add($"Group survival produced negative usable food for {change.GroupId}.");
+            }
+
+            if (change.SubsistenceMode is "Gatherer" or "Mixed" && change.PrimaryAction == "Gather" && change.FallbackAction != "Hunt" && change.ExtractionPlan != "KnownSourceLimited")
             {
                 errors.Add($"Group {change.GroupId} does not follow gather-then-hunt fallback order.");
             }
 
-            if (change.PrimaryAction == "Hunt" && change.FallbackAction != "Gather" && change.SubsistenceMode == "Hunter")
+            if (change.SubsistenceMode == "Hunter" && change.PrimaryAction == "Hunt" && change.FallbackAction != "Gather" && change.ExtractionPlan != "KnownSourceLimited")
             {
                 errors.Add($"Group {change.GroupId} does not follow hunt-then-gather fallback order.");
             }

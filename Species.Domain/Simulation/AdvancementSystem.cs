@@ -102,6 +102,8 @@ public sealed class AdvancementSystem
 
             var unlockedThisMonth = new List<AdvancementDefinition>();
             var checks = new List<string>();
+            var advancementBudget = ProgressionPacingConstants.AdvancementMonthlyBudget;
+            var adoptionBudget = ProgressionPacingConstants.AdoptionMonthlyBudget;
 
             EvaluateAdvancement(
                 updatedGroup,
@@ -112,6 +114,9 @@ public sealed class AdvancementSystem
                 evidence.SuccessfulGatheringWithKnowledgeMonths,
                 AdvancementConstants.ImprovedGatheringMonthsRequired + 1,
                 "flora knowledge plus sustained need",
+                1.00f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -125,6 +130,9 @@ public sealed class AdvancementSystem
                 evidence.SuccessfulHuntingWithKnowledgeMonths,
                 AdvancementConstants.ImprovedHuntingMonthsRequired + 1,
                 "fauna knowledge, tracking, and sustained need",
+                1.05f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -139,6 +147,9 @@ public sealed class AdvancementSystem
                 Math.Min(evidence.SurplusStoredFoodMonths, evidence.StoragePressureMonths),
                 AdvancementConstants.FoodStorageSurplusMonthsRequired,
                 "preservation knowledge plus durable storage conditions",
+                0.95f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -151,6 +162,9 @@ public sealed class AdvancementSystem
                 evidence.KnownRouteTravelMonths,
                 AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired,
                 "known route use plus continuity",
+                0.85f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -165,6 +179,9 @@ public sealed class AdvancementSystem
                 Math.Min(evidence.MaterialPracticeMonths, evidence.SuccessfulResidenceWithRegionKnowledgeMonths),
                 AdvancementConstants.LocalResourceUseMonthsRequired,
                 "local region knowledge plus material practice",
+                0.90f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -179,6 +196,9 @@ public sealed class AdvancementSystem
                 evidence.ShelterReadinessMonths,
                 AdvancementConstants.StrongerShelterMonthsRequired,
                 "shelter-method knowledge plus settled material readiness",
+                0.90f,
+                ref advancementBudget,
+                ref adoptionBudget,
                 unlockedThisMonth,
                 checks);
 
@@ -216,6 +236,9 @@ public sealed class AdvancementSystem
         int evidenceCount,
         int requiredCount,
         string prerequisiteLabel,
+        float needFactor,
+        ref float advancementBudget,
+        ref float adoptionBudget,
         ICollection<AdvancementDefinition> unlockedThisMonth,
         ICollection<string> checks)
     {
@@ -231,21 +254,76 @@ public sealed class AdvancementSystem
             return;
         }
 
+        var capabilityProgress = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
+        var adoptionProgress = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
+
         if (!prerequisiteMet)
         {
+            capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, advancementId, capabilityProgress, 0.0f, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
+            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
             checks.Add($"{definition.Name}: waiting on {prerequisiteLabel}.");
             return;
         }
 
-        if (evidenceCount >= requiredCount)
+        var evidenceRatio = requiredCount <= 0
+            ? 0.0f
+            : Math.Clamp(evidenceCount / (float)requiredCount, 0.0f, 2.0f);
+        var capabilityGain = Math.Min(
+            ProgressionPacingConstants.AdvancementMonthlyGainCap,
+            1.25f + evidenceRatio * 5.5f + needFactor * 2.0f);
+        capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, advancementId, capabilityProgress, capabilityGain, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
+
+        if (capabilityProgress < ProgressionPacingConstants.StageThreshold)
         {
-            group.LearnedAdvancementIds.Add(advancementId);
-            unlockedThisMonth.Add(definition);
-            checks.Add($"{definition.Name}: learned at {evidenceCount}/{requiredCount}.");
+            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
+            checks.Add($"{definition.Name}: capability progress {capabilityProgress:0}/{ProgressionPacingConstants.StageThreshold:0} from {evidenceCount}/{requiredCount} after {prerequisiteLabel}.");
             return;
         }
 
-        checks.Add($"{definition.Name}: {evidenceCount}/{requiredCount} after {prerequisiteLabel}.");
+        var adoptionGain = Math.Min(
+            ProgressionPacingConstants.AdoptionMonthlyGainCap,
+            0.75f + evidenceRatio * 3.5f + needFactor * 1.5f);
+        adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, adoptionGain, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
+
+        if (adoptionProgress >= ProgressionPacingConstants.StageThreshold)
+        {
+            group.LearnedAdvancementIds.Add(advancementId);
+            group.AdvancementEvidence.AdvancementProgressById.Remove(advancementId);
+            group.AdvancementEvidence.AdoptionProgressById.Remove(advancementId);
+            unlockedThisMonth.Add(definition);
+            checks.Add($"{definition.Name}: adopted after paced capability and adoption progress.");
+            return;
+        }
+
+        checks.Add($"{definition.Name}: capability {capabilityProgress:0}/100, adoption {adoptionProgress:0}/100 from {evidenceCount}/{requiredCount} after {prerequisiteLabel}.");
+    }
+
+    private static float ApplyProgress(
+        IDictionary<string, float> progressById,
+        string id,
+        float currentProgress,
+        float requestedGain,
+        ref float monthlyBudget,
+        float monthlyDecay)
+    {
+        var gain = Math.Min(requestedGain, Math.Max(0.0f, monthlyBudget));
+        var progress = requestedGain <= 0.0f
+            ? Math.Max(0.0f, currentProgress - monthlyDecay)
+            : Math.Min(ProgressionPacingConstants.StageThreshold, currentProgress + gain);
+
+        if (requestedGain > 0.0f)
+        {
+            monthlyBudget = Math.Max(0.0f, monthlyBudget - gain);
+        }
+
+        if (progress <= 0.0f)
+        {
+            progressById.Remove(id);
+            return 0.0f;
+        }
+
+        progressById[id] = progress;
+        return progress;
     }
 
     private static string BuildRelevantDiscoveriesSummary(PopulationGroup group, DiscoveryCatalog discoveryCatalog, string regionId)
@@ -298,7 +376,17 @@ public sealed class AdvancementSystem
 
     private static string BuildEvidenceSummary(AdvancementEvidenceState evidence)
     {
-        return $"GatherUse={evidence.SuccessfulGatheringWithKnowledgeMonths} | HuntUse={evidence.SuccessfulHuntingWithKnowledgeMonths} | StorageUse={evidence.SurplusStoredFoodMonths}/{evidence.StoragePressureMonths} | RouteUse={evidence.KnownRouteTravelMonths} | LocalUse={evidence.SuccessfulResidenceWithRegionKnowledgeMonths}/{evidence.MaterialPracticeMonths} | Shelter={evidence.ShelterReadinessMonths} | Stability={evidence.StabilityMonths}";
+        return $"GatherUse={evidence.SuccessfulGatheringWithKnowledgeMonths} | HuntUse={evidence.SuccessfulHuntingWithKnowledgeMonths} | StorageUse={evidence.SurplusStoredFoodMonths}/{evidence.StoragePressureMonths} | RouteUse={evidence.KnownRouteTravelMonths} | LocalUse={evidence.SuccessfulResidenceWithRegionKnowledgeMonths}/{evidence.MaterialPracticeMonths} | Shelter={evidence.ShelterReadinessMonths} | Stability={evidence.StabilityMonths} | CapabilityProgress=[{SummarizeProgress(evidence.AdvancementProgressById)}] | AdoptionProgress=[{SummarizeProgress(evidence.AdoptionProgressById)}]";
+    }
+
+    private static string SummarizeProgress(IReadOnlyDictionary<string, float> progressById)
+    {
+        if (progressById.Count == 0)
+        {
+            return "none";
+        }
+
+        return string.Join(", ", progressById.OrderBy(entry => entry.Key, StringComparer.Ordinal).Select(entry => $"{entry.Key}:{entry.Value:0}"));
     }
 
     private static PopulationGroup CloneGroup(PopulationGroup group)
@@ -313,6 +401,10 @@ public sealed class AdvancementSystem
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            HungerPressure = group.HungerPressure,
+            ShortageMonths = group.ShortageMonths,
+            FoodStressState = group.FoodStressState,
+            SubsistencePreference = group.SubsistencePreference,
             SubsistenceMode = group.SubsistenceMode,
             Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,

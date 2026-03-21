@@ -26,9 +26,10 @@ public static class WorldSummaryFormatter
                 : string.Join(", ", region.Ecosystem.FaunaPopulations
                     .OrderBy(entry => entry.Key, StringComparer.Ordinal)
                     .Select(entry => $"{entry.Key}:{entry.Value}"));
+            var proto = region.Ecosystem.ProtoLifeSubstrate;
 
             lines.Add(
-                $"{region.Id} | {region.Name} | Biome={region.Biome} | Water={region.WaterAvailability} | Fertility={region.Fertility:0.00} | Neighbors=[{string.Join(", ", region.NeighborIds)}] | Flora=[{flora}] | Fauna=[{fauna}]");
+                $"{region.Id} | {region.Name} | Biome={region.Biome} | Water={region.WaterAvailability} | Fertility={region.Fertility:0.00} | Neighbors=[{string.Join(", ", region.NeighborIds)}] | Proto=[FCap:{proto.ProtoFloraCapacity:0.00}, FaCap:{proto.ProtoFaunaCapacity:0.00}, FPress:{proto.ProtoFloraPressure:0.00}, FaPress:{proto.ProtoFaunaPressure:0.00}, Vacancy:{proto.EcologicalVacancy:0.00}] | Flora=[{flora}] | Fauna=[{fauna}]");
         }
 
         return string.Join(Environment.NewLine, lines);

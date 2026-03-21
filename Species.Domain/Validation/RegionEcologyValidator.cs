@@ -22,6 +22,8 @@ public static class RegionEcologyValidator
                 continue;
             }
 
+            ValidateSubstrate(region.Id, region.Ecosystem.ProtoLifeSubstrate, errors);
+
             foreach (var floraPopulation in region.Ecosystem.FloraPopulations)
             {
                 if (!knownFloraIds.Contains(floraPopulation.Key))
@@ -112,6 +114,24 @@ public static class RegionEcologyValidator
             errors.Add($"Regional biological profile {profile.SpeciesId} has negative counters.");
         }
 
+        if (profile.StableSupportMonths < 0 ||
+            profile.SocialCoordinationPressureMonths < 0 ||
+            profile.LearningPressureMonths < 0 ||
+            profile.SapienceProgress < 0)
+        {
+            errors.Add($"Regional biological profile {profile.SpeciesId} has negative sapience-emergence counters.");
+        }
+
+        if (profile.HungerPressure is < 0 or > 1 || profile.ShortageMonths < 0 || profile.FeedingMomentum is < 0 or > 1)
+        {
+            errors.Add($"Regional biological profile {profile.SpeciesId} has invalid hunger or feeding state.");
+        }
+
+        if (!Enum.IsDefined(profile.FoodStressState))
+        {
+            errors.Add($"Regional biological profile {profile.SpeciesId} has an invalid food stress state.");
+        }
+
         if (profile.IsExtinct && profile.LastPopulation > 0)
         {
             errors.Add($"Regional biological profile {profile.SpeciesId} is extinct but still has population.");
@@ -133,6 +153,31 @@ public static class RegionEcologyValidator
             traits.Resilience is < 0 or > 100)
         {
             errors.Add($"Regional biological profile {speciesId} has traits outside the valid range.");
+        }
+    }
+
+    private static void ValidateSubstrate(string regionId, ProtoLifeSubstrate substrate, ICollection<string> errors)
+    {
+        if (substrate.ProtoFloraCapacity is < 0 or > 1 ||
+            substrate.ProtoFaunaCapacity is < 0 or > 1 ||
+            substrate.ProtoFloraPressure is < 0 or > 1 ||
+            substrate.ProtoFaunaPressure is < 0 or > 1 ||
+            substrate.FloraOccupancyDeficit is < 0 or > 1 ||
+            substrate.FaunaOccupancyDeficit is < 0 or > 1 ||
+            substrate.FloraSupportDeficit is < 0 or > 1 ||
+            substrate.FaunaSupportDeficit is < 0 or > 1 ||
+            substrate.EcologicalVacancy is < 0 or > 1 ||
+            substrate.RecentCollapseOpening is < 0 or > 1)
+        {
+            errors.Add($"Region {regionId} has proto-life substrate values outside the normalized range.");
+        }
+
+        if (substrate.ProtoFloraReadinessMonths < 0 ||
+            substrate.ProtoFaunaReadinessMonths < 0 ||
+            substrate.ProtoFloraGenesisCooldownMonths < 0 ||
+            substrate.ProtoFaunaGenesisCooldownMonths < 0)
+        {
+            errors.Add($"Region {regionId} has negative proto-genesis readiness or cooldown counters.");
         }
     }
 }

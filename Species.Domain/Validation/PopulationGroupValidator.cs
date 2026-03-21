@@ -57,6 +57,21 @@ public static class PopulationGroupValidator
                 errors.Add($"Population group {group.Id} has negative StoredFood.");
             }
 
+            if (group.HungerPressure is < 0 or > 1)
+            {
+                errors.Add($"Population group {group.Id} has invalid HungerPressure.");
+            }
+
+            if (group.ShortageMonths < 0)
+            {
+                errors.Add($"Population group {group.Id} has negative ShortageMonths.");
+            }
+
+            if (!Enum.IsDefined(group.FoodStressState))
+            {
+                errors.Add($"Population group {group.Id} has invalid FoodStressState.");
+            }
+
             if (group.MonthsSinceLastMove < 0)
             {
                 errors.Add($"Population group {group.Id} has negative MonthsSinceLastMove.");

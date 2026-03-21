@@ -133,8 +133,8 @@ public static class AdvancementsScreenDataBuilder
     {
         var discoveryId = discoveryCatalog.GetLocalFloraDiscoveryId(group.CurrentRegionId);
         var knowsFlora = group.KnownDiscoveryIds.Contains(discoveryId);
-        var progress = group.AdvancementEvidence.SuccessfulGatheringWithKnowledgeMonths;
-        var progressSummary = $"Gathering after local flora knowledge: {progress}/{AdvancementConstants.ImprovedGatheringMonthsRequired} months.";
+        var evidenceProgress = group.AdvancementEvidence.SuccessfulGatheringWithKnowledgeMonths;
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.ImprovedGatheringId, $"Gathering after local flora knowledge: {evidenceProgress}/{AdvancementConstants.ImprovedGatheringMonthsRequired + 1} months.");
         var requirements = new List<string>
         {
             $"{(knowsFlora ? "Known" : "Missing")} discovery: {regionName} Flora",
@@ -154,7 +154,9 @@ public static class AdvancementsScreenDataBuilder
         }
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.ImprovedGatheringId,
+            evidenceProgress,
             AdvancementConstants.ImprovedGatheringMonthsRequired + 1,
             "Local flora knowledge is in place.",
             requirements,
@@ -169,8 +171,8 @@ public static class AdvancementsScreenDataBuilder
     {
         var discoveryId = discoveryCatalog.GetLocalFaunaDiscoveryId(group.CurrentRegionId);
         var knowsFauna = group.KnownDiscoveryIds.Contains(discoveryId);
-        var progress = group.AdvancementEvidence.SuccessfulHuntingWithKnowledgeMonths;
-        var progressSummary = $"Hunting after local fauna knowledge: {progress}/{AdvancementConstants.ImprovedHuntingMonthsRequired} months.";
+        var evidenceProgress = group.AdvancementEvidence.SuccessfulHuntingWithKnowledgeMonths;
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.ImprovedHuntingId, $"Hunting after local fauna knowledge: {evidenceProgress}/{AdvancementConstants.ImprovedHuntingMonthsRequired + 1} months.");
         var requirements = new List<string>
         {
             $"{(knowsFauna ? "Known" : "Missing")} discovery: {regionName} Fauna",
@@ -190,7 +192,9 @@ public static class AdvancementsScreenDataBuilder
         }
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.ImprovedHuntingId,
+            evidenceProgress,
             AdvancementConstants.ImprovedHuntingMonthsRequired + 1,
             "Local fauna knowledge is in place.",
             requirements,
@@ -200,8 +204,8 @@ public static class AdvancementsScreenDataBuilder
 
     private static AdvancementRequirementInfo BuildStorageRequirement(PopulationGroup group, PolityContext? focusContext)
     {
-        var progress = Math.Min(group.AdvancementEvidence.SurplusStoredFoodMonths, group.AdvancementEvidence.StoragePressureMonths);
-        var progressSummary = $"Stored food under pressure: {progress}/{AdvancementConstants.FoodStorageSurplusMonthsRequired}.";
+        var evidenceProgress = Math.Min(group.AdvancementEvidence.SurplusStoredFoodMonths, group.AdvancementEvidence.StoragePressureMonths);
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.FoodStorageId, $"Stored food under pressure: {evidenceProgress}/{AdvancementConstants.FoodStorageSurplusMonthsRequired}.");
         var requirements = new List<string>
         {
             $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId) ? "Known" : "Missing")} discovery: Preservation Clues",
@@ -211,7 +215,9 @@ public static class AdvancementsScreenDataBuilder
         };
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.FoodStorageId,
+            evidenceProgress,
             AdvancementConstants.FoodStorageSurplusMonthsRequired,
             "Repeated food surplus has been achieved.",
             requirements,
@@ -222,8 +228,8 @@ public static class AdvancementsScreenDataBuilder
     private static AdvancementRequirementInfo BuildTravelRequirement(PopulationGroup group)
     {
         var hasKnownRouteUse = group.AdvancementEvidence.KnownRouteTravelMonths > 0;
-        var progress = group.AdvancementEvidence.KnownRouteTravelMonths;
-        var progressSummary = $"Known-route travel months: {progress}/{AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired}.";
+        var evidenceProgress = group.AdvancementEvidence.KnownRouteTravelMonths;
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.OrganizedTravelId, $"Known-route travel months: {evidenceProgress}/{AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired}.");
         var requirements = new List<string>
         {
             $"{(hasKnownRouteUse ? "Has" : "Needs")} successful travel along a known route",
@@ -243,7 +249,9 @@ public static class AdvancementsScreenDataBuilder
         }
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.OrganizedTravelId,
+            evidenceProgress,
             AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired,
             "Known-route travel has begun.",
             requirements,
@@ -259,8 +267,8 @@ public static class AdvancementsScreenDataBuilder
     {
         var discoveryId = discoveryCatalog.GetLocalRegionConditionsDiscoveryId(group.CurrentRegionId);
         var knowsRegion = group.KnownDiscoveryIds.Contains(discoveryId);
-        var progress = Math.Min(group.AdvancementEvidence.SuccessfulResidenceWithRegionKnowledgeMonths, group.AdvancementEvidence.MaterialPracticeMonths);
-        var progressSummary = $"Stable local material practice: {progress}/{AdvancementConstants.LocalResourceUseMonthsRequired}.";
+        var evidenceProgress = Math.Min(group.AdvancementEvidence.SuccessfulResidenceWithRegionKnowledgeMonths, group.AdvancementEvidence.MaterialPracticeMonths);
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.LocalResourceUseId, $"Stable local material practice: {evidenceProgress}/{AdvancementConstants.LocalResourceUseMonthsRequired}.");
         var requirements = new List<string>
         {
             $"{(knowsRegion ? "Known" : "Missing")} discovery: {regionName} Conditions",
@@ -281,7 +289,9 @@ public static class AdvancementsScreenDataBuilder
         }
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.LocalResourceUseId,
+            evidenceProgress,
             AdvancementConstants.LocalResourceUseMonthsRequired,
             "Local region knowledge is in place.",
             requirements,
@@ -291,8 +301,8 @@ public static class AdvancementsScreenDataBuilder
 
     private static AdvancementRequirementInfo BuildShelterRequirement(PopulationGroup group, PolityContext? focusContext)
     {
-        var progress = group.AdvancementEvidence.ShelterReadinessMonths;
-        var progressSummary = $"Shelter-readiness months: {progress}/{AdvancementConstants.StrongerShelterMonthsRequired}.";
+        var evidenceProgress = group.AdvancementEvidence.ShelterReadinessMonths;
+        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.StrongerShelterId, $"Shelter-readiness months: {evidenceProgress}/{AdvancementConstants.StrongerShelterMonthsRequired}.");
         var requirements = new List<string>
         {
             $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId) ? "Known" : "Missing")} discovery: Shelter Methods",
@@ -302,7 +312,9 @@ public static class AdvancementsScreenDataBuilder
         };
 
         return BuildEvidenceResult(
-            progress,
+            group,
+            AdvancementCatalog.StrongerShelterId,
+            evidenceProgress,
             AdvancementConstants.StrongerShelterMonthsRequired,
             "Shelter knowledge and material readiness are in place.",
             requirements,
@@ -311,6 +323,8 @@ public static class AdvancementsScreenDataBuilder
     }
 
     private static AdvancementRequirementInfo BuildEvidenceResult(
+        PopulationGroup group,
+        string advancementId,
         int progress,
         int required,
         string prerequisiteMessage,
@@ -318,7 +332,9 @@ public static class AdvancementsScreenDataBuilder
         string progressSummary,
         string listHint)
     {
-        if (progress >= required)
+        var capability = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
+        var adoption = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
+        if (capability >= 100.0f && adoption >= 100.0f)
         {
             return new AdvancementRequirementInfo(
                 true,
@@ -332,11 +348,18 @@ public static class AdvancementsScreenDataBuilder
         var remaining = required - progress;
         return new AdvancementRequirementInfo(
             false,
-            $"{prerequisiteMessage} Needs {remaining} more month{(remaining == 1 ? string.Empty : "s")} of matching evidence.",
+            $"{prerequisiteMessage} Needs {remaining} more month{(remaining == 1 ? string.Empty : "s")} of matching evidence and more paced capability/adoption progress.",
             requirements,
             progressSummary,
             listHint,
             "Building toward unlock.");
+    }
+
+    private static string BuildPacedProgressSummary(PopulationGroup group, string advancementId, string evidenceSummary)
+    {
+        var capability = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
+        var adoption = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
+        return $"{evidenceSummary} Capability progress: {capability:0}/100. Adoption progress: {adoption:0}/100.";
     }
 
     private static int GetSortOrder(AdvancementScreenStatus status)

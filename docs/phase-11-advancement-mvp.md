@@ -10,7 +10,9 @@ This phase adds advancements only. It does not add tech trees, research points, 
 
 The distinction remains strict:
 
-- Discovery = "we know"
+- Encounter = "we have signs/contact"
+- Discovery = "we have a durable finding"
+- Knowledge = "we understand enough to operate from it"
 - Advancement = "we can"
 
 Discoveries improve decision-making only.
@@ -33,6 +35,13 @@ In MVP form, the direct execution improvements now live in advancements, not dis
 9. End-of-tick finalization
 
 This preserves the causal rule that practical capability comes after lived experience and any new knowledge unlocked from it.
+
+Advancements are now intentionally slower than discoveries. Each advancement moves through:
+
+- capability progress: repeated evidence that the polity is building a workable method
+- adoption progress: continued time under valid conditions until that method becomes a durable operational capability
+
+Both layers are monthly, capped, and condition-driven rather than binary threshold jumps.
 
 ## Advancement Content
 
@@ -58,20 +67,21 @@ Each group now keeps lightweight advancement evidence for:
 - repeated travel on known routes
 - repeated successful survival in known regions
 
-There is no large skill framework, no decay, and no sharing in this phase.
+There is no large skill framework and no sharing in this phase. Advancement pacing now includes slow progress loss when required conditions disappear, so dormant opportunities do not sit at a hidden threshold and burst into multiple same-tick unlocks later.
 
 ## Unlock Rules
 
-Advancements unlock through explicit threshold checks.
+Advancements now unlock through paced progress rather than raw threshold checks.
 
 Typical pattern:
 
 - a relevant discovery prerequisite exists when appropriate
 - the group repeats a practical behavior or use case
-- the threshold is met
-- the advancement is learned
+- capability progress accumulates
+- adoption progress follows more slowly
+- the advancement is learned only after both are complete
 
-Unlocks are binary in MVP form.
+This preserves the distinction that discovery is awareness while advancement is repeatable operational capability.
 
 ## Practical Effects
 
@@ -94,6 +104,8 @@ Advancement names are authored so future Chronicle text can naturally say things
 - group learned Organized Travel
 
 Chronicle generation itself remains deferred.
+
+The indirect Chronicle effect is that important advancement milestones now arrive more naturally over time instead of landing in large same-tick piles without strong ongoing cause.
 
 ## Deferred
 

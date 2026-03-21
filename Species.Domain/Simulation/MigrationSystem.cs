@@ -135,6 +135,13 @@ public sealed class MigrationSystem
                 $"shortage {survivalChange.Shortage} crossed the severe-shortage trigger {MigrationConstants.SevereShortageTrigger} while migration pressure remained {effectivePressure}");
         }
 
+        if (survivalChange.FoodStressState is nameof(FoodStressState.SevereShortage) or nameof(FoodStressState.Starvation))
+        {
+            return new MigrationConsideration(
+                true,
+                $"group ended the month in {survivalChange.FoodStressState.ToLowerInvariant()} after only {survivalChange.UsableFoodConsumed} usable food");
+        }
+
         if (survivalChange.StarvationLoss >= MigrationConstants.SevereStarvationTrigger)
         {
             return new MigrationConsideration(
@@ -210,21 +217,21 @@ public sealed class MigrationSystem
             ? MigrationConstants.KnownRegionBonus
             : -MigrationConstants.UnknownRegionPenalty;
 
-        if (knowledge.ConditionsKnowledge == KnowledgeLevel.Known)
+        if (knowledge.ConditionsKnowledge >= KnowledgeLevel.Discovery)
         {
             score += DiscoveryConstants.LocalRegionConditionsBonus;
         }
 
         if (!string.Equals(currentRegion.Id, knowledge.RegionId, StringComparison.Ordinal))
         {
-            score += knowledge.RouteKnowledge == KnowledgeLevel.Known
+            score += knowledge.RouteKnowledge >= KnowledgeLevel.Discovery
                 ? DiscoveryConstants.KnownRouteBonus
-                : knowledge.RouteKnowledge == KnowledgeLevel.Partial || knowledge.RouteKnowledge == KnowledgeLevel.Rumored
+                : knowledge.RouteKnowledge == KnowledgeLevel.Encounter
                     ? -DiscoveryConstants.UnknownRoutePenalty * 0.5f
                     : -DiscoveryConstants.UnknownRoutePenalty;
 
             if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.OrganizedTravelId) &&
-                knowledge.RouteKnowledge == KnowledgeLevel.Known)
+                knowledge.RouteKnowledge >= KnowledgeLevel.Discovery)
             {
                 score += AdvancementConstants.OrganizedTravelKnownRouteBonus;
             }
@@ -242,9 +249,9 @@ public sealed class MigrationSystem
     {
         return level switch
         {
-            KnowledgeLevel.Known => 1.00f,
-            KnowledgeLevel.Partial => 0.82f,
-            KnowledgeLevel.Rumored => 0.62f,
+            KnowledgeLevel.Knowledge => 1.00f,
+            KnowledgeLevel.Discovery => 0.82f,
+            KnowledgeLevel.Encounter => 0.62f,
             _ => 0.45f
         };
     }
@@ -325,11 +332,16 @@ public sealed class MigrationSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            SpeciesClass = group.SpeciesClass,
             PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            HungerPressure = group.HungerPressure,
+            ShortageMonths = group.ShortageMonths,
+            FoodStressState = group.FoodStressState,
+            SubsistencePreference = group.SubsistencePreference,
             SubsistenceMode = group.SubsistenceMode,
             Pressures = group.Pressures.Clone(),
             LastRegionId = group.LastRegionId,

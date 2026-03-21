@@ -1,6 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 namespace Species.Domain.Generation;
@@ -14,7 +15,8 @@ public static class RegionEcosystemSeeder
         Random random)
     {
         var floraPopulations = SeedFlora(region, floraCatalog, random);
-        var faunaPopulations = SeedFauna(region, floraPopulations, faunaCatalog, random);
+        var faunaPopulations = SeedFauna(region, floraPopulations, floraCatalog, faunaCatalog, random);
+        var protoLifeSubstrate = BuildProtoLifeSubstrate(region, floraPopulations, faunaPopulations);
         var floraProfiles = floraPopulations.Keys.ToDictionary(
             speciesId => speciesId,
             speciesId => new RegionalBiologicalProfile
@@ -38,7 +40,70 @@ public static class RegionEcosystemSeeder
             },
             StringComparer.Ordinal);
 
-        return new RegionEcosystem(floraPopulations, faunaPopulations, floraProfiles, faunaProfiles);
+        return new RegionEcosystem(protoLifeSubstrate, floraPopulations, faunaPopulations, floraProfiles, faunaProfiles);
+    }
+
+    private static ProtoLifeSubstrate BuildProtoLifeSubstrate(
+        Region region,
+        IReadOnlyDictionary<string, int> floraPopulations,
+        IReadOnlyDictionary<string, int> faunaPopulations)
+    {
+        var fertility = (float)Math.Clamp(region.Fertility, 0.0, 1.0);
+        var waterFactor = region.WaterAvailability switch
+        {
+            WaterAvailability.High => 1.00f,
+            WaterAvailability.Medium => 0.72f,
+            _ => 0.42f
+        };
+        var terrainFactor = region.Biome switch
+        {
+            Biome.Wetlands => 1.00f,
+            Biome.Forest => 0.92f,
+            Biome.Plains => 0.86f,
+            Biome.Highlands => 0.64f,
+            Biome.Tundra => 0.38f,
+            Biome.Desert => 0.22f,
+            _ => 0.60f
+        };
+
+        var protoFloraCapacity = ClampNormalized((fertility * 0.55f) + (waterFactor * 0.30f) + (terrainFactor * 0.15f));
+        var protoFaunaCapacity = ClampNormalized((protoFloraCapacity * 0.60f) + (terrainFactor * 0.25f) + (waterFactor * 0.15f));
+        var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(), protoFloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
+        var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(), protoFaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
+        var floraOccupancyDeficit = ClampNormalized(1.0f - floraOccupancy);
+        var faunaOccupancyDeficit = ClampNormalized(1.0f - faunaOccupancy);
+        var floraSupportDeficit = ClampNormalized(Math.Max(0.0f, protoFloraCapacity - floraOccupancy));
+        var faunaSupportBaseline = ClampNormalized((floraOccupancy * 0.65f) + (protoFloraCapacity * 0.20f) + (faunaOccupancy * 0.15f));
+        var faunaSupportDeficit = ClampNormalized(Math.Max(0.0f, protoFaunaCapacity - faunaSupportBaseline));
+        var ecologicalVacancy = ClampNormalized((floraOccupancyDeficit * 0.52f) + (faunaOccupancyDeficit * 0.48f));
+
+        return new ProtoLifeSubstrate
+        {
+            ProtoFloraCapacity = protoFloraCapacity,
+            ProtoFaunaCapacity = protoFaunaCapacity,
+            ProtoFloraPressure = ClampNormalized(protoFloraCapacity * floraOccupancyDeficit * 0.35f),
+            ProtoFaunaPressure = ClampNormalized(protoFaunaCapacity * faunaSupportBaseline * faunaOccupancyDeficit * 0.28f),
+            FloraOccupancyDeficit = floraOccupancyDeficit,
+            FaunaOccupancyDeficit = faunaOccupancyDeficit,
+            FloraSupportDeficit = floraSupportDeficit,
+            FaunaSupportDeficit = faunaSupportDeficit,
+            EcologicalVacancy = ecologicalVacancy,
+            RecentCollapseOpening = 0.0f,
+            ProtoFloraReadinessMonths = 0,
+            ProtoFaunaReadinessMonths = 0,
+            ProtoFloraGenesisCooldownMonths = 0,
+            ProtoFaunaGenesisCooldownMonths = 0
+        };
+    }
+
+    private static float NormalizePopulation(double totalPopulation, float capacity, float scale)
+    {
+        if (capacity <= 0.0f || scale <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        return ClampNormalized((float)(totalPopulation / Math.Max(1.0f, capacity * scale)));
     }
 
     private static IReadOnlyDictionary<string, int> SeedFlora(
@@ -50,11 +115,6 @@ public static class RegionEcosystemSeeder
 
         foreach (var species in floraCatalog.Definitions)
         {
-            if (!species.SupportedWaterAvailabilities.Contains(region.WaterAvailability))
-            {
-                continue;
-            }
-
             var abundance = GetFloraAbundance(region, species, random);
             if (abundance < EcologySeedingConstants.MinimumSeededPopulation)
             {
@@ -70,14 +130,19 @@ public static class RegionEcosystemSeeder
     private static IReadOnlyDictionary<string, int> SeedFauna(
         Region region,
         IReadOnlyDictionary<string, int> floraPopulations,
+        FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         Random random)
     {
         var populations = new Dictionary<string, int>(StringComparer.Ordinal);
         var floraSupport = floraPopulations.Count == 0
             ? 0.0f
-            : ToPopulationSupport(floraPopulations.Values.Average());
-        var preySupport = 0.0f;
+            : (float)floraPopulations.Sum(entry =>
+            {
+                var flora = floraCatalog.GetById(entry.Key);
+                return flora is null ? 0.0 : entry.Value * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
+            }) / EcologySeedingConstants.PopulationScale;
+        var preySupportBySpeciesId = new Dictionary<string, float>(StringComparer.Ordinal);
 
         foreach (var species in faunaCatalog.Definitions)
         {
@@ -86,18 +151,14 @@ public static class RegionEcosystemSeeder
                 continue;
             }
 
-            var abundance = GetFaunaAbundance(region, species, floraSupport, preySupport, random);
+            var abundance = GetFaunaAbundance(region, species, floraPopulations, floraCatalog, preySupportBySpeciesId, random);
             if (abundance < EcologySeedingConstants.MinimumSeededPopulation)
             {
                 continue;
             }
 
             populations[species.Id] = ToPopulationCount(abundance);
-
-            if (species.DietCategory != DietCategory.Carnivore)
-            {
-                preySupport = Math.Max(preySupport, abundance);
-            }
+            preySupportBySpeciesId[species.Id] = abundance * species.FoodYield;
         }
 
         return populations;
@@ -108,14 +169,22 @@ public static class RegionEcosystemSeeder
         FloraSpeciesDefinition species,
         Random random)
     {
+        if (!species.SupportedWaterAvailabilities.Contains(region.WaterAvailability))
+        {
+            return 0.0f;
+        }
+
         var biomeMultiplier = species.CoreBiomes.Contains(region.Biome)
             ? 1.0f
             : EcologySeedingConstants.FloraNonCoreBiomeMultiplier;
-        var fertilityFit = GetFertilityFit((float)region.Fertility, species.PreferredFertilityMin, species.PreferredFertilityMax);
+        var fertilityFit = GetFertilityFit((float)region.Fertility, species.HabitatFertilityMin, species.HabitatFertilityMax);
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FloraRandomVarianceRange);
-        var abundance = (species.GrowthRate * 0.55f) +
-                        (species.FoodValue * 0.10f) +
-                        (fertilityFit * 0.35f) +
+        var supportFit = ResolveFloraSupportFit(region, species, fertilityFit);
+        var abundance = (supportFit * 0.34f) +
+                        (species.GrowthRate * 0.18f) +
+                        (species.RecoveryRate * 0.16f) +
+                        (species.RegionalAbundance * 0.22f) +
+                        (species.SpreadTendency * 0.10f) +
                         (species.CoreBiomes.Contains(region.Biome) ? EcologySeedingConstants.FloraBiomeMatchBonus : 0.0f);
 
         abundance *= EcologySeedingConstants.FloraWaterSupportMultiplier;
@@ -125,40 +194,36 @@ public static class RegionEcosystemSeeder
         return ClampNormalized(abundance);
     }
 
+    private static float ResolveFloraSupportFit(Region region, FloraSpeciesDefinition species, float fertilityFit)
+    {
+        var waterFit = species.SupportedWaterAvailabilities.Contains(region.WaterAvailability) ? 1.0f : 0.0f;
+        var biomeFit = species.CoreBiomes.Contains(region.Biome) ? 1.0f : EcologySeedingConstants.FloraNonCoreBiomeMultiplier;
+        return ClampNormalized((fertilityFit * 0.42f) + (waterFit * 0.36f) + (biomeFit * 0.22f));
+    }
+
     private static float GetFaunaAbundance(
         Region region,
         FaunaSpeciesDefinition species,
-        float floraSupport,
-        float preySupport,
+        IReadOnlyDictionary<string, int> floraPopulations,
+        FloraSpeciesCatalog floraCatalog,
+        IReadOnlyDictionary<string, float> preySupportBySpeciesId,
         Random random)
     {
+        var fertilityFit = GetFertilityFit((float)region.Fertility, species.HabitatFertilityMin, species.HabitatFertilityMax);
         var biomeMultiplier = species.CoreBiomes.Contains(region.Biome)
             ? 1.0f
             : EcologySeedingConstants.FaunaNonCoreBiomeMultiplier;
-        var support = species.DietCategory switch
-        {
-            DietCategory.Herbivore => floraSupport * EcologySeedingConstants.HerbivoreFloraSupportMultiplier,
-            DietCategory.Omnivore => (floraSupport * EcologySeedingConstants.OmnivoreFloraSupportMultiplier) +
-                                     (preySupport * EcologySeedingConstants.OmnivorePreySupportMultiplier),
-            DietCategory.Carnivore => preySupport * EcologySeedingConstants.CarnivorePreySupportMultiplier,
-            _ => 0.0f
-        };
-
-        if (species.DietCategory == DietCategory.Herbivore && floraSupport < EcologySeedingConstants.WeakFloraSupportThreshold)
-        {
-            support *= 0.25f;
-        }
-
-        if (species.DietCategory == DietCategory.Carnivore && preySupport < EcologySeedingConstants.WeakPreySupportThreshold)
-        {
-            support *= 0.10f;
-        }
+        var support = ResolveSeedDietSupport(species, floraPopulations, floraCatalog, preySupportBySpeciesId);
 
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FaunaRandomVarianceRange);
-        var abundance = (support * 0.60f) +
-                        (species.ReproductionRate * 0.15f) +
-                        ((1.0f - species.FoodRequirement) * 0.10f) +
-                        ((1.0f - species.MigrationTendency) * 0.05f) +
+        var abundance = (support * 0.42f) +
+                        (fertilityFit * 0.14f) +
+                        (species.ReproductionRate * 0.12f) +
+                        ((1.0f - species.RequiredIntake) * 0.08f) +
+                        (species.FeedingEfficiency * 0.08f) +
+                        ((1.0f - species.MortalitySensitivity) * 0.06f) +
+                        ((1.0f - species.Mobility) * 0.04f) +
+                        (species.RegionalAbundance * 0.06f) +
                         (species.CoreBiomes.Contains(region.Biome) ? EcologySeedingConstants.FaunaBiomeMatchBonus : 0.0f);
 
         abundance *= EcologySeedingConstants.FaunaWaterSupportMultiplier;
@@ -166,6 +231,81 @@ public static class RegionEcosystemSeeder
         abundance *= variance;
 
         return ClampNormalized(abundance);
+    }
+
+    private static float ResolveSeedDietSupport(
+        FaunaSpeciesDefinition species,
+        IReadOnlyDictionary<string, int> floraPopulations,
+        FloraSpeciesCatalog floraCatalog,
+        IReadOnlyDictionary<string, float> preySupportBySpeciesId)
+    {
+        var preferredLinks = species.DietLinks.Where(link => !link.IsFallback).ToArray();
+        var fallbackLinks = species.DietLinks.Where(link => link.IsFallback).ToArray();
+        var preferredSupport = ResolveSeedDietSupport(preferredLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: false);
+        var fallbackSupport = ResolveSeedDietSupport(fallbackLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: true);
+        var support = preferredSupport + fallbackSupport;
+
+        if (preferredLinks.Length > 0 && preferredSupport < EcologySeedingConstants.WeakFloraSupportThreshold * 0.75f)
+        {
+            support *= 0.55f;
+        }
+
+        return support;
+    }
+
+    private static float ResolveSeedDietSupport(
+        IReadOnlyList<FaunaDietLink> links,
+        IReadOnlyDictionary<string, int> floraPopulations,
+        FloraSpeciesCatalog floraCatalog,
+        IReadOnlyDictionary<string, float> preySupportBySpeciesId,
+        bool includeFallbackPenalty)
+    {
+        if (links.Count == 0)
+        {
+            return 0.0f;
+        }
+
+        var totalWeight = links.Sum(link => link.Weight);
+        if (totalWeight <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        var support = 0.0f;
+        foreach (var link in links)
+        {
+            var share = link.Weight / totalWeight;
+            var linkSupport = link.TargetKind switch
+            {
+                FaunaDietTargetKind.FloraSpecies => ResolveSeedFloraSupport(link.TargetSpeciesId, floraPopulations, floraCatalog) * EcologySeedingConstants.HerbivoreFloraSupportMultiplier,
+                FaunaDietTargetKind.FaunaSpecies => preySupportBySpeciesId.GetValueOrDefault(link.TargetSpeciesId) * EcologySeedingConstants.CarnivorePreySupportMultiplier,
+                FaunaDietTargetKind.ScavengePool => preySupportBySpeciesId.Values.Sum() * EcologySeedingConstants.OmnivorePreySupportMultiplier * 0.30f,
+                _ => 0.0f
+            };
+
+            if (includeFallbackPenalty)
+            {
+                linkSupport *= 1.0f - FaunaSimulationConstants.FallbackDietPenalty;
+            }
+
+            support += linkSupport * share;
+        }
+
+        return support;
+    }
+
+    private static float ResolveSeedFloraSupport(
+        string floraSpeciesId,
+        IReadOnlyDictionary<string, int> floraPopulations,
+        FloraSpeciesCatalog floraCatalog)
+    {
+        if (!floraPopulations.TryGetValue(floraSpeciesId, out var population))
+        {
+            return 0.0f;
+        }
+
+        var flora = floraCatalog.GetById(floraSpeciesId);
+        return flora is null ? 0.0f : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
     }
 
     private static float GetFertilityFit(float fertility, float preferredMin, float preferredMax)

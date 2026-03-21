@@ -49,6 +49,7 @@ public static class DiscoveryStateValidator
             ValidateCounters(group.Id, group.DiscoveryEvidence.MaterialUseMonthsByResourceId, validMaterialKeys, errors, "material use");
             ValidateCounters(group.Id, group.DiscoveryEvidence.ContactMonthsByPolityId, validPolityIds, errors, "contact polity");
             ValidateCounters(group.Id, group.DiscoveryEvidence.SharedExposureMonthsByDiscoveryId, validDiscoveryIds, errors, "shared discovery");
+            ValidateProgressCounters(group.Id, group.DiscoveryEvidence.DiscoveryProgressByDiscoveryId, validDiscoveryIds, errors, "discovery progress");
 
             if (group.DiscoveryEvidence.RecurringFoodPressureMonths < 0 ||
                 group.DiscoveryEvidence.RecurringThreatPressureMonths < 0 ||
@@ -64,6 +65,24 @@ public static class DiscoveryStateValidator
                 if (!validRouteKeys.Contains(route.Key))
                 {
                     errors.Add($"Population group {group.Id} references invalid route evidence key {route.Key}.");
+                }
+            }
+        }
+
+        foreach (var polity in tickResult.World.Polities)
+        {
+            foreach (var awareness in polity.SpeciesAwareness)
+            {
+                if (string.IsNullOrWhiteSpace(awareness.SpeciesId))
+                {
+                    errors.Add($"Polity {polity.Id} has a species-awareness entry with no species ID.");
+                }
+
+                if (awareness.EncounterProgress is < 0.0f or > 100.0f ||
+                    awareness.DiscoveryProgress is < 0.0f or > 100.0f ||
+                    awareness.KnowledgeProgress is < 0.0f or > 100.0f)
+                {
+                    errors.Add($"Polity {polity.Id} has species-awareness progress outside the canonical 0-100 range.");
                 }
             }
         }
@@ -112,6 +131,27 @@ public static class DiscoveryStateValidator
             if (entry.Value < 0)
             {
                 errors.Add($"Population group {groupId} has negative {label} value for {entry.Key}.");
+            }
+        }
+    }
+
+    private static void ValidateProgressCounters(
+        string groupId,
+        IReadOnlyDictionary<string, float> counters,
+        IReadOnlySet<string> validKeys,
+        ICollection<string> errors,
+        string label)
+    {
+        foreach (var entry in counters)
+        {
+            if (!validKeys.Contains(entry.Key))
+            {
+                errors.Add($"Population group {groupId} references invalid {label} key {entry.Key}.");
+            }
+
+            if (entry.Value is < 0.0f or > 100.0f)
+            {
+                errors.Add($"Population group {groupId} has {label} outside the canonical 0-100 range for {entry.Key}.");
             }
         }
     }

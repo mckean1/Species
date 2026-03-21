@@ -3,6 +3,7 @@ namespace Species.Domain.Models;
 public sealed class RegionEcosystem
 {
     public RegionEcosystem(
+        ProtoLifeSubstrate? protoLifeSubstrate = null,
         IReadOnlyDictionary<string, int>? floraPopulations = null,
         IReadOnlyDictionary<string, int>? faunaPopulations = null,
         IReadOnlyDictionary<string, RegionalBiologicalProfile>? floraProfiles = null,
@@ -10,6 +11,7 @@ public sealed class RegionEcosystem
         IReadOnlyList<FossilRecord>? fossilRecords = null,
         IReadOnlyList<BiologicalHistoryRecord>? biologicalHistoryRecords = null)
     {
+        ProtoLifeSubstrate = protoLifeSubstrate?.Clone() ?? new ProtoLifeSubstrate();
         FloraPopulations = floraPopulations ?? new Dictionary<string, int>(StringComparer.Ordinal);
         FaunaPopulations = faunaPopulations ?? new Dictionary<string, int>(StringComparer.Ordinal);
         FloraProfiles = floraProfiles ?? new Dictionary<string, RegionalBiologicalProfile>(StringComparer.Ordinal);
@@ -17,6 +19,8 @@ public sealed class RegionEcosystem
         FossilRecords = fossilRecords ?? Array.Empty<FossilRecord>();
         BiologicalHistoryRecords = biologicalHistoryRecords ?? Array.Empty<BiologicalHistoryRecord>();
     }
+
+    public ProtoLifeSubstrate ProtoLifeSubstrate { get; }
 
     public IReadOnlyDictionary<string, int> FloraPopulations { get; }
 

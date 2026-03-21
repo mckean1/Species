@@ -4,7 +4,9 @@ Phase 15 deepens the existing discovery and advancement layers without turning t
 
 The guiding split is now explicit:
 
-- discovery = learned knowledge from exposure, pressure, continuity, or contact
+- encounter = first contact, signs, or limited observation
+- discovery = durable finding from exposure, pressure, continuity, or contact
+- knowledge = stronger operating familiarity built on sustained exposure and discovery-backed context
 - advancement = usable capability that becomes reliable only when real prerequisites support it
 
 ## What Changed

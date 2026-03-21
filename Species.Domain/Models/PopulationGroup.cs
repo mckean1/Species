@@ -11,6 +11,8 @@ public sealed class PopulationGroup
 
     public string SpeciesId { get; init; } = string.Empty;
 
+    public SpeciesClass SpeciesClass { get; init; } = SpeciesClass.Sapient;
+
     public string PolityId { get; init; } = string.Empty;
 
     public string CurrentRegionId { get; set; } = string.Empty;
@@ -20,6 +22,14 @@ public sealed class PopulationGroup
     public int Population { get; set; }
 
     public int StoredFood { get; set; }
+
+    public float HungerPressure { get; set; }
+
+    public int ShortageMonths { get; set; }
+
+    public FoodStressState FoodStressState { get; set; }
+
+    public SubsistencePreference SubsistencePreference { get; set; } = SubsistencePreference.Mixed;
 
     public SubsistenceMode SubsistenceMode { get; set; }
 

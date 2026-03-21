@@ -24,7 +24,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.FaunaChanges)
         {
             lines.Add(
-                $"{change.RegionId} | {change.RegionName} | {change.FaunaSpeciesId} ({change.FaunaSpeciesName}) | {change.PreviousPopulation} -> {change.NewPopulation} | Needed={change.FoodNeeded:0.00} | Consumed={change.FoodConsumed:0.00} | Fulfillment={change.FulfillmentRatio:0.00} | Habitat={change.HabitatSupport:0.00} | Outcome={change.Outcome} | FloraConsumed=[{change.ConsumedFloraSummary}] | FaunaConsumed=[{change.ConsumedFaunaSummary}] | Cause={change.PrimaryCause}");
+                $"{change.RegionId} | {change.RegionName} | {change.FaunaSpeciesId} ({change.FaunaSpeciesName}) | {change.PreviousPopulation} -> {change.NewPopulation} | Needed={change.FoodNeeded:0.00} | Consumed={change.FoodConsumed:0.00} | Fulfillment={change.FulfillmentRatio:0.00} | FoodState={change.FoodStressState} | Hunger={change.HungerPressure:0.00}/{change.ShortageMonths}m | Habitat={change.HabitatSupport:0.00} | Migrated={change.MigratedOut} | Outcome={change.Outcome} | FloraConsumed=[{change.ConsumedFloraSummary}] | FaunaConsumed=[{change.ConsumedFaunaSummary}] | Cause={change.PrimaryCause}");
         }
 
         lines.Add(string.Empty);
@@ -42,7 +42,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.GroupSurvivalChanges)
         {
             lines.Add(
-                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Mode={change.SubsistenceMode} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Hardship=FoodEff:{change.FoodPressureEffective}/WaterEff:{change.WaterPressureEffective}/{change.HardshipSeverityLabel} | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
+                $"{change.GroupId} | {change.GroupName} | Region={change.CurrentRegionId} ({change.CurrentRegionName}) | Preference={change.SubsistencePreference} | Mode={change.SubsistenceMode} | Plan={change.ExtractionPlan} | Population={change.StartingPopulation}->{change.FinalPopulation} | Need={change.MonthlyFoodNeed} | Primary={change.PrimaryAction}:{change.PrimaryFoodGained} | Fallback={change.FallbackAction}:{change.FallbackFoodGained} | Acquired={change.TotalFoodAcquired} | Usable={change.UsableFoodConsumed} | StoredFood={change.StoredFoodBefore}->{change.StoredFoodAfter} | Hardship=FoodEff:{change.FoodPressureEffective}/WaterEff:{change.WaterPressureEffective}/{change.HardshipSeverityLabel} | FoodState={change.FoodStressState} | Hunger={change.HungerPressure:0.00}/{change.ShortageMonths}m | Shortage={change.Shortage} | StarvationLoss={change.StarvationLoss} | Outcome={change.Outcome} | PrimarySummary={change.PrimarySummary} | FallbackSummary={change.FallbackSummary} | Reason={change.SurvivalReason}");
         }
 
         lines.Add(string.Empty);

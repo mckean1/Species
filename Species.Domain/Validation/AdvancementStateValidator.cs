@@ -41,6 +41,9 @@ public static class AdvancementStateValidator
                 errors.Add($"Population group {group.Id} has negative advancement evidence.");
             }
 
+            ValidateProgressCounters(group.Id, group.AdvancementEvidence.AdvancementProgressById, validAdvancementIds, errors, "advancement progress");
+            ValidateProgressCounters(group.Id, group.AdvancementEvidence.AdoptionProgressById, validAdvancementIds, errors, "adoption progress");
+
             if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedHuntingId) &&
                 !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId))
             {
@@ -69,5 +72,26 @@ public static class AdvancementStateValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateProgressCounters(
+        string groupId,
+        IReadOnlyDictionary<string, float> counters,
+        IReadOnlySet<string> validKeys,
+        ICollection<string> errors,
+        string label)
+    {
+        foreach (var entry in counters)
+        {
+            if (!validKeys.Contains(entry.Key))
+            {
+                errors.Add($"Population group {groupId} references invalid {label} ID {entry.Key}.");
+            }
+
+            if (entry.Value is < 0.0f or > 100.0f)
+            {
+                errors.Add($"Population group {groupId} has {label} outside the canonical 0-100 range for {entry.Key}.");
+            }
+        }
     }
 }

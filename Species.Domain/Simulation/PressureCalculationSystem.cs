@@ -111,11 +111,16 @@ public sealed class PressureCalculationSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            SpeciesClass = group.SpeciesClass,
             PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
             Population = group.Population,
             StoredFood = group.StoredFood,
+            HungerPressure = group.HungerPressure,
+            ShortageMonths = group.ShortageMonths,
+            FoodStressState = group.FoodStressState,
+            SubsistencePreference = group.SubsistencePreference,
             SubsistenceMode = group.SubsistenceMode,
             LastRegionId = group.LastRegionId,
             MonthsSinceLastMove = group.MonthsSinceLastMove,
@@ -135,9 +140,19 @@ public sealed class PressureCalculationSystem
             : (float)group.StoredFood / Math.Max(1, group.Population);
         var storedFoodSafety = MathF.Min(1.0f, foodReserveMonths / PressureCalculationConstants.StoredFoodMonthsSafe);
         var ecologySupport = visibleFoodSupport / PressureCalculationConstants.PressureScaleMaximum;
+        var hungerCarryover = group.HungerPressure * 25.0f;
+        var stressBonus = group.FoodStressState switch
+        {
+            FoodStressState.HungerPressure => 8.0f,
+            FoodStressState.SevereShortage => 18.0f,
+            FoodStressState.Starvation => 32.0f,
+            _ => 0.0f
+        };
 
         var pressure = (1.0f - storedFoodSafety) * 45.0f +
-                       (1.0f - ecologySupport) * 55.0f;
+                       (1.0f - ecologySupport) * 55.0f +
+                       hungerCarryover +
+                       stressBonus;
 
         return ClampPressure(pressure);
     }
@@ -183,24 +198,24 @@ public sealed class PressureCalculationSystem
     {
         if (pressure >= 70)
         {
-            return $"High because stored food is thin and only {DescribeKnowledge(knowledge.OverallKnowledge)} food support is visible.";
+            return $"High because stored food is thin, only {DescribeKnowledge(knowledge.OverallKnowledge)} food support is visible, and visible food is not guaranteed to be usable food.";
         }
 
         if (pressure >= 40)
         {
-            return $"Moderate because the polity can account for about {visibleFoodSupport}% of current food need from what it knows.";
+            return $"Moderate because the polity can account for about {visibleFoodSupport}% of current food need from what it knows, before actor-specific usable access losses.";
         }
 
-        return $"Low because stored food and known local support look manageable.";
+        return $"Low because stored food and known local support look manageable, and recent usable-food stress is limited.";
     }
 
     private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
     {
         var source = knowledge.WaterKnowledge switch
         {
-            KnowledgeLevel.Known => "Derived from known local water sources.",
-            KnowledgeLevel.Partial => "Derived from partial water observations in the current region.",
-            KnowledgeLevel.Rumored => "Derived from rumors and route familiarity rather than confirmed water knowledge.",
+            KnowledgeLevel.Knowledge => "Derived from established local water knowledge.",
+            KnowledgeLevel.Discovery => "Derived from discovered local water patterns.",
+            KnowledgeLevel.Encounter => "Derived from recent encounters and route exposure rather than established water knowledge.",
             _ => "Derived from uncertain local water knowledge."
         };
 
@@ -283,9 +298,9 @@ public sealed class PressureCalculationSystem
     {
         return level switch
         {
-            KnowledgeLevel.Known => "known",
-            KnowledgeLevel.Partial => "partially known",
-            KnowledgeLevel.Rumored => "rumored",
+            KnowledgeLevel.Knowledge => "known",
+            KnowledgeLevel.Discovery => "discovered",
+            KnowledgeLevel.Encounter => "encountered",
             _ => "uncertain"
         };
     }

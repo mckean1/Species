@@ -8,11 +8,13 @@ public sealed class SimulationEngine
 {
     private readonly FloraSpeciesCatalog floraCatalog;
     private readonly FaunaSpeciesCatalog faunaCatalog;
+    private readonly SapientSpeciesCatalog sapientCatalog;
     private readonly DiscoveryCatalog discoveryCatalog;
     private readonly AdvancementCatalog advancementCatalog;
     private readonly FloraSimulationSystem floraSimulationSystem;
     private readonly FaunaSimulationSystem faunaSimulationSystem;
     private readonly BiologicalEvolutionSystem biologicalEvolutionSystem;
+    private readonly ProtoPressureSystem protoPressureSystem;
     private readonly PressureCalculationSystem pressureCalculationSystem;
     private readonly GroupSurvivalSystem groupSurvivalSystem;
     private readonly MigrationSystem migrationSystem;
@@ -32,17 +34,20 @@ public sealed class SimulationEngine
         World initialWorld,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
+        SapientSpeciesCatalog sapientCatalog,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog)
     {
         CurrentWorld = initialWorld;
         this.floraCatalog = floraCatalog;
         this.faunaCatalog = faunaCatalog;
+        this.sapientCatalog = sapientCatalog;
         this.discoveryCatalog = discoveryCatalog;
         this.advancementCatalog = advancementCatalog;
         floraSimulationSystem = new FloraSimulationSystem();
         faunaSimulationSystem = new FaunaSimulationSystem();
         biologicalEvolutionSystem = new BiologicalEvolutionSystem();
+        protoPressureSystem = new ProtoPressureSystem();
         pressureCalculationSystem = new PressureCalculationSystem();
         groupSurvivalSystem = new GroupSurvivalSystem();
         migrationSystem = new MigrationSystem();
@@ -80,14 +85,15 @@ public sealed class SimulationEngine
         var advancedWorld = AdvanceMonth(CurrentWorld);
         var floraResult = floraSimulationSystem.Run(advancedWorld, floraCatalog);
         var faunaResult = faunaSimulationSystem.Run(floraResult.World, floraCatalog, faunaCatalog);
-        var biologicalEvolutionResult = biologicalEvolutionSystem.Run(faunaResult.World, floraCatalog, faunaCatalog, floraResult.Changes, faunaResult.Changes);
-        var pressureResult = pressureCalculationSystem.Run(biologicalEvolutionResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
+        var biologicalEvolutionResult = biologicalEvolutionSystem.Run(faunaResult.World, floraCatalog, faunaCatalog, sapientCatalog, floraResult.Changes, faunaResult.Changes);
+        var protoPressureResult = protoPressureSystem.Run(biologicalEvolutionResult.World);
+        var pressureResult = pressureCalculationSystem.Run(protoPressureResult.World, discoveryCatalog, floraCatalog, faunaCatalog);
         var enactedLawWorld = enactedLawSystem.Run(pressureResult.World);
         var survivalResult = groupSurvivalSystem.Run(enactedLawWorld, floraCatalog, faunaCatalog, advancementCatalog);
         var migrationResult = migrationSystem.Run(survivalResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes);
         var settlementResult = settlementSystem.Run(migrationResult.World);
         var materialEconomyResult = materialEconomySystem.Run(settlementResult.World);
-        var discoveryResult = discoverySystem.Run(materialEconomyResult.World, discoveryCatalog, survivalResult.Changes, migrationResult.Changes);
+        var discoveryResult = discoverySystem.Run(materialEconomyResult.World, discoveryCatalog, floraCatalog, faunaCatalog, survivalResult.Changes, migrationResult.Changes);
         var advancementResult = advancementSystem.Run(discoveryResult.World, discoveryCatalog, advancementCatalog, survivalResult.Changes, migrationResult.Changes);
         var socialIdentityResult = socialIdentitySystem.Run(advancementResult.World);
         var interPolityResult = interPolityInteractionSystem.Run(socialIdentityResult.World);
@@ -98,7 +104,7 @@ public sealed class SimulationEngine
         var finalizedWorld = FinalizeTick(chronicleResult.World);
 
         CurrentWorld = finalizedWorld;
-        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, settlementResult.Changes, materialEconomyResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
+        return new SimulationTickResult(finalizedWorld, floraResult.Changes, faunaResult.Changes, protoPressureResult.Changes, pressureResult.Changes, survivalResult.Changes, migrationResult.Changes, settlementResult.Changes, materialEconomyResult.Changes, biologicalEvolutionResult.Changes, discoveryResult.Changes, advancementResult.Changes, socialIdentityResult.Changes, interPolityResult.Changes, politicalScaleResult.Changes, lawProposalResult.Changes, chronicleResult.RecordedEntries, chronicleResult.RevealedEntries);
     }
 
     public bool PassActiveLawProposal()

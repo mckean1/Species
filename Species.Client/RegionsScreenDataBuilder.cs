@@ -77,12 +77,12 @@ public static class RegionsScreenDataBuilder
             .ThenBy(group => group.Name, StringComparer.Ordinal)
             .ToArray();
 
-        var exactPresenceVisible = snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known;
+        var exactPresenceVisible = snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery;
         var presencePopulation = groupsHere.Sum(group => group.Population);
-        var topFlora = snapshot?.FloraKnowledge == KnowledgeLevel.Known
+        var topFlora = snapshot?.FloraKnowledge >= KnowledgeLevel.Discovery
             ? ResolveTopPopulationNames(region.Ecosystem.FloraPopulations, floraCatalog.GetById).Take(3).ToArray()
             : Array.Empty<string>();
-        var topFauna = snapshot?.FaunaKnowledge == KnowledgeLevel.Known
+        var topFauna = snapshot?.FaunaKnowledge >= KnowledgeLevel.Discovery
             ? ResolveTopPopulationNames(region.Ecosystem.FaunaPopulations, faunaCatalog.GetById).Take(3).ToArray()
             : Array.Empty<string>();
         var knowledge = BuildKnowledge(region, snapshot, focusGroup, discoveryCatalog);
@@ -152,20 +152,20 @@ public static class RegionsScreenDataBuilder
             context.Add("Other groups are present");
         }
 
-        if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.High)
+        if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.High)
         {
             context.Add("Water is reliable");
         }
-        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.Low)
+        else if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.Low)
         {
             context.Add("Water is scarce");
         }
 
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility >= 0.70)
+        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility >= 0.70)
         {
             context.Add("Land looks productive");
         }
-        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility <= 0.35)
+        else if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility <= 0.35)
         {
             context.Add("Resources appear thin");
         }
@@ -176,13 +176,13 @@ public static class RegionsScreenDataBuilder
             opportunities.Add(KnowledgePresentation.DescribeWater(snapshot));
         }
 
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known && region.Fertility >= 0.65)
+        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility >= 0.65)
         {
             opportunities.Add("Fertile ground");
         }
-        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial)
+        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter)
         {
-            opportunities.Add("Land quality only partly known");
+            opportunities.Add("Land quality is only encountered so far");
         }
 
         if (topFlora.Length > 0)
@@ -206,11 +206,11 @@ public static class RegionsScreenDataBuilder
             risks.Add($"{threatText} local conditions");
         }
 
-        if (snapshot?.WaterKnowledge == KnowledgeLevel.Known && region.WaterAvailability == WaterAvailability.Low)
+        if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.Low)
         {
             risks.Add("Limited water");
         }
-        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Partial)
+        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Encounter)
         {
             risks.Add("Water availability uncertain");
         }
@@ -224,9 +224,9 @@ public static class RegionsScreenDataBuilder
             region.Id,
             region.Name,
             snapshot is null ? "Known" : KnowledgePresentation.DescribeRegionFamiliarity(snapshot),
-            snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsKnownRegion == true ? region.Biome.ToString() : "Unknown",
+            snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsKnownRegion == true ? region.Biome.ToString() : "Unknown",
             snapshot is null ? region.WaterAvailability.ToString() : KnowledgePresentation.DescribeWater(snapshot),
-            snapshot?.ConditionsKnowledge == KnowledgeLevel.Known ? region.Fertility.ToString("0.00") : snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial ? "Estimated" : "Unknown",
+            snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery ? region.Fertility.ToString("0.00") : snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter ? "Encountered" : "Unknown",
             exactPresenceVisible ? presencePopulation : 0,
             exactPresenceVisible ? presencePopulation.ToString("N0") : (groupsHere.Length > 0 ? "Signs" : "None"),
             BuildGroupPresence(groupsHere, exactPresenceVisible),
@@ -282,7 +282,7 @@ public static class RegionsScreenDataBuilder
 
     private static IReadOnlyList<string> BuildMaterialLines(Region region, RegionKnowledgeSnapshot? snapshot)
     {
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsCurrentRegion == true)
+        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsCurrentRegion == true)
         {
             var stores = region.MaterialProfile.Opportunities;
             return
@@ -295,9 +295,9 @@ public static class RegionsScreenDataBuilder
             ];
         }
 
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial)
+        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter)
         {
-            return ["Material strengths are only partly known"];
+            return ["Material strengths have only been encountered"];
         }
 
         return ["Material potential not yet known"];
@@ -305,7 +305,7 @@ public static class RegionsScreenDataBuilder
 
     private static IReadOnlyList<string> BuildBiology(Region region, RegionKnowledgeSnapshot? snapshot, FloraSpeciesCatalog floraCatalog, FaunaSpeciesCatalog faunaCatalog)
     {
-        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.FaunaKnowledge == KnowledgeLevel.Known || snapshot?.FloraKnowledge == KnowledgeLevel.Known))
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.FaunaKnowledge >= KnowledgeLevel.Discovery || snapshot?.FloraKnowledge >= KnowledgeLevel.Discovery))
         {
             return ["Biological differences are not yet understood"];
         }
@@ -337,7 +337,7 @@ public static class RegionsScreenDataBuilder
 
     private static IReadOnlyList<string> BuildFossils(Region region, RegionKnowledgeSnapshot? snapshot)
     {
-        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge == KnowledgeLevel.Known))
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery))
         {
             return ["Deep history is unknown here"];
         }
@@ -353,7 +353,7 @@ public static class RegionsScreenDataBuilder
 
     private static string DescribeMaterials(Region region, RegionKnowledgeSnapshot? snapshot)
     {
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Known || snapshot?.IsCurrentRegion == true)
+        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsCurrentRegion == true)
         {
             var top = region.MaterialProfile.Opportunities.AsDictionary()
                 .OrderByDescending(entry => entry.Value)
@@ -366,8 +366,8 @@ public static class RegionsScreenDataBuilder
                 : $"Material strengths: {string.Join(", ", top)}";
         }
 
-        return snapshot?.ConditionsKnowledge == KnowledgeLevel.Partial
-            ? "Material opportunities are only partly known"
+        return snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter
+            ? "Material opportunities have only been encountered"
             : "Material opportunities not yet known";
     }
 

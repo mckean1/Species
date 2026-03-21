@@ -58,7 +58,9 @@ Polities can now truthfully remain mobile, become seasonal, become semi-rooted, 
 
 The distinction remains strict:
 
-- Discovery = "we know"
+- Encounter = "we have signs/contact"
+- Discovery = "we have a durable finding"
+- Knowledge = "we understand enough to operate from it"
 - Advancement = "we can"
 
 Discoveries affect decision-making only.

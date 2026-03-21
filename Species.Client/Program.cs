@@ -10,6 +10,7 @@ const int InputPollDelayMilliseconds = 25;
 
 var floraCatalog = FloraSpeciesCatalog.CreateStarterSet();
 var faunaCatalog = FaunaSpeciesCatalog.CreateStarterSet();
+var sapientCatalog = SapientSpeciesCatalog.CreateStarterSet();
 var world = WorldGenerator.Create(floraCatalog, faunaCatalog);
 var discoveryCatalog = DiscoveryCatalog.CreateForWorld(world);
 var advancementCatalog = AdvancementCatalog.CreateStarterSet();
@@ -27,7 +28,7 @@ if (validationErrors.Length > 0)
     return;
 }
 
-var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog);
+var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, sapientCatalog, discoveryCatalog, advancementCatalog);
 var viewState = new PlayerViewState();
 viewState.EnsureFocalPolity(simulationEngine.CurrentWorld);
 simulationEngine.PlayerPolityId = viewState.FocalPolityId;
@@ -363,7 +364,7 @@ string[] CollectStartupValidationErrors(World currentWorld)
 {
     return WorldValidator.Validate(currentWorld)
         .Concat(SpeciesDefinitionValidator.Validate(floraCatalog))
-        .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog))
+        .Concat(SpeciesDefinitionValidator.Validate(faunaCatalog, floraCatalog))
         .Concat(DiscoveryCatalogValidator.Validate(discoveryCatalog))
         .Concat(AdvancementCatalogValidator.Validate(advancementCatalog))
         .Concat(ChronicleValidator.Validate(currentWorld))

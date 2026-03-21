@@ -1,7 +1,9 @@
 using Species.Domain.Constants;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Domain.Catalogs;
 
 namespace Species.Domain.Generation;
 
@@ -41,7 +43,8 @@ public static class PopulationGroupSpawner
             var storedFood = random.Next(
                 PopulationGroupSpawningConstants.MinimumStartingStoredFood,
                 PopulationGroupSpawningConstants.MaximumStartingStoredFood + 1);
-            var subsistenceMode = ResolveSubsistenceMode(region);
+            var subsistencePreference = ResolveSubsistencePreference(region);
+            var subsistenceMode = ResolveInitialSubsistenceMode(subsistencePreference);
             var governmentForm = ResolveGovernmentForm(region, subsistenceMode, index);
             var polityId = $"polity-{index + 1:D2}";
             var name = BuildGroupName(region, index);
@@ -51,17 +54,22 @@ public static class PopulationGroupSpawner
                 Id = $"group-{index + 1:D2}",
                 Name = name,
                 SpeciesId = DefaultSpeciesId,
+                SpeciesClass = SpeciesClass.Sapient,
                 PolityId = polityId,
                 CurrentRegionId = region.Id,
                 OriginRegionId = region.Id,
                 Population = population,
                 StoredFood = storedFood,
+                SubsistencePreference = subsistencePreference,
+                HungerPressure = 0.0f,
+                ShortageMonths = 0,
+                FoodStressState = FoodStressState.FedStable,
                 SubsistenceMode = subsistenceMode,
                 Pressures = new PressureState(),
                 LastRegionId = string.Empty,
                 MonthsSinceLastMove = 0,
                 KnownRegionIds = new HashSet<string>(GetKnownRegionIds(region), StringComparer.Ordinal),
-                KnownDiscoveryIds = new HashSet<string>(StringComparer.Ordinal),
+                KnownDiscoveryIds = new HashSet<string>(GetInitialKnownDiscoveries(region), StringComparer.Ordinal),
                 DiscoveryEvidence = new DiscoveryEvidenceState(),
                 LearnedAdvancementIds = new HashSet<string>(StringComparer.Ordinal),
                 AdvancementEvidence = new AdvancementEvidenceState()
@@ -91,7 +99,8 @@ public static class PopulationGroupSpawner
                 ExternalPressure = new ExternalPressureState(),
                 ScaleState = new PoliticalScaleState(),
                 SocialMemory = new SocialMemoryState(),
-                SocialIdentity = new SocialIdentityState()
+                SocialIdentity = new SocialIdentityState(),
+                SpeciesAwareness = BuildInitialSpeciesAwareness(region)
             });
         }
 
@@ -105,22 +114,32 @@ public static class PopulationGroupSpawner
         return floraScore + faunaScore + (int)Math.Round(region.Fertility * 100);
     }
 
-    private static SubsistenceMode ResolveSubsistenceMode(Region region)
+    private static SubsistencePreference ResolveSubsistencePreference(Region region)
     {
         var floraScore = region.Ecosystem.FloraPopulations.Values.Sum();
         var faunaScore = region.Ecosystem.FaunaPopulations.Values.Sum();
 
         if (floraScore > faunaScore * 2)
         {
-            return SubsistenceMode.Gatherer;
+            return SubsistencePreference.ForagerLeaning;
         }
 
         if (faunaScore > floraScore * 2)
         {
-            return SubsistenceMode.Hunter;
+            return SubsistencePreference.HunterLeaning;
         }
 
-        return SubsistenceMode.Mixed;
+        return SubsistencePreference.Mixed;
+    }
+
+    private static SubsistenceMode ResolveInitialSubsistenceMode(SubsistencePreference subsistencePreference)
+    {
+        return subsistencePreference switch
+        {
+            SubsistencePreference.ForagerLeaning => SubsistenceMode.Gatherer,
+            SubsistencePreference.HunterLeaning => SubsistenceMode.Hunter,
+            _ => SubsistenceMode.Mixed
+        };
     }
 
     private static IEnumerable<string> GetKnownRegionIds(Region region)
@@ -131,6 +150,51 @@ public static class PopulationGroupSpawner
         {
             yield return neighborId;
         }
+    }
+
+    private static IEnumerable<string> GetInitialKnownDiscoveries(Region region)
+    {
+        yield return $"discovery-local-flora:{region.Id}";
+        yield return $"discovery-local-fauna:{region.Id}";
+        yield return $"discovery-local-water-sources:{region.Id}";
+        yield return $"discovery-local-region-conditions:{region.Id}";
+    }
+
+    private static List<PolitySpeciesAwarenessState> BuildInitialSpeciesAwareness(Region region)
+    {
+        var awareness = new List<PolitySpeciesAwarenessState>
+        {
+            new()
+            {
+                SpeciesId = DefaultSpeciesId,
+                SpeciesClass = SpeciesClass.Sapient,
+                EncounterProgress = 100.0f,
+                DiscoveryProgress = 100.0f,
+                KnowledgeProgress = 100.0f
+            }
+        };
+
+        awareness.AddRange(BuildInitialSpeciesAwareness(region.Ecosystem.FloraPopulations, SpeciesClass.Flora));
+        awareness.AddRange(BuildInitialSpeciesAwareness(region.Ecosystem.FaunaPopulations, SpeciesClass.Fauna));
+        return awareness;
+    }
+
+    private static IEnumerable<PolitySpeciesAwarenessState> BuildInitialSpeciesAwareness(
+        IReadOnlyDictionary<string, int> populations,
+        SpeciesClass speciesClass)
+    {
+        return populations
+            .Where(entry => entry.Value > 0)
+            .OrderByDescending(entry => entry.Value)
+            .Take(3)
+            .Select(entry => new PolitySpeciesAwarenessState
+            {
+                SpeciesId = entry.Key,
+                SpeciesClass = speciesClass,
+                EncounterProgress = 100.0f,
+                DiscoveryProgress = 100.0f,
+                KnowledgeProgress = 100.0f
+            });
     }
 
     private static string BuildGroupName(Region region, int index)

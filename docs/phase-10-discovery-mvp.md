@@ -2,19 +2,23 @@
 
 ## Scope
 
-Phase 10 adds group-owned discoveries as knowledge unlocked from repeated lived experience. Discoveries now exist as explicit content, groups accumulate lightweight evidence for them over time, and monthly discovery evaluation runs after survival and migration.
+Phase 10 adds group-owned discoveries as durable findings unlocked from repeated lived experience. Discoveries now exist as explicit content, groups accumulate lightweight evidence for them over time, and monthly discovery evaluation runs after survival and migration.
 
 This phase adds discoveries only. It does not add advancements, raw output bonuses, research systems, Chronicle generation, or discovery sharing.
+
+The current architecture now keeps this layer for region, route, and material discoveries, while flora/fauna species awareness is handled as a separate polity-owned staged progress model (`Encounter`, `Discovery`, `Knowledge`) rather than a binary regional unlock.
 
 ## Discovery Versus Advancement
 
 The distinction is strict:
 
-- Discovery = "we know"
+- Encounter = "we have signs/contact"
+- Discovery = "we have a durable finding"
+- Knowledge = "we understand this well enough to operate from it"
 - Advancement = "we can"
 
-Discoveries improve decision-making only.
-They widen what the polity can safely see or estimate about the world.
+Discoveries sit between encounter and full knowledge.
+They improve decision-making by widening what the polity can safely see or estimate about the world.
 
 Discoveries do not directly improve:
 
@@ -65,11 +69,11 @@ Each group now keeps a lightweight evidence state for repeated experience:
 - water exposure months by region
 - route traversal counts
 
-There is no large memory framework, no decay, and no discovery sharing in this phase.
+There is no large memory framework and no discovery sharing in this phase. Discovery pacing now includes slow progress loss when supporting exposure disappears, which keeps stalled discoveries from piling up and then bursting complete later.
 
 ## Unlock Rules
 
-Discovery unlocks are binary and threshold-based.
+Regional/material discovery progression is now paced and progress-based rather than instant threshold completion.
 
 Examples:
 
@@ -78,6 +82,13 @@ Examples:
 - repeated residence in one region unlocks local region conditions
 - repeated water exposure in one region unlocks local water-source knowledge
 - repeated traversal of the same neighboring connection unlocks route knowledge
+
+These signals now:
+
+- accumulate monthly progress instead of unlocking immediately at the first threshold crossing
+- spend from a limited monthly discovery budget per group
+- unlock only after paced progress reaches completion
+- reduce same-tick clusters unless there is unusually strong ongoing evidence across multiple fronts
 
 ## Decision Effects Only
 
@@ -95,9 +106,18 @@ The implementation now preserves a small distinction between:
 - actor knowledge / observed regional view
 - player-facing presentation of that knowledge
 
-Unknown stays unknown, partial experience stays partial, and discoveries promote specific fields from uncertain estimates into known local facts.
+Unknown stays unknown, encounters stay weak/incomplete, discoveries promote specific fields into durable local findings, and sustained familiarity can become stronger knowledge.
 
 These are decision-context effects only. They do not modify direct action output.
+
+By contrast, flora/fauna species awareness now advances monthly from abundance, overlap, conspicuousness, repeated contact, subsistence behavior, and successful interaction. That awareness remains staged and capped per month so species do not become instantly usable just because they are present.
+
+The tuned pacing rule is:
+
+- passive presence mostly builds `Encounter`
+- `Discovery` needs repeated overlap/contact over time
+- `Knowledge` needs repeated successful use
+- scarce species progress much more slowly because low abundance reduces repeatable contact and successful interaction
 
 ## Chronicle Readiness
 

@@ -56,6 +56,8 @@ public sealed class Polity
 
     public MaterialProductionState MaterialProduction { get; set; } = new();
 
+    public List<PolitySpeciesAwarenessState> SpeciesAwareness { get; init; } = [];
+
     public int MaterialShortageMonths { get; set; }
 
     public int MaterialSurplusMonths { get; set; }
@@ -89,6 +91,7 @@ public sealed class Polity
             SocialIdentity = SocialIdentity.Clone(),
             MaterialStores = MaterialStores.Clone(),
             MaterialProduction = MaterialProduction.Clone(),
+            SpeciesAwareness = SpeciesAwareness.Select(state => state.Clone()).ToList(),
             MaterialShortageMonths = MaterialShortageMonths,
             MaterialSurplusMonths = MaterialSurplusMonths
         };

@@ -20,6 +20,8 @@ public sealed class DiscoveryEvidenceState
 
     public Dictionary<string, int> SharedExposureMonthsByDiscoveryId { get; init; } = new(StringComparer.Ordinal);
 
+    public Dictionary<string, float> DiscoveryProgressByDiscoveryId { get; init; } = new(StringComparer.Ordinal);
+
     public int RecurringFoodPressureMonths { get; set; }
 
     public int RecurringThreatPressureMonths { get; set; }
@@ -43,6 +45,7 @@ public sealed class DiscoveryEvidenceState
             MaterialUseMonthsByResourceId = new Dictionary<string, int>(MaterialUseMonthsByResourceId, StringComparer.Ordinal),
             ContactMonthsByPolityId = new Dictionary<string, int>(ContactMonthsByPolityId, StringComparer.Ordinal),
             SharedExposureMonthsByDiscoveryId = new Dictionary<string, int>(SharedExposureMonthsByDiscoveryId, StringComparer.Ordinal),
+            DiscoveryProgressByDiscoveryId = new Dictionary<string, float>(DiscoveryProgressByDiscoveryId, StringComparer.Ordinal),
             RecurringFoodPressureMonths = RecurringFoodPressureMonths,
             RecurringThreatPressureMonths = RecurringThreatPressureMonths,
             RecurringMaterialShortageMonths = RecurringMaterialShortageMonths,

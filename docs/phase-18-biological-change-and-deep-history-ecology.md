@@ -16,6 +16,8 @@ Phase 18 adds the long-horizon biological layer to the simulation while keeping 
 ## Regional Biological Architecture
 
 - Species baseline remains the lineage-level truth in flora and fauna catalogs.
+- Canonical top-level classification is now `SpeciesClass`: `Flora`, `Fauna`, `Sapient`.
+- Sapience remains a fauna-lineage emergence path, but emerged sapients are classified as their own active `SpeciesClass`.
 - Regional biological profiles now hold local inherited expression:
   - trait profile
   - pressure memory

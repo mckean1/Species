@@ -28,6 +28,22 @@ public sealed class RegionalBiologicalProfile
 
     public int LastPopulation { get; set; }
 
+    public float HungerPressure { get; set; }
+
+    public int ShortageMonths { get; set; }
+
+    public float FeedingMomentum { get; set; }
+
+    public FoodStressState FoodStressState { get; set; }
+
+    public int StableSupportMonths { get; set; }
+
+    public int SocialCoordinationPressureMonths { get; set; }
+
+    public int LearningPressureMonths { get; set; }
+
+    public int SapienceProgress { get; set; }
+
     public RegionalBiologicalProfile Clone()
     {
         return new RegionalBiologicalProfile
@@ -43,7 +59,15 @@ public sealed class RegionalBiologicalProfile
             SpeciationProgress = SpeciationProgress,
             ViabilityScore = ViabilityScore,
             IsExtinct = IsExtinct,
-            LastPopulation = LastPopulation
+            LastPopulation = LastPopulation,
+            HungerPressure = HungerPressure,
+            ShortageMonths = ShortageMonths,
+            FeedingMomentum = FeedingMomentum,
+            FoodStressState = FoodStressState,
+            StableSupportMonths = StableSupportMonths,
+            SocialCoordinationPressureMonths = SocialCoordinationPressureMonths,
+            LearningPressureMonths = LearningPressureMonths,
+            SapienceProgress = SapienceProgress
         };
     }
 }

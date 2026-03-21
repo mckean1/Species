@@ -25,8 +25,12 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Simulation auto-advances while unpaused.
 - Tick delay is `1000ms`.
 - Player-facing screens are focal-polity knowledge-aware rather than omniscient.
-- Discoveries remain knowledge.
+- `Encounter -> Discovery -> Knowledge` is the canonical knowledge-state ladder for world familiarity.
 - Advancements remain capability.
+- `SpeciesClass` is the canonical biology classification model: `Flora`, `Fauna`, `Sapient`.
+- Regional ecology now has explicit proto-life substrate naming: `ProtoFloraCapacity`, `ProtoFaunaCapacity`, `ProtoFloraPressure`, `ProtoFaunaPressure`.
+- Proto-life capacity is latent ecological room; proto-life pressure is current monthly activation pressure, and the two are intentionally separate.
+- Sapience is canonically a fauna-lineage emergence that becomes its own active `SpeciesClass` once present.
 - Laws, enacted-law monthly effects, political blocs, and polity-facing governance presentation are already implemented on explicit polity state.
 - Settlements, polity regional presence, and place-based anchoring are now implemented in lightweight form.
 - Aggregate material extraction, limited non-food stores, and simple production bridges are now implemented in lightweight form.
@@ -47,21 +51,22 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 2. Flora simulation
 3. Fauna simulation
 4. Regional biological inheritance / divergence / deep-history update
-5. Group pressure recalculation
-6. Enacted law monthly effects
-7. Group survival and consumption
-8. Migration decision and movement
-9. Settlement / polity presence update
-10. Material extraction / production bridge update
-11. Discovery evaluation
-12. Advancement evaluation
-13. Social identity / tradition update
-14. Inter-polity interaction / external pressure update
-15. Political scaling / attachment / fragmentation update
-16. Political bloc monthly update
-17. Law proposal update
-18. Chronicle update and feed progression
-19. End-of-tick finalization
+5. Regional proto-life substrate pressure update
+6. Group pressure recalculation
+7. Enacted law monthly effects
+8. Group survival and consumption
+9. Migration decision and movement
+10. Settlement / polity presence update
+11. Material extraction / production bridge update
+12. Discovery evaluation
+13. Advancement evaluation
+14. Social identity / tradition update
+15. Inter-polity interaction / external pressure update
+16. Political scaling / attachment / fragmentation update
+17. Political bloc monthly update
+18. Law proposal update
+19. Chronicle update and feed progression
+20. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -118,6 +123,7 @@ Still deferred:
 ## Docs
 
 - [docs/phase-1-world-region-foundation.md](docs/phase-1-world-region-foundation.md)
+- [docs/canonical-biology-architecture.md](docs/canonical-biology-architecture.md)
 - [docs/phase-2-species-definitions.md](docs/phase-2-species-definitions.md)
 - [docs/phase-3-region-ecology-state.md](docs/phase-3-region-ecology-state.md)
 - [docs/phase-4-flora-simulation-and-engine.md](docs/phase-4-flora-simulation-and-engine.md)

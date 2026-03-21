@@ -1,5 +1,6 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Enums;
+using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 public static class KnownSpeciesScreenDataBuilder
@@ -25,30 +26,37 @@ public static class KnownSpeciesScreenDataBuilder
         }
 
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+        var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, focusGroup.PolityId, StringComparison.Ordinal));
         var summaries = new List<KnownSpeciesSummary>
         {
             BuildOwnSpeciesSummary(world, focusGroup, regionsById)
         };
 
-        var knownFaunaById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
-        foreach (var regionId in focusGroup.KnownRegionIds)
+        if (focusPolity is null)
         {
-            if (!focusGroup.KnownDiscoveryIds.Contains($"discovery-local-fauna:{regionId}") ||
-                !regionsById.TryGetValue(regionId, out var region))
-            {
-                continue;
-            }
+            return summaries;
+        }
 
-            foreach (var faunaId in region.Ecosystem.FaunaPopulations
-                         .Where(entry => entry.Value > 0)
-                         .OrderByDescending(entry => entry.Value)
-                         .Take(3)
-                         .Select(entry => entry.Key))
+        var visibleRegionIds = focusGroup.KnownRegionIds
+            .Append(focusGroup.CurrentRegionId)
+            .Concat(world.PopulationGroups
+                .Where(group => string.Equals(group.PolityId, focusPolity.Id, StringComparison.Ordinal))
+                .Select(group => group.CurrentRegionId))
+            .ToHashSet(StringComparer.Ordinal);
+        var knownFaunaById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
+
+        foreach (var awareness in focusPolity.SpeciesAwareness
+                     .Where(state => state.SpeciesClass == SpeciesClass.Fauna && state.CurrentLevel >= KnowledgeLevel.Encounter)
+                     .OrderBy(state => state.SpeciesId, StringComparer.Ordinal))
+        {
+            foreach (var region in world.Regions
+                         .Where(region => visibleRegionIds.Contains(region.Id))
+                         .Where(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(awareness.SpeciesId) > 0))
             {
-                if (!knownFaunaById.TryGetValue(faunaId, out var regions))
+                if (!knownFaunaById.TryGetValue(awareness.SpeciesId, out var regions))
                 {
                     regions = [];
-                    knownFaunaById.Add(faunaId, regions);
+                    knownFaunaById.Add(awareness.SpeciesId, regions);
                 }
 
                 regions.Add(region);
@@ -63,7 +71,10 @@ public static class KnownSpeciesScreenDataBuilder
                 continue;
             }
 
-            summaries.Add(BuildFaunaSummary(fauna, faunaEntry.Value));
+            var awareness = focusPolity.SpeciesAwareness.First(state =>
+                state.SpeciesClass == SpeciesClass.Fauna &&
+                string.Equals(state.SpeciesId, faunaEntry.Key, StringComparison.Ordinal));
+            summaries.Add(BuildFaunaSummary(fauna, faunaEntry.Value, awareness.CurrentLevel));
         }
 
         return summaries;
@@ -94,11 +105,11 @@ public static class KnownSpeciesScreenDataBuilder
         return new KnownSpeciesSummary(
             focusGroup.SpeciesId,
             BuildPlayerSpeciesName(focusGroup.SpeciesId),
-            "Our species",
+            "Sapient species",
             true,
             $"{speciesGroups.Sum(group => group.Population):N0}",
             avgPressure >= 50 ? "familiar, pressured" : "familiar, common nearby",
-            "The species your polity belongs to.",
+            "The sapient species your polity belongs to.",
             [
                 $"Known population: {speciesGroups.Sum(group => group.Population):N0}",
                 $"Known range: {regions.Length} region{(regions.Length == 1 ? string.Empty : "s")}",
@@ -108,7 +119,7 @@ public static class KnownSpeciesScreenDataBuilder
             BuildOwnContext(focusGroup, regions));
     }
 
-    private static KnownSpeciesSummary BuildFaunaSummary(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions)
+    private static KnownSpeciesSummary BuildFaunaSummary(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions, KnowledgeLevel knowledgeLevel)
     {
         var totalPopulation = regions.Sum(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(fauna.Id));
         var isDangerous = fauna.DietCategory == DietCategory.Carnivore;
@@ -116,9 +127,16 @@ public static class KnownSpeciesScreenDataBuilder
         {
             >= 900 => "common nearby",
             >= 350 => "present nearby",
-            _ => "rare"
+            >= 1 => "rare",
+            _ => "sparsely confirmed"
         };
-        var status = isDangerous ? $"{prevalence}, dangerous" : prevalence;
+        var knowledgeStatus = knowledgeLevel switch
+        {
+            KnowledgeLevel.Knowledge => "reliably understood",
+            KnowledgeLevel.Discovery => "recognized resource",
+            _ => "encountered"
+        };
+        var status = isDangerous ? $"{prevalence}, {knowledgeStatus}, dangerous" : $"{prevalence}, {knowledgeStatus}";
         var habitat = string.Join(", ", regions.Select(region => region.Name).Distinct(StringComparer.Ordinal).Take(3));
 
         var overview = isDangerous
@@ -182,7 +200,7 @@ public static class KnownSpeciesScreenDataBuilder
     {
         var context = new List<string>
         {
-            "This is your own species.",
+            "This is your own sapient species.",
             focusGroup.Pressures.Water.DisplayValue >= 40
                 ? $"Water access is currently the main species-level concern for your polity ({focusGroup.Pressures.Water.SeverityLabel.ToLowerInvariant()})."
                 : "No single species-level pressure dominates your polity right now."
@@ -201,7 +219,7 @@ public static class KnownSpeciesScreenDataBuilder
         var traits = new List<string>
         {
             $"Diet: {fauna.DietCategory}",
-            fauna.MigrationTendency >= 0.65f ? "Mobility: highly mobile" : fauna.MigrationTendency >= 0.45f ? "Mobility: moderately mobile" : "Mobility: relatively settled",
+            fauna.Mobility >= 0.65f ? "Mobility: highly mobile" : fauna.Mobility >= 0.45f ? "Mobility: moderately mobile" : "Mobility: relatively settled",
             $"Yield / usefulness: {(fauna.FoodYield >= 0.60f ? "high" : fauna.FoodYield >= 0.35f ? "moderate" : "limited")}"
         };
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Phase 4 introduces the first real monthly simulation step. Flora is no longer static seeded state; it now changes over time based on regional habitat fit.
+Phase 4 introduces the first real monthly simulation step. Flora is no longer static seeded state; it now changes over time as the aggregate ecological base layer.
 
 This phase also introduces `SimulationEngine` as the canonical orchestrator for monthly ticks.
 
@@ -46,26 +46,29 @@ There is no automatic flora reintroduction in Phase 4. If a species reaches `0` 
 
 For each flora species already present in a region, the system:
 
-1. checks water support
-2. checks core biome fit
-3. evaluates fertility fit
-4. computes a habitat-driven target abundance
-5. moves the current abundance toward that target using `GrowthRate`
-6. stores the result as a bounded whole number
+1. evaluates local support from water, biome, fertility, and broad climate fit
+2. grows flora from that support using `GrowthRate` and `RecoveryRate`
+3. declines flora from recent consumption pressure, harshness, and poor support
+4. allows bounded spread into neighboring suitable regions when established flora is strong enough
+5. stores the result as a bounded whole number
 
 This keeps flora behavior causal, bounded, and easy to inspect.
 
 ### Habitat Inputs
 
-Target abundance is currently driven by:
+Flora support and abundance are currently driven by:
 
 - supported vs unsupported water
 - whether the region biome is in `CoreBiomes`
-- how close region fertility is to `PreferredFertilityMin` / `PreferredFertilityMax`
+- how close region fertility is to `HabitatFertilityMin` / `HabitatFertilityMax`
 - flora `GrowthRate`
-- flora `FoodValue`
+- flora `RecoveryRate`
+- flora `UsableBiomass`
+- flora `ConsumptionResilience`
+- flora `SpreadTendency`
+- flora `RegionalAbundance`
 
-Unsupported water drives the target to zero and forces strong decline.
+Unsupported or harsh support drives strong decline. Strong established flora can also spread to nearby suitable regions.
 
 ### Extinction
 
@@ -74,7 +77,7 @@ Regional flora extinction is supported directly:
 - populations can decline to `0`
 - `0` means extinction from that region
 - extinct flora is removed from active regional flora storage
-- no spontaneous reseeding or regeneration occurs in this phase
+- there is no random primitive-life spawning or deep botany sub-simulation
 
 ## Validation and Debugging
 

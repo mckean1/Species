@@ -6,9 +6,9 @@ public static class KnowledgePresentation
     {
         return level switch
         {
-            KnowledgeLevel.Known => "Known",
-            KnowledgeLevel.Partial => "Partially known",
-            KnowledgeLevel.Rumored => "Rumored",
+            KnowledgeLevel.Knowledge => "Knowledge",
+            KnowledgeLevel.Discovery => "Discovery",
+            KnowledgeLevel.Encounter => "Encounter",
             _ => "Unknown"
         };
     }
@@ -17,9 +17,9 @@ public static class KnowledgePresentation
     {
         return snapshot.OverallKnowledge switch
         {
-            KnowledgeLevel.Known => "Known",
-            KnowledgeLevel.Partial => "Partial",
-            KnowledgeLevel.Rumored => "Rumored",
+            KnowledgeLevel.Knowledge => "Knowledge",
+            KnowledgeLevel.Discovery => "Discovery",
+            KnowledgeLevel.Encounter => "Encounter",
             _ => "Unknown"
         };
     }
@@ -28,30 +28,30 @@ public static class KnowledgePresentation
     {
         return snapshot.WaterKnowledge switch
         {
-            KnowledgeLevel.Known => snapshot.WaterSupport switch
+            KnowledgeLevel.Knowledge => snapshot.WaterSupport switch
             {
-                >= 85 => "Reliable water known",
-                >= 45 => "Water known, but moderate",
-                _ => "Water known to be scarce"
+                >= 85 => "Water is well known and reliable",
+                >= 45 => "Water is known, but moderate",
+                _ => "Water is known to be scarce"
             },
-            KnowledgeLevel.Partial => snapshot.WaterSupport switch
+            KnowledgeLevel.Discovery => snapshot.WaterSupport switch
             {
-                >= 70 => "Water seems steady",
-                >= 40 => "Water availability uncertain",
-                _ => "Water appears thin"
+                >= 70 => "Water sources have been discovered as steady",
+                >= 40 => "Water sources are discovered, but uneven",
+                _ => "Water sources are discovered as thin"
             },
-            KnowledgeLevel.Rumored => "Rumored water access",
+            KnowledgeLevel.Encounter => "Water has been encountered, but remains uncertain",
             _ => "Water not yet observed"
         };
     }
 
-    public static string DescribeFoodSigns(KnowledgeLevel level, string knownLabel, string partialLabel, string rumoredLabel, string unknownLabel)
+    public static string DescribeFoodSigns(KnowledgeLevel level, string knowledgeLabel, string discoveryLabel, string encounterLabel, string unknownLabel)
     {
         return level switch
         {
-            KnowledgeLevel.Known => knownLabel,
-            KnowledgeLevel.Partial => partialLabel,
-            KnowledgeLevel.Rumored => rumoredLabel,
+            KnowledgeLevel.Knowledge => knowledgeLabel,
+            KnowledgeLevel.Discovery => discoveryLabel,
+            KnowledgeLevel.Encounter => encounterLabel,
             _ => unknownLabel
         };
     }
@@ -60,19 +60,19 @@ public static class KnowledgePresentation
     {
         return snapshot.FaunaKnowledge switch
         {
-            KnowledgeLevel.Known => snapshot.ThreatPressure switch
+            KnowledgeLevel.Knowledge => snapshot.ThreatPressure switch
             {
-                >= 70 => "Predators known to be dangerous",
+                >= 70 => "Predators are known to be dangerous",
                 >= 40 => "Predator risk is known",
-                _ => "No major predator threat known"
+                _ => "No major predator threat is known"
             },
-            KnowledgeLevel.Partial => snapshot.ThreatPressure switch
+            KnowledgeLevel.Discovery => snapshot.ThreatPressure switch
             {
-                >= 70 => "Predator signs are strong",
-                >= 40 => "Predator signs observed",
-                _ => "Few predator signs observed"
+                >= 70 => "Predator danger has been discovered",
+                >= 40 => "Predator signs have been discovered",
+                _ => "Only light predator signs are discovered"
             },
-            KnowledgeLevel.Rumored => "Predator signs rumored",
+            KnowledgeLevel.Encounter => "Predator signs have been encountered",
             _ => "Threats not yet observed"
         };
     }

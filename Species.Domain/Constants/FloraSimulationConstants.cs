@@ -2,17 +2,26 @@ namespace Species.Domain.Constants;
 
 public static class FloraSimulationConstants
 {
-    public const float UnsupportedWaterTargetMultiplier = 0.0f;
-    public const float CoreBiomeFitMultiplier = 1.0f;
-    public const float NonCoreBiomeFitMultiplier = 0.40f;
-    public const float BaseTargetContribution = 0.15f;
-    public const float GrowthRateTargetWeight = 0.45f;
-    public const float FoodValueTargetWeight = 0.05f;
-    public const float FertilityTargetWeight = 0.35f;
-    public const float CoreBiomeTargetBonus = 0.20f;
-    public const float MinimumMonthlyAdjustmentRate = 0.10f;
-    public const float GrowthRateAdjustmentWeight = 0.45f;
-    public const float UnsupportedWaterDeclineRate = 0.65f;
+    public const float CoreBiomeFitMultiplier = 1.00f;
+    public const float NonCoreBiomeFitMultiplier = 0.42f;
+    public const float SupportTargetWeight = 0.46f;
+    public const float AbundanceTargetWeight = 0.24f;
+    public const float ProtoPressureTargetWeight = 0.14f;
+    public const float VacancyTargetWeight = 0.16f;
+    public const float MinimumGrowthRate = 0.06f;
+    public const float GrowthRateWeight = 0.34f;
+    public const float RecoveryRateWeight = 0.34f;
+    public const float BiomassGrowthWeight = 0.10f;
+    public const float RecoveryOccupancyWeight = 0.24f;
+    public const float HarshnessDeclineWeight = 0.38f;
+    public const float ConsumptionDeclineWeight = 0.42f;
+    public const float PoorSupportDeclineWeight = 0.30f;
+    public const float UnderTargetDeclineReliefWeight = 0.18f;
+    public const float SpreadThreshold = 0.18f;
+    public const float SpreadSourceOccupancyThreshold = 0.22f;
+    public const float SpreadNeighborPressureWeight = 0.14f;
+    public const float SpreadPopulationFactor = 0.12f;
+    public const int MinimumSpreadPopulation = 4;
     public const int ExtinctionThresholdPopulation = 1;
     public const float FertilityFitFalloffRange = 0.40f;
 }

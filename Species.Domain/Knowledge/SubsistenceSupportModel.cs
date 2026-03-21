@@ -28,7 +28,25 @@ public static class SubsistenceSupportModel
                 continue;
             }
 
-            total += flora.Value * ResolveFoodPerUnit(species.FoodValue, multiplier);
+            total += flora.Value * ResolveFoodPerUnit(ResolveFloraFoodPerPopulation(species), multiplier);
+        }
+
+        return total;
+    }
+
+    public static float CalculateFloraEcologySupport(Region region, FloraSpeciesCatalog floraCatalog)
+    {
+        var total = 0.0f;
+
+        foreach (var flora in region.Ecosystem.FloraPopulations)
+        {
+            var species = floraCatalog.GetById(flora.Key);
+            if (species is null || flora.Value <= 0)
+            {
+                continue;
+            }
+
+            total += flora.Value * ResolveFloraSupportPerPopulation(species);
         }
 
         return total;
@@ -117,6 +135,19 @@ public static class SubsistenceSupportModel
     public static int ResolveFoodPerUnit(float baseFoodValue, float multiplier)
     {
         return Math.Max(1, (int)MathF.Round(baseFoodValue * GroupSurvivalConstants.FoodUnitScale * multiplier, MidpointRounding.AwayFromZero));
+    }
+
+    public static float ResolveFloraFoodPerPopulation(FloraSpeciesDefinition species)
+    {
+        return (species.UsableBiomass * 0.78f) + (species.RegionalAbundance * 0.22f);
+    }
+
+    public static float ResolveFloraSupportPerPopulation(FloraSpeciesDefinition species)
+    {
+        return (species.UsableBiomass * 0.46f) +
+               (species.RegionalAbundance * 0.28f) +
+               (species.RecoveryRate * 0.14f) +
+               (species.ConsumptionResilience * 0.12f);
     }
 
     public static float ResolveGatheringMultiplier(PopulationGroup group, Region region)

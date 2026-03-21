@@ -47,7 +47,7 @@ This preserves the design rule that unfolding history is the main player-facing 
 
 Region Viewer is a player-facing current-state screen.
 
-It shows only what the focal polity actually knows or has reason to estimate. Hidden world truth is replaced by partial, rumored, estimated, or unknown presentation.
+It shows only what the focal polity actually knows or has reason to estimate. Hidden world truth is replaced by `Encounter`, `Discovery`, `Knowledge`, or `Unknown` presentation as appropriate.
 
 It may show:
 
@@ -64,7 +64,7 @@ When groups are present, the screen also shows a short summary of their:
 - population
 - stored food
 - subsistence mode
-- known discoveries
+- discovered findings
 - learned advancements
 
 This is presented as a world-state viewer, not as a raw diagnostics dump.

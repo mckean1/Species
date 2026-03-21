@@ -20,9 +20,17 @@ public sealed class FaunaPopulationChange
 
     public required float FulfillmentRatio { get; init; }
 
+    public required float HungerPressure { get; init; }
+
+    public required int ShortageMonths { get; init; }
+
+    public required string FoodStressState { get; init; }
+
     public required float HabitatSupport { get; init; }
 
     public required float BiologicalFit { get; init; }
+
+    public required int MigratedOut { get; init; }
 
     public required string Outcome { get; init; }
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Phase 5 adds the first real monthly fauna ecology loop. Fauna no longer stays at seeded static values. Each month fauna consumes food from the actual regional ecology state and then adjusts population from food actually consumed plus habitat support.
+Phase 5 adds the first real monthly fauna ecology loop. Fauna no longer stays at seeded static values or relies on abstract food-only shortcuts. Each month fauna attempts to feed from actual regional flora and fauna abundance, accumulates shortage pressure when underfed, reproduces when fed, dies back when shortages persist, and may migrate into better neighboring regions.
 
 ## Tick Placement
 
@@ -12,53 +12,88 @@ Within the monthly ecology flow, Phase 5 now runs:
 
 1. Advance month
 2. Flora simulation
-3. Fauna consumption
-4. Fauna population adjustment
+3. Fauna feeding and regional consumption
+4. Fauna hunger, reproduction, mortality, and migration adjustment
 5. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this order.
 
-## Food Consumption Rules
+## Feeding Rules
 
-Fauna outcome is based on food actually consumed, not theoretical food availability alone.
+Fauna outcome is based on food actually consumed from the current ecology state, not theoretical food availability alone.
 
 For each fauna species already present in a region:
 
 1. determine habitat support
-2. calculate food need from current population and `FoodRequirement`
-3. consume eligible food based on `DietCategory`
-4. measure actual consumption
-5. compute fulfillment ratio
-6. adjust population from fulfillment plus habitat support
+2. calculate required intake from current population and `RequiredIntake`
+3. resolve explicit preferred diet links from `DietLinks`
+4. consume available named flora/prey targets from the actual regional ecology state
+5. measure the resulting feeding ratio
+6. convert that usable-food ratio into food stress state, hunger pressure, and shortage persistence
+7. apply reproduction or mortality from fedness, shortage pressure, and support
+8. migrate a bounded share outward if shortages persist and a better neighboring region exists
+
+Food present in a region is not automatically usable food for a fauna species. Usable food is the portion the species can actually convert into intake after diet-link targeting, encounter/refuge friction, fallback penalties, and conversion efficiency are applied.
 
 ### Herbivores
 
-- consume flora only
-- use current regional flora populations
-- flora `FoodValue` influences usable food
+- draw almost all intake from explicit flora targets
+- use current regional flora populations and flora support values
+- flora `UsableBiomass`, `RegionalAbundance`, and recovery/resilience qualities influence usable flora support
 - consumed flora reduces the real regional flora populations
 
 ### Carnivores
 
-- consume fauna only
-- may consume herbivores, omnivores, and other carnivores
+- draw most intake from explicit prey targets
+- may consume herbivores, omnivores, and other carnivores if those targets are linked
 - may not consume their own species
+- prey with higher `PredatorVulnerability` is easier to consume efficiently
+- prey refuge and encounter friction limit how much of a prey population is actually accessible in a month
+- prey accessibility tightens further when prey is sparse or predators locally overconcentrate
 - consumed prey reduces the real regional fauna populations
 
 ### Omnivores
 
-- consume both flora and fauna
-- use a simple split with fallback when one side is weak
+- draw intake from both flora and prey according to explicit weighted diet links
+- can fall back across sources when one side is weak, subject to availability and efficiency
 - consumed flora and fauna both reduce the real regional ecology state
+
+### Scavenge Share
+
+- `FaunaDietTargetKind.ScavengePool` exists as a limited low-efficiency fallback source
+- it is intentionally weak and does not replace actual flora or prey abundance as the main ecological base
+- it helps prevent total brittleness without introducing a separate carcass simulation system
 
 ## Habitat Support
 
-Fauna habitat support remains intentionally simple:
+Fauna habitat support remains intentionally simple and aggregate:
 
 - supported water is the practical support gate
-- unsupported water strongly penalizes survival
+- unsupported water strongly penalizes feeding success and population recovery
 - core biomes provide strong habitat support
 - non-core biomes reduce support
+- fertility fit provides an additional local support signal through `HabitatFertilityMin` and `HabitatFertilityMax`
+
+## Hunger, Reproduction, and Mortality
+
+- each regional fauna population tracks `HungerPressure`
+- each regional fauna population also tracks `FeedingMomentum`, which smooths reproduction and prevents immediate boom-bust breeding swings
+- feeding momentum rises more slowly than shortages do, so reproduction lags recovery instead of snapping back immediately
+- each regional fauna population resolves into `FedStable`, `HungerPressure`, `SevereShortage`, or `Starvation`
+- repeated underfeeding increments shortage persistence
+- well-fed populations reproduce according to `ReproductionRate`, filtered through the lagging feeding momentum state
+- persistent shortages convert into mortality according to `MortalitySensitivity`
+- no usable food escalates starvation rapidly instead of allowing indefinite survival off nominal food presence
+- populations can recover when feeding improves because hunger pressure also decays
+
+## Migration
+
+- migration is aggregate and region-based
+- only a bounded share of a population may migrate in a month
+- migration is driven by persistent shortages plus species `Mobility`
+- migration is also a stability valve for predator-prey loops; hungry fauna can bleed outward instead of only amplifying local collapse
+- movement only occurs when a neighboring region offers materially better feeding/support conditions
+- migration does not create new fauna from nothing; it only redistributes existing population
 
 ## Extinction
 
@@ -78,17 +113,21 @@ Phase 5 adds debug output for:
 - month/date
 - fauna species and region
 - prior and new population
-- food needed
+- required intake
 - food actually consumed
-- fulfillment ratio
+- feeding ratio
 - habitat support
+- hunger pressure
+- shortage months
+- migrated-out amount
 - consumed flora summary
 - consumed fauna summary
-- growth / decline / extinction outcome
+- growth / decline / extinction / migration outcome
 
 Validation now also checks:
 
 - negative fauna populations
+- invalid hunger pressure or shortage month state
 - cannibalism is excluded
 - tick month advancement remains correct
 
@@ -101,7 +140,6 @@ The following remain deferred:
 - discoveries and advancements
 - adaptations
 - chronicle generation
-- migration between regions
 - prey preference matrices
 - explicit kill events or combat simulation
 - social behavior and age structure

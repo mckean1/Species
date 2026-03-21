@@ -8,17 +8,29 @@ public sealed class FloraSpeciesDefinition
 
     public string Name { get; init; } = string.Empty;
 
+    public SpeciesClass SpeciesClass { get; init; } = SpeciesClass.Flora;
+
     public IReadOnlyList<Biome> CoreBiomes { get; init; } = Array.Empty<Biome>();
 
     public IReadOnlyList<WaterAvailability> SupportedWaterAvailabilities { get; init; } = Array.Empty<WaterAvailability>();
 
-    public float PreferredFertilityMin { get; init; }
+    public float HabitatFertilityMin { get; init; }
 
-    public float PreferredFertilityMax { get; init; }
+    public float HabitatFertilityMax { get; init; }
 
     public float GrowthRate { get; init; }
 
-    public float FoodValue { get; init; }
+    public float RecoveryRate { get; init; }
+
+    public float UsableBiomass { get; init; }
+
+    public float ConsumptionResilience { get; init; }
+
+    public float SpreadTendency { get; init; }
+
+    public float RegionalAbundance { get; init; }
+
+    public float Conspicuousness { get; init; }
 
     public BiologicalTraitProfile BaselineTraits { get; init; } = new();
 

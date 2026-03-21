@@ -4,12 +4,29 @@
 
 Phase 3 turns regions into living ecological containers by attaching seeded flora and fauna population state to every region.
 
+Under the canonical biology architecture, region ecology also has a proto-life substrate boundary beneath concrete species populations.
+
 This phase adds initial ecology only. It does not simulate growth, decline, feeding, migration, pressure, groups, discoveries, advancements, adaptations, or chronicle behavior over time.
 
 ## RegionEcosystem
 
 `RegionEcosystem` is the aggregate living-state container owned by each region.
 
+- `ProtoLifeSubstrate`: regional proto-life groundwork that defines:
+  - `ProtoFloraCapacity`
+  - `ProtoFaunaCapacity`
+  - `ProtoFloraPressure`
+  - `ProtoFaunaPressure`
+  - `FloraOccupancyDeficit`
+  - `FaunaOccupancyDeficit`
+  - `FloraSupportDeficit`
+  - `FaunaSupportDeficit`
+  - `EcologicalVacancy`
+  - `RecentCollapseOpening`
+  - `ProtoFloraReadinessMonths`
+  - `ProtoFaunaReadinessMonths`
+  - `ProtoFloraGenesisCooldownMonths`
+  - `ProtoFaunaGenesisCooldownMonths`
 - `FloraPopulations`: flora population values keyed by flora species ID.
 - `FaunaPopulations`: fauna population values keyed by fauna species ID.
 
@@ -19,8 +36,16 @@ The values are aggregate whole-number population levels, not individual entities
 
 Population state is stored directly on the region through its `RegionEcosystem`.
 
+- Proto-life substrate is stored separately from concrete populations.
 - Flora populations are stored as `species ID -> population value`.
 - Fauna populations are stored as `species ID -> population value`.
+
+`ProtoFloraCapacity` / `ProtoFaunaCapacity` describe latent ecological room.
+`ProtoFloraPressure` / `ProtoFaunaPressure` describe active monthly substrate pressure.
+
+Capacity is structural. Pressure is dynamic.
+Pressure can rise when regions are underfilled and connected to suitable neighboring ecology, and it can decay when vacancy closes or harsh conditions drag it down.
+Vacancy alone is not enough to keep pressure high forever. Empty or harsh regions now lose pressure unless suitability, neighboring spread, and active ecological support continue to justify it.
 
 This keeps the MVP state compact, inspectable, and easy to evolve into later ecology simulation without introducing fine-grained entity management.
 
@@ -28,13 +53,24 @@ This keeps the MVP state compact, inspectable, and easy to evolve into later eco
 
 Phase 3 seeds ecology during world generation using region conditions plus the Phase 2 species definitions.
 
+The canonical order is:
+
+1. derive regional proto-life substrate capacity/pressure
+2. seed flora populations from regional conditions and flora definitions
+3. seed fauna populations from regional conditions plus seeded flora/fauna support
+
+Later monthly substrate updates can adjust proto pressures. In the current biology architecture, rare new-species genesis can eventually occur from this substrate, but only through sustained readiness, rare trigger windows, establishment checks, and cooldowns. Proto pressure alone still does not directly create species.
+
+For fauna in particular, readiness and establishment now require active food-base support from real flora/fauna abundance. Proto-fauna pressure does not override an empty food web.
+
 ### Flora Seeding
 
 Flora seeding considers:
 
 - `CoreBiomes` as a strong positive fit
 - `SupportedWaterAvailabilities` as a practical support gate
-- region fertility against `PreferredFertilityMin` / `PreferredFertilityMax`
+- region fertility against `HabitatFertilityMin` / `HabitatFertilityMax`
+- flora `RegionalAbundance`, `GrowthRate`, `RecoveryRate`, and `SpreadTendency`
 - small seed-based variation
 
 Flora generally seeds more broadly and more strongly than fauna.
