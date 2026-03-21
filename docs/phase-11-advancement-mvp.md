@@ -1,4 +1,4 @@
-# Phase 11: Advancement MVP
+# Phase 11: Advancement Capability Layer
 
 ## Scope
 
@@ -18,7 +18,7 @@ The distinction remains strict:
 Discoveries improve decision-making only.
 Advancements directly improve execution and capability.
 
-In MVP form, the direct execution improvements now live in advancements, not discoveries.
+Direct execution improvements live in advancements, not discoveries or species-awareness states.
 
 ## Monthly Order
 
@@ -47,7 +47,7 @@ Both layers are monthly, capped, and condition-driven rather than binary thresho
 
 Advancement names are written to read naturally after "learned".
 
-MVP content includes:
+Current content includes:
 
 - Improved Gathering
 - Improved Hunting

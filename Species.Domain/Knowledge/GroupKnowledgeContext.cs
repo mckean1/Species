@@ -295,8 +295,9 @@ public sealed class GroupKnowledgeContext
     {
         return level switch
         {
+            // Species may exist in the world and still be unusable to this actor.
+            // Intentional exploitation requires Knowledge, not merely Discovery.
             KnowledgeLevel.Knowledge => SpeciesAwarenessConstants.KnowledgeUsabilityMultiplier,
-            KnowledgeLevel.Discovery => SpeciesAwarenessConstants.DiscoveryUsabilityMultiplier,
             _ => 0.0f
         };
     }

@@ -6,6 +6,7 @@ public static class FoodStressModel
 {
     public static float ResolveHungerPressure(float currentHungerPressure, float usableFoodRatio, float riseRate, float decayRate)
     {
+        // Food stress is driven by usable food, not gross food present in the world.
         var targetHunger = 1.0f - Math.Clamp(usableFoodRatio, 0.0f, 1.0f);
         var rate = targetHunger >= currentHungerPressure ? riseRate : decayRate;
         return ClampNormalized(currentHungerPressure + ((targetHunger - currentHungerPressure) * rate));

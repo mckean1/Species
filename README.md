@@ -26,11 +26,14 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Tick delay is `1000ms`.
 - Player-facing screens are focal-polity knowledge-aware rather than omniscient.
 - `Encounter -> Discovery -> Knowledge` is the canonical knowledge-state ladder for world familiarity.
+- Flora/fauna species awareness uses `Encounter -> Discovery -> Knowledge`, and intentional species exploitation requires `Knowledge`.
 - Advancements remain capability.
 - `SpeciesClass` is the canonical biology classification model: `Flora`, `Fauna`, `Sapient`.
 - Regional ecology now has explicit proto-life substrate naming: `ProtoFloraCapacity`, `ProtoFaunaCapacity`, `ProtoFloraPressure`, `ProtoFaunaPressure`.
 - Proto-life capacity is latent ecological room; proto-life pressure is current monthly activation pressure, and the two are intentionally separate.
+- Proto-life is a regional substrate, not arbitrary species spawning.
 - Sapience is canonically a fauna-lineage emergence that becomes its own active `SpeciesClass` once present.
+- Starvation follows usable-food failure, not mere world-food totals.
 - Laws, enacted-law monthly effects, political blocs, and polity-facing governance presentation are already implemented on explicit polity state.
 - Settlements, polity regional presence, and place-based anchoring are now implemented in lightweight form.
 - Aggregate material extraction, limited non-food stores, and simple production bridges are now implemented in lightweight form.
@@ -69,6 +72,14 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 20. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
+
+## Progression Ownership
+
+- Species awareness owns flora/fauna species familiarity and intentional-use eligibility.
+- Discoveries own broader non-species findings such as routes, materials, conditions, and methods.
+- Advancements own repeatable operational capability.
+
+This split is intentional: discovery is not advancement, and species `Discovery` is not enough to intentionally exploit that species.
 
 ## Scope Notes
 

@@ -1,12 +1,12 @@
-# Phase 10: Discovery MVP
+# Phase 10: Discovery And Species-Awareness Boundaries
 
 ## Scope
 
 Phase 10 adds group-owned discoveries as durable findings unlocked from repeated lived experience. Discoveries now exist as explicit content, groups accumulate lightweight evidence for them over time, and monthly discovery evaluation runs after survival and migration.
 
-This phase adds discoveries only. It does not add advancements, raw output bonuses, research systems, Chronicle generation, or discovery sharing.
+This phase adds broader discoveries only. It does not add advancements, raw output bonuses, research systems, Chronicle generation, or discovery sharing.
 
-The current architecture now keeps this layer for region, route, and material discoveries, while flora/fauna species awareness is handled as a separate polity-owned staged progress model (`Encounter`, `Discovery`, `Knowledge`) rather than a binary regional unlock.
+The current architecture keeps this layer for region, route, condition, material, and method discoveries, while flora/fauna species awareness is handled as a separate polity-owned staged progress model (`Encounter`, `Discovery`, `Knowledge`) rather than a binary regional unlock.
 
 ## Discovery Versus Advancement
 
@@ -49,7 +49,7 @@ This keeps discoveries grounded in completed lived actions from the month.
 
 Discovery content is authored so it reads naturally after "discovered".
 
-Examples in MVP form include:
+Examples include:
 
 - region flora knowledge
 - region fauna knowledge
@@ -77,8 +77,6 @@ Regional/material discovery progression is now paced and progress-based rather t
 
 Examples:
 
-- repeated successful gathering in one region unlocks local flora knowledge
-- repeated successful hunting in one region unlocks local fauna knowledge
 - repeated residence in one region unlocks local region conditions
 - repeated water exposure in one region unlocks local water-source knowledge
 - repeated traversal of the same neighboring connection unlocks route knowledge
@@ -117,7 +115,14 @@ The tuned pacing rule is:
 - passive presence mostly builds `Encounter`
 - `Discovery` needs repeated overlap/contact over time
 - `Knowledge` needs repeated successful use
+- only `Knowledge` authorizes intentional species exploitation
 - scarce species progress much more slowly because low abundance reduces repeatable contact and successful interaction
+
+The ownership boundary is:
+
+- this phase owns non-species discoveries
+- species awareness owns flora/fauna species knowing and use eligibility
+- advancements own execution-changing capability
 
 ## Chronicle Readiness
 

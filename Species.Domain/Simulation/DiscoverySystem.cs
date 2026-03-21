@@ -33,6 +33,9 @@ public sealed class DiscoverySystem
         var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
         var changes = new List<DiscoveryChange>(world.PopulationGroups.Count);
 
+        // Boundary:
+        // - The main group loop below owns broader non-species discoveries such as routes, methods, and materials.
+        // - Species-specific flora/fauna knowing and use progression is handled separately in UpdateSpeciesAwareness.
         foreach (var group in world.PopulationGroups.OrderBy(group => group.Id, StringComparer.Ordinal))
         {
             var updatedGroup = CloneGroup(group);
@@ -302,6 +305,8 @@ public sealed class DiscoverySystem
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog)
     {
+        // Species awareness is intentionally separate from broader discovery progression.
+        // It owns only the Encounter -> Discovery -> Knowledge ladder for actual flora/fauna species.
         var groupsByPolityId = updatedGroups
             .GroupBy(group => group.PolityId, StringComparer.Ordinal)
             .ToDictionary(grouping => grouping.Key, grouping => grouping.ToArray(), StringComparer.Ordinal);
@@ -485,7 +490,7 @@ public sealed class DiscoverySystem
             }
 
             exposure.SuccessfulInteractions++;
-        exposure.SuccessfulUseIntensity += Math.Clamp(consumed.Value / 18.0f, 0.08f, 0.85f);
+            exposure.SuccessfulUseIntensity += Math.Clamp(consumed.Value / 18.0f, 0.08f, 0.85f);
         }
     }
 

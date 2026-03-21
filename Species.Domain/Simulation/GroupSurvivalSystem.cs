@@ -99,7 +99,7 @@ public sealed class GroupSurvivalSystem
             var remainingNeedAfterStoredFood = Math.Max(0, remainingNeedAfterActions - consumedFromStoredFood);
             var settlementFoodUsed = ConsumeSettlementReserve(settlementLookup, group, remainingNeedAfterStoredFood);
             // "Usable food" is the amount this actor can actually convert into survival this month,
-            // after subsistence access, storage access, and local reserve access are resolved.
+            // after subsistence access, Knowledge gating, storage access, and local reserve access are resolved.
             var usableFoodConsumed = consumedFromActions + consumedFromStoredFood + settlementFoodUsed;
             var usableFoodRatio = state.MonthlyFoodNeed <= 0
                 ? 1.0f
@@ -672,6 +672,8 @@ public sealed class GroupSurvivalSystem
             FloraSpeciesCatalog floraCatalog,
             FaunaSpeciesCatalog faunaCatalog)
         {
+            // "Known support" is intentionally strict: only Knowledge-backed species use counts here.
+            // Discovery can improve awareness and future progress, but it must not grant deliberate extraction.
             var knownGatheringSupport = floraPopulations
                 .Where(entry => entry.Value > 0)
                 .Sum(entry =>

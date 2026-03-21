@@ -121,8 +121,23 @@ System boundary:
 - passive regional presence alone should usually only build `Encounter` slowly
 - `Discovery` requires repeated exposure over time
 - `Knowledge` requires repeated successful practical interaction, not just co-presence
-- sapient extraction may intentionally target species from `Discovery` onward, but `Discovery` remains partial usability and `Knowledge` remains the reliable use state
+- intentional flora/fauna exploitation requires `Knowledge`
+- `Discovery` may inform planning, messaging, and future progress, but it does not authorize deliberate extraction
 - this is still separate from broader research or speculative science systems
+
+## Progression Ownership
+
+The progression ownership split is:
+
+- species awareness owns flora/fauna species familiarity through `Encounter -> Discovery -> Knowledge`
+- broader discoveries own non-species findings such as routes, materials, conditions, and methods
+- advancements own repeatable operational capability
+
+These systems are related, but they do not mean the same thing.
+
+- species awareness answers "do we know this species well enough to use it intentionally?"
+- discoveries answer "what durable finding have we learned about the world?"
+- advancements answer "what can we now do reliably?"
 
 ## System Boundaries
 

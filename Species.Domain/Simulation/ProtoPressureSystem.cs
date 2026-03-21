@@ -196,8 +196,7 @@ public sealed class ProtoPressureSystem
         var opening = region.Ecosystem.BiologicalHistoryRecords
             .Where(record =>
                 string.Equals(record.EventKind, "regional-extinction", StringComparison.Ordinal) ||
-                string.Equals(record.EventKind, "extinction", StringComparison.Ordinal) ||
-                string.Equals(record.EventKind, "speciation", StringComparison.Ordinal))
+                string.Equals(record.EventKind, "extinction", StringComparison.Ordinal))
             .Select(record => ResolveOpeningContribution(record, currentYear, currentMonth))
             .Sum();
 
@@ -213,9 +212,7 @@ public sealed class ProtoPressureSystem
         }
 
         var freshness = 1.0f - (monthsAgo / ProtoLifePressureConstants.RecentCollapseWindowMonths);
-        return string.Equals(record.EventKind, "speciation", StringComparison.Ordinal)
-            ? freshness * 0.12f
-            : freshness * 0.28f;
+        return freshness * 0.28f;
     }
 
     private static float NormalizePopulation(int totalPopulation, float capacity, float scale)

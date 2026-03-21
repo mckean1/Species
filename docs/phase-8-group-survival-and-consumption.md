@@ -50,7 +50,7 @@ Gathering:
 
 - reads real flora populations from the current region
 - only intentionally targets flora sources the group has sufficient practical knowledge of
-- uses polity-owned species awareness, where `Discovery` allows limited intentional use and `Knowledge` allows reliable use
+- uses polity-owned species awareness, where intentional use requires `Knowledge`
 - uses flora `UsableBiomass`-driven gathering support to determine usable food
 - reduces actual flora populations in the region
 
@@ -62,7 +62,7 @@ Hunting:
 
 - reads real fauna populations from the current region
 - only intentionally targets fauna sources the group has sufficient practical knowledge of
-- uses polity-owned species awareness, where `Discovery` allows limited intentional use and `Knowledge` allows reliable use
+- uses polity-owned species awareness, where intentional use requires `Knowledge`
 - uses fauna `FoodYield` to determine usable food
 - reduces actual fauna populations in the region
 
@@ -71,8 +71,8 @@ Hunting is aggregate only. There are no detailed prey strategies, weapon systems
 Groups cannot intentionally exploit species just because those species exist in the world. Intentional extraction is knowledge-gated and bound to polity species-awareness state:
 
 - `Encounter` is not enough for deliberate use
-- `Discovery` allows deliberate but still limited use
-- `Knowledge` is the reliable operational state
+- `Discovery` is recognition, not usable extraction
+- `Knowledge` is the reliable operational state that enables deliberate extraction
 
 Food in the world still is not the same thing as usable food for that actor. A species can be abundant in a region and still contribute little or nothing if the polity has not progressed far enough in its awareness of that species.
 
