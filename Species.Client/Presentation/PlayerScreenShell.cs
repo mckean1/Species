@@ -24,7 +24,7 @@ public static class PlayerScreenShell
         [
             HorizontalBorder(innerWidth),
             BorderLine(PadBetween($"{PaneTitle}{screenName}{Reset}", $"{White}{currentDate}{Reset}", innerWidth), innerWidth),
-            BorderLine(PadBetween($"{Dim}Polity:{Reset} {Blue}{polityName}{Reset}", $"{Dim}State:{Reset} {stateText}", innerWidth), innerWidth),
+            BorderLine(PadBetween($"{White}Polity:{Reset} {Blue}{polityName}{Reset}", $"{White}State:{Reset} {stateText}", innerWidth), innerWidth),
             HorizontalBorder(innerWidth)
         ];
     }
