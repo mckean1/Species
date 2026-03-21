@@ -76,7 +76,7 @@ These are broad ecological roles only. Actual monthly feeding behavior is driven
 - `FaunaDietTargetKind.FaunaSpecies`: intake drawn from a named prey fauna species.
 - `FaunaDietTargetKind.ScavengePool`: limited low-efficiency fallback intake from incidental scavenging pressure without adding a separate carrion persistence system.
 
-Each link has a normalized weight and may be marked as fallback. Preferred links are attempted first; fallback links only help cover remaining unmet intake.
+Each link has a normalized weight and may be marked as fallback. Preferred links are attempted first; fallback links only help cover remaining unmet intake and should not be treated as equal-strength core support.
 
 ### Flora Biomass and Fauna Yield
 

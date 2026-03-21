@@ -28,7 +28,7 @@ public static class SubsistenceSupportModel
                 continue;
             }
 
-            total += flora.Value * ResolveFoodPerUnit(ResolveFloraFoodPerPopulation(species), multiplier);
+            total += flora.Value * ResolveFoodPerUnit(ResolveFloraFoodPerPopulation(region, species), multiplier);
         }
 
         return total;
@@ -36,6 +36,7 @@ public static class SubsistenceSupportModel
 
     public static float CalculateFloraEcologySupport(Region region, FloraSpeciesCatalog floraCatalog)
     {
+        // Ecology support is live flora under current local conditions, not a generic "plant food exists" shortcut.
         var total = 0.0f;
 
         foreach (var flora in region.Ecosystem.FloraPopulations)
@@ -46,7 +47,7 @@ public static class SubsistenceSupportModel
                 continue;
             }
 
-            total += flora.Value * ResolveFloraSupportPerPopulation(species);
+            total += flora.Value * ResolveFloraSupportPerPopulation(region, species);
         }
 
         return total;
@@ -137,17 +138,40 @@ public static class SubsistenceSupportModel
         return Math.Max(1, (int)MathF.Round(baseFoodValue * GroupSurvivalConstants.FoodUnitScale * multiplier, MidpointRounding.AwayFromZero));
     }
 
-    public static float ResolveFloraFoodPerPopulation(FloraSpeciesDefinition species)
+    public static float ResolveFloraFoodPerPopulation(Region region, FloraSpeciesDefinition species)
     {
-        return (species.UsableBiomass * 0.78f) + (species.RegionalAbundance * 0.22f);
+        var localFit = ResolveFloraEnvironmentalFit(region, species);
+        return ((species.UsableBiomass * 0.82f) + (species.RegionalAbundance * 0.18f)) *
+               (0.55f + (localFit * 0.45f));
     }
 
-    public static float ResolveFloraSupportPerPopulation(FloraSpeciesDefinition species)
+    public static float ResolveFloraSupportPerPopulation(Region region, FloraSpeciesDefinition species)
     {
-        return (species.UsableBiomass * 0.46f) +
-               (species.RegionalAbundance * 0.28f) +
-               (species.RecoveryRate * 0.14f) +
-               (species.ConsumptionResilience * 0.12f);
+        var localFit = ResolveFloraEnvironmentalFit(region, species);
+        return ((species.UsableBiomass * 0.40f) +
+                (species.RegionalAbundance * 0.22f) +
+                (species.RecoveryRate * 0.20f) +
+                (species.ConsumptionResilience * 0.18f)) *
+               (0.45f + (localFit * 0.55f));
+    }
+
+    public static float ResolveFloraEnvironmentalFit(Region region, FloraSpeciesDefinition species)
+    {
+        if (!species.SupportedWaterAvailabilities.Contains(region.WaterAvailability))
+        {
+            return 0.0f;
+        }
+
+        var fertilityFit = ResolveFertilityFit((float)region.Fertility, species.HabitatFertilityMin, species.HabitatFertilityMax);
+        var biomeFit = species.CoreBiomes.Contains(region.Biome) ? 1.0f : 0.42f;
+        var waterFit = region.WaterAvailability switch
+        {
+            WaterAvailability.High => species.SupportedWaterAvailabilities.Contains(WaterAvailability.High) ? 1.00f : 0.74f,
+            WaterAvailability.Medium => species.SupportedWaterAvailabilities.Contains(WaterAvailability.Medium) ? 0.92f : 0.64f,
+            _ => species.SupportedWaterAvailabilities.Contains(WaterAvailability.Low) ? 0.86f : 0.28f
+        };
+
+        return Math.Clamp((fertilityFit * 0.40f) + (waterFit * 0.32f) + (biomeFit * 0.28f), 0.0f, 1.0f);
     }
 
     public static float ResolveGatheringMultiplier(PopulationGroup group, Region region)
@@ -189,5 +213,19 @@ public static class SubsistenceSupportModel
     public static int ClampScore(float value)
     {
         return (int)MathF.Round(Math.Clamp(value, 0.0f, 100.0f), MidpointRounding.AwayFromZero);
+    }
+
+    private static float ResolveFertilityFit(float fertility, float preferredMin, float preferredMax)
+    {
+        if (fertility >= preferredMin && fertility <= preferredMax)
+        {
+            return 1.0f;
+        }
+
+        var distance = fertility < preferredMin
+            ? preferredMin - fertility
+            : fertility - preferredMax;
+
+        return Math.Clamp(1.0f - (distance / 0.40f), 0.0f, 1.0f);
     }
 }

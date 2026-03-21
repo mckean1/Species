@@ -174,6 +174,8 @@ public static class RegionEcologyValidator
 
         if (substrate.ProtoFloraReadinessMonths < 0 ||
             substrate.ProtoFaunaReadinessMonths < 0 ||
+            substrate.ProtoFloraCandidateMonths < 0 ||
+            substrate.ProtoFaunaCandidateMonths < 0 ||
             substrate.ProtoFloraGenesisCooldownMonths < 0 ||
             substrate.ProtoFaunaGenesisCooldownMonths < 0)
         {

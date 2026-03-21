@@ -41,6 +41,11 @@ public static class GroupSurvivalValidator
                 errors.Add($"Group survival produced negative usable food for {change.GroupId}.");
             }
 
+            if (change.KnownGatheringSupport < 0 || change.KnownHuntingSupport < 0)
+            {
+                errors.Add($"Group survival produced invalid known usable support for {change.GroupId}.");
+            }
+
             if (change.SubsistenceMode is "Gatherer" or "Mixed" && change.PrimaryAction == "Gather" && change.FallbackAction != "Hunt" && change.ExtractionPlan != "KnownSourceLimited")
             {
                 errors.Add($"Group {change.GroupId} does not follow gather-then-hunt fallback order.");

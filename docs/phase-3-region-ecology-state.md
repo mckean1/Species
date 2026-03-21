@@ -25,6 +25,8 @@ This phase adds initial ecology only. It does not simulate growth, decline, feed
   - `RecentCollapseOpening`
   - `ProtoFloraReadinessMonths`
   - `ProtoFaunaReadinessMonths`
+  - `ProtoFloraCandidateMonths`
+  - `ProtoFaunaCandidateMonths`
   - `ProtoFloraGenesisCooldownMonths`
   - `ProtoFaunaGenesisCooldownMonths`
 - `FloraPopulations`: flora population values keyed by flora species ID.
@@ -59,7 +61,15 @@ The canonical order is:
 2. seed flora populations from regional conditions and flora definitions
 3. seed fauna populations from regional conditions plus seeded flora/fauna support
 
-Later monthly substrate updates can adjust proto pressures. In the current biology architecture, rare new-species genesis can eventually occur from this substrate, but only through sustained readiness, rare trigger windows, establishment checks, and cooldowns. Proto pressure alone still does not directly create species.
+Later monthly substrate updates can adjust proto pressures. In the current biology architecture, rare new-species genesis can eventually occur from this substrate, but only through:
+
+1. sustained readiness under strong substrate conditions
+2. a shorter candidate window once those conditions keep holding
+3. a rare lineage-candidate trigger
+4. establishment viability checks
+5. success or failure with pressure reduction and cooldown
+
+Proto pressure alone still does not directly create species.
 
 For fauna in particular, readiness and establishment now require active food-base support from real flora/fauna abundance. Proto-fauna pressure does not override an empty food web.
 
@@ -91,6 +101,20 @@ Current MVP diet interpretation:
 - Carnivores rely primarily on prey support and seed conservatively when prey is weak.
 
 This is intentionally not a full food-web simulator. It is just enough to produce plausible regional starting ecology.
+
+## Proto-Genesis Boundary
+
+The region substrate now supports a full rare-species genesis pipeline without turning into arbitrary spawning:
+
+- `ProtoFloraPressure` / `ProtoFaunaPressure` build readiness over time
+- `ProtoFloraCandidateMonths` / `ProtoFaunaCandidateMonths` represent a narrower sustained opportunity window after readiness is already established
+- a candidate lineage event must still pass a low monthly trigger chance
+- successful establishment still requires local viability
+- success reduces local proto pressure more strongly and applies cooldown
+- failed attempts also spend some local opportunity so the same region does not retry at full strength immediately
+- full ecosystems suppress candidate windows and trigger chance
+
+Collapse or extinction can create real openings through `RecentCollapseOpening`, but successful genesis is not treated as a collapse opening.
 
 ## Validation and Debugging
 

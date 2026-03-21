@@ -18,6 +18,7 @@ public sealed class FloraSimulationSystem
         foreach (var region in world.Regions)
         {
             var updatedFlora = new Dictionary<string, int>(region.Ecosystem.FloraPopulations, StringComparer.Ordinal);
+            var updatedFloraProfiles = CloneProfiles(region.Ecosystem.FloraProfiles);
             var plannedIncoming = sourcePlansByTargetRegionId.GetValueOrDefault(region.Id, []);
 
             foreach (var floraEntry in region.Ecosystem.FloraPopulations.OrderBy(entry => entry.Key, StringComparer.Ordinal))
@@ -34,9 +35,10 @@ public sealed class FloraSimulationSystem
                 var targetPopulation = ResolveTargetPopulation(region, species, support);
                 var harshness = ResolveHarshness(region, species, support);
                 var consumptionPressure = ResolveConsumptionPressure(floraEntry.Value, profile);
-                var growth = ResolveGrowth(floraEntry.Value, targetPopulation, species, support);
+                var growth = ResolveGrowth(region, floraEntry.Value, targetPopulation, species, support);
                 var decline = ResolveDecline(floraEntry.Value, targetPopulation, species, support, harshness, consumptionPressure);
                 var newPopulation = Math.Max(0, floraEntry.Value + growth - decline);
+                var updatedProfile = ResolveFloraProfile(updatedFloraProfiles, region, species);
 
                 if (newPopulation <= FloraSimulationConstants.ExtinctionThresholdPopulation && support < 0.12f)
                 {
@@ -51,6 +53,13 @@ public sealed class FloraSimulationSystem
                 {
                     updatedFlora.Remove(floraEntry.Key);
                 }
+
+                updatedProfile.LastPopulation = newPopulation;
+                updatedProfile.IsExtinct = newPopulation <= 0;
+                updatedProfile.ViabilityScore = Math.Clamp(
+                    (int)Math.Round((support * 46.0f) + ((1.0f - harshness) * 24.0f) + ((1.0f - consumptionPressure) * 16.0f) + (Math.Min(1.0f, newPopulation / (double)Math.Max(1, targetPopulation)) * 14.0f), MidpointRounding.AwayFromZero),
+                    0,
+                    100);
 
                 changes.Add(new FloraPopulationChange
                 {
@@ -84,6 +93,10 @@ public sealed class FloraSimulationSystem
 
                 var incomingTraits = region.Ecosystem.FloraProfiles.GetValueOrDefault(species.Id)?.Traits ?? species.BaselineTraits;
                 var incomingSupport = ResolveSupport(region, species, incomingTraits);
+                var incomingProfile = ResolveFloraProfile(updatedFloraProfiles, region, species);
+                incomingProfile.LastPopulation = updatedFlora[incoming.SpeciesId];
+                incomingProfile.IsExtinct = false;
+                incomingProfile.ViabilityScore = Math.Clamp((int)Math.Round((incomingSupport * 72.0f) + 18.0f, MidpointRounding.AwayFromZero), 0, 100);
 
                 changes.Add(new FloraPopulationChange
                 {
@@ -114,7 +127,7 @@ public sealed class FloraSimulationSystem
                     region.Ecosystem.ProtoLifeSubstrate,
                     updatedFlora,
                     new Dictionary<string, int>(region.Ecosystem.FaunaPopulations, StringComparer.Ordinal),
-                    CloneProfiles(region.Ecosystem.FloraProfiles),
+                    updatedFloraProfiles,
                     CloneProfiles(region.Ecosystem.FaunaProfiles),
                     region.Ecosystem.FossilRecords.ToArray(),
                     region.Ecosystem.BiologicalHistoryRecords.ToArray()),
@@ -226,16 +239,18 @@ public sealed class FloraSimulationSystem
     {
         var protoSupport = region.Ecosystem.ProtoLifeSubstrate.ProtoFloraPressure;
         var vacancy = region.Ecosystem.ProtoLifeSubstrate.FloraOccupancyDeficit;
+        var collapseOpening = region.Ecosystem.ProtoLifeSubstrate.RecentCollapseOpening;
         var targetNormalized =
             (support * FloraSimulationConstants.SupportTargetWeight) +
             (species.RegionalAbundance * FloraSimulationConstants.AbundanceTargetWeight) +
             (protoSupport * FloraSimulationConstants.ProtoPressureTargetWeight) +
-            (vacancy * FloraSimulationConstants.VacancyTargetWeight);
+            (vacancy * FloraSimulationConstants.VacancyTargetWeight) +
+            (collapseOpening * FloraSimulationConstants.CollapseRecoveryTargetWeight);
 
         return ToPopulationCount(ClampNormalized(targetNormalized));
     }
 
-    private static int ResolveGrowth(int currentPopulation, int targetPopulation, FloraSpeciesDefinition species, float support)
+    private static int ResolveGrowth(Region region, int currentPopulation, int targetPopulation, FloraSpeciesDefinition species, float support)
     {
         if (support <= 0.0f)
         {
@@ -245,12 +260,14 @@ public sealed class FloraSimulationSystem
         var occupancyDeficit = targetPopulation <= 0
             ? 0.0f
             : Math.Clamp((targetPopulation - currentPopulation) / (float)Math.Max(1, targetPopulation), 0.0f, 1.0f);
+        var collapseOpening = Math.Clamp((double)species.SpreadTendency * 0.35 + region.Ecosystem.ProtoLifeSubstrate.RecentCollapseOpening * 0.65, 0.0, 1.0);
         var growthRate =
             FloraSimulationConstants.MinimumGrowthRate +
             (species.GrowthRate * FloraSimulationConstants.GrowthRateWeight) +
             (species.RecoveryRate * FloraSimulationConstants.RecoveryRateWeight) +
             (species.UsableBiomass * FloraSimulationConstants.BiomassGrowthWeight) +
-            (occupancyDeficit * FloraSimulationConstants.RecoveryOccupancyWeight);
+            (occupancyDeficit * FloraSimulationConstants.RecoveryOccupancyWeight) +
+            ((float)collapseOpening * FloraSimulationConstants.CollapseRecoveryGrowthWeight);
 
         return Math.Max(0, (int)MathF.Round(currentPopulation * support * growthRate, MidpointRounding.AwayFromZero));
     }
@@ -408,6 +425,27 @@ public sealed class FloraSimulationSystem
     private static Dictionary<string, RegionalBiologicalProfile> CloneProfiles(IReadOnlyDictionary<string, RegionalBiologicalProfile> profiles)
     {
         return profiles.ToDictionary(entry => entry.Key, entry => entry.Value.Clone(), StringComparer.Ordinal);
+    }
+
+    private static RegionalBiologicalProfile ResolveFloraProfile(
+        IDictionary<string, RegionalBiologicalProfile> profiles,
+        Region region,
+        FloraSpeciesDefinition species)
+    {
+        if (profiles.TryGetValue(species.Id, out var existing))
+        {
+            return existing;
+        }
+
+        var created = new RegionalBiologicalProfile
+        {
+            SpeciesId = species.Id,
+            RegionId = region.Id,
+            Traits = species.BaselineTraits.Clone(),
+            ViabilityScore = 50
+        };
+        profiles[species.Id] = created;
+        return created;
     }
 
     private static int ToPopulationCount(float value)

@@ -1,8 +1,8 @@
-# Phase 4: Flora Simulation and SimulationEngine
+# Phase 4: Flora Simulation And Ecological Base Layer
 
 ## Scope
 
-Phase 4 introduces the first real monthly simulation step. Flora is no longer static seeded state; it now changes over time as the aggregate ecological base layer.
+Phase 4 introduces the first real monthly simulation step. Flora is no longer static seeded state; it now changes over time as the aggregate ecological base layer that later fauna and sapient support depend on.
 
 This phase also introduces `SimulationEngine` as the canonical orchestrator for monthly ticks.
 
@@ -34,23 +34,24 @@ In Phase 4, the implemented order is:
 2. Flora simulation
 3. End-of-tick finalization
 
-Fauna and later systems remain deferred.
+The later biology architecture keeps flora at the front of the ecology loop because live flora quality materially shapes the food web above it.
 
 ## Flora Simulation
 
-Flora simulation only updates flora species already present in a region. This is intentional.
+Flora simulation updates established flora and allows bounded spread into suitable neighboring regions. It stays aggregate and region-based.
 
 There is no automatic flora reintroduction in Phase 4. If a species reaches `0` in a region, it is extinct there until a future explicit causal system reintroduces it.
 
-### Target Abundance Concept
+### Monthly Flora Inputs
 
 For each flora species already present in a region, the system:
 
 1. evaluates local support from water, biome, fertility, and broad climate fit
-2. grows flora from that support using `GrowthRate` and `RecoveryRate`
-3. declines flora from recent consumption pressure, harshness, and poor support
-4. allows bounded spread into neighboring suitable regions when established flora is strong enough
-5. stores the result as a bounded whole number
+2. resolves a local target abundance from support, regional abundance tendency, proto-flora pressure, vacancy, and recent ecological opening
+3. grows flora from support, growth/recovery traits, underfill, and recovery opportunity
+4. declines flora from real consumption pressure, harshness, and poor support
+5. allows bounded spread into neighboring suitable regions when established flora is strong enough
+6. stores the result as a bounded whole number
 
 This keeps flora behavior causal, bounded, and easy to inspect.
 
@@ -67,8 +68,21 @@ Flora support and abundance are currently driven by:
 - flora `ConsumptionResilience`
 - flora `SpreadTendency`
 - flora `RegionalAbundance`
+- current regional vacancy / underfill
+- recent ecological opening after collapse
 
-Unsupported or harsh support drives strong decline. Strong established flora can also spread to nearby suitable regions.
+Unsupported or harsh support drives strong decline. Underfilled or recently opened regions recover faster when suitable flora remains established nearby.
+
+## Ecological Role
+
+Flora is the real biological base layer.
+
+- live flora abundance under local conditions drives flora ecology support
+- fauna herbivory and omnivory consume real flora populations
+- sapient foraging consumes real flora populations
+- weak flora support should weaken the food web above it
+
+Food is therefore not "generic plants in the world". It is live regional flora translated into usable support through current abundance and local fit.
 
 ### Extinction
 
@@ -90,13 +104,9 @@ Phase 4 adds:
 
 ## Deferred
 
-The following remain deferred to Phase 5 and beyond:
+The following remain deferred:
 
-- fauna simulation behavior
-- population groups
-- pressure systems
-- discoveries and advancements
-- adaptation
-- chronicle generation
-- flora spread between regions
-- flora reintroduction from extinction
+- decorative botany detail
+- agriculture or cultivation
+- pollination, disease, and plant life-stage cohorts
+- deep seasonal plant sub-systems

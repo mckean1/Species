@@ -91,6 +91,8 @@ public static class RegionEcosystemSeeder
             RecentCollapseOpening = 0.0f,
             ProtoFloraReadinessMonths = 0,
             ProtoFaunaReadinessMonths = 0,
+            ProtoFloraCandidateMonths = 0,
+            ProtoFaunaCandidateMonths = 0,
             ProtoFloraGenesisCooldownMonths = 0,
             ProtoFaunaGenesisCooldownMonths = 0
         };
@@ -140,7 +142,7 @@ public static class RegionEcosystemSeeder
             : (float)floraPopulations.Sum(entry =>
             {
                 var flora = floraCatalog.GetById(entry.Key);
-                return flora is null ? 0.0 : entry.Value * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
+                return flora is null ? 0.0 : entry.Value * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, flora);
             }) / EcologySeedingConstants.PopulationScale;
         var preySupportBySpeciesId = new Dictionary<string, float>(StringComparer.Ordinal);
 
@@ -213,7 +215,7 @@ public static class RegionEcosystemSeeder
         var biomeMultiplier = species.CoreBiomes.Contains(region.Biome)
             ? 1.0f
             : EcologySeedingConstants.FaunaNonCoreBiomeMultiplier;
-        var support = ResolveSeedDietSupport(species, floraPopulations, floraCatalog, preySupportBySpeciesId);
+        var support = ResolveSeedDietSupport(region, species, floraPopulations, floraCatalog, preySupportBySpeciesId);
 
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FaunaRandomVarianceRange);
         var abundance = (support * 0.42f) +
@@ -234,15 +236,23 @@ public static class RegionEcosystemSeeder
     }
 
     private static float ResolveSeedDietSupport(
+        Region region,
         FaunaSpeciesDefinition species,
         IReadOnlyDictionary<string, int> floraPopulations,
         FloraSpeciesCatalog floraCatalog,
         IReadOnlyDictionary<string, float> preySupportBySpeciesId)
     {
+        // Seeder support intentionally follows the same preferred-then-fallback structure as
+        // the live food web so emergency diet options do not overstate starting viability.
         var preferredLinks = species.DietLinks.Where(link => !link.IsFallback).ToArray();
         var fallbackLinks = species.DietLinks.Where(link => link.IsFallback).ToArray();
-        var preferredSupport = ResolveSeedDietSupport(preferredLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: false);
-        var fallbackSupport = ResolveSeedDietSupport(fallbackLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: true);
+        var preferredSupport = ResolveSeedDietSupport(region, preferredLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: false);
+        var remainingSupportNeed = Math.Max(0.0f, (species.RequiredIntake * EcologySeedingConstants.PopulationScale) - preferredSupport);
+        var fallbackSupport = remainingSupportNeed <= 0.01f
+            ? 0.0f
+            : Math.Min(
+                remainingSupportNeed,
+                ResolveSeedDietSupport(region, fallbackLinks, floraPopulations, floraCatalog, preySupportBySpeciesId, includeFallbackPenalty: true));
         var support = preferredSupport + fallbackSupport;
 
         if (preferredLinks.Length > 0 && preferredSupport < EcologySeedingConstants.WeakFloraSupportThreshold * 0.75f)
@@ -254,6 +264,7 @@ public static class RegionEcosystemSeeder
     }
 
     private static float ResolveSeedDietSupport(
+        Region region,
         IReadOnlyList<FaunaDietLink> links,
         IReadOnlyDictionary<string, int> floraPopulations,
         FloraSpeciesCatalog floraCatalog,
@@ -277,9 +288,9 @@ public static class RegionEcosystemSeeder
             var share = link.Weight / totalWeight;
             var linkSupport = link.TargetKind switch
             {
-                FaunaDietTargetKind.FloraSpecies => ResolveSeedFloraSupport(link.TargetSpeciesId, floraPopulations, floraCatalog) * EcologySeedingConstants.HerbivoreFloraSupportMultiplier,
+                FaunaDietTargetKind.FloraSpecies => ResolveSeedFloraSupport(region, link.TargetSpeciesId, floraPopulations, floraCatalog) * EcologySeedingConstants.HerbivoreFloraSupportMultiplier,
                 FaunaDietTargetKind.FaunaSpecies => preySupportBySpeciesId.GetValueOrDefault(link.TargetSpeciesId) * EcologySeedingConstants.CarnivorePreySupportMultiplier,
-                FaunaDietTargetKind.ScavengePool => preySupportBySpeciesId.Values.Sum() * EcologySeedingConstants.OmnivorePreySupportMultiplier * 0.30f,
+                FaunaDietTargetKind.ScavengePool => preySupportBySpeciesId.Values.Sum() * EcologySeedingConstants.OmnivorePreySupportMultiplier * FaunaSimulationConstants.ScavengeSupportShareMultiplier,
                 _ => 0.0f
             };
 
@@ -295,6 +306,7 @@ public static class RegionEcosystemSeeder
     }
 
     private static float ResolveSeedFloraSupport(
+        Region region,
         string floraSpeciesId,
         IReadOnlyDictionary<string, int> floraPopulations,
         FloraSpeciesCatalog floraCatalog)
@@ -305,7 +317,7 @@ public static class RegionEcosystemSeeder
         }
 
         var flora = floraCatalog.GetById(floraSpeciesId);
-        return flora is null ? 0.0f : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
+        return flora is null ? 0.0f : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, flora);
     }
 
     private static float GetFertilityFit(float fertility, float preferredMin, float preferredMax)

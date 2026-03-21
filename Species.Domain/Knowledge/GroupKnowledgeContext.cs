@@ -278,6 +278,9 @@ public sealed class GroupKnowledgeContext
 
     private KnowledgeLevel ResolveSpeciesKnowledge(Region region, string speciesId, SpeciesClass speciesClass)
     {
+        // Sapient intentional use needs both:
+        // 1. enough regional field familiarity to meaningfully recognize the local ecology, and
+        // 2. polity species-awareness that has reached Knowledge for this specific species.
         var fieldKnowledge = speciesClass == SpeciesClass.Flora
             ? ObserveRegion(region, group.CurrentRegionId).FloraKnowledge
             : ObserveRegion(region, group.CurrentRegionId).FaunaKnowledge;

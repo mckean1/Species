@@ -83,8 +83,15 @@ public sealed class BiologicalEvolutionSystem
         ICollection<BiologicalHistoryChange> chronicleChanges,
         ProtoLifeSubstrate substrate)
     {
+        // Staged flora genesis:
+        // 1. substrate readiness holds for months
+        // 2. a shorter candidate window opens only while conditions stay strong
+        // 3. a rare lineage-candidate roll fires
+        // 4. establishment viability is checked against actual local ecology
+        // 5. success or failure spends local opportunity through pressure drop + cooldown
         if (substrate.ProtoFloraGenesisCooldownMonths > 0 ||
-            substrate.ProtoFloraReadinessMonths < ProtoGenesisConstants.FloraReadinessMonthsRequired)
+            substrate.ProtoFloraReadinessMonths < ProtoGenesisConstants.FloraReadinessMonthsRequired ||
+            substrate.ProtoFloraCandidateMonths < ProtoGenesisConstants.FloraCandidateMonthsRequired)
         {
             return substrate;
         }
@@ -92,39 +99,29 @@ public sealed class BiologicalEvolutionSystem
         var suitability = ResolveFloraSuitability(region);
         var vacancy = substrate.EcologicalVacancy;
         var fullnessSuppression = ResolveFullnessSuppression(vacancy);
-        var triggerChance = Math.Min(
-            ProtoGenesisConstants.FloraMonthlyTriggerChanceCap,
-            ((substrate.ProtoFloraPressure - ProtoGenesisConstants.FloraReadinessPressureThreshold) * 0.32f) +
-            ((substrate.ProtoFloraReadinessMonths - ProtoGenesisConstants.FloraReadinessMonthsRequired + 1) * 0.015f) +
-            (suitability * 0.06f) +
-            (vacancy * 0.08f)) * fullnessSuppression;
-        if (!PassesTrigger(world, region.Id, "proto-flora-genesis", triggerChance))
+        var triggerChance = ResolveFloraGenesisTriggerChance(substrate, suitability, vacancy, fullnessSuppression);
+        if (!PassesTrigger(world, region.Id, "proto-flora-candidate", triggerChance))
         {
             return substrate;
         }
 
-        var seedStrength = Math.Clamp((substrate.ProtoFloraPressure * 0.46f) + (suitability * 0.30f) + (vacancy * 0.24f), 0.0f, 1.0f);
-        var startingPopulation = Math.Max(
-            4,
-            (int)Math.Round(seedStrength * EcologySeedingConstants.PopulationScale * 0.14f, MidpointRounding.AwayFromZero));
-        var viability = Math.Clamp((int)Math.Round((seedStrength * 60.0f) + (vacancy * 20.0f) + (suitability * 20.0f), MidpointRounding.AwayFromZero), 0, 100);
-
-        if (startingPopulation < 4 || viability < 58)
+        var establishment = EvaluateFloraGenesisEstablishment(substrate, suitability, vacancy, fullnessSuppression);
+        if (!establishment.CanEstablish)
         {
-            history.Add(CreateHistory(region.Id, $"failed-protoflora:{world.CurrentYear:D3}{world.CurrentMonth:D2}", "genesis-failed", world.CurrentYear, world.CurrentMonth, $"Proto-flora lineage attempt in {region.Name} failed to establish."));
+            history.Add(CreateHistory(region.Id, $"failed-protoflora:{world.CurrentYear:D3}{world.CurrentMonth:D2}", "genesis-failed", world.CurrentYear, world.CurrentMonth, $"A proto-flora lineage candidate appeared in {region.Name} but failed establishment."));
             return ReduceGenesisPressure(substrate, isFlora: true, success: false);
         }
 
         var species = CreateProtoFloraSpecies(region, substrate, world.CurrentYear, world.CurrentMonth);
         floraCatalog.AddOrReplace(species);
-        floraPopulations[species.Id] = startingPopulation;
+        floraPopulations[species.Id] = establishment.StartingPopulation;
         floraProfiles[species.Id] = new RegionalBiologicalProfile
         {
             SpeciesId = species.Id,
             RegionId = region.Id,
             Traits = species.BaselineTraits.Clone(),
-            LastPopulation = startingPopulation,
-            ViabilityScore = viability,
+            LastPopulation = establishment.StartingPopulation,
+            ViabilityScore = establishment.Viability,
             ContinuityMonths = 1,
             SuccessfulMonths = 1
         };
@@ -157,7 +154,8 @@ public sealed class BiologicalEvolutionSystem
         ProtoLifeSubstrate substrate)
     {
         if (substrate.ProtoFaunaGenesisCooldownMonths > 0 ||
-            substrate.ProtoFaunaReadinessMonths < ProtoGenesisConstants.FaunaReadinessMonthsRequired)
+            substrate.ProtoFaunaReadinessMonths < ProtoGenesisConstants.FaunaReadinessMonthsRequired ||
+            substrate.ProtoFaunaCandidateMonths < ProtoGenesisConstants.FaunaCandidateMonthsRequired)
         {
             return substrate;
         }
@@ -171,50 +169,34 @@ public sealed class BiologicalEvolutionSystem
         if (foodSupport < ProtoGenesisConstants.FaunaFoodSupportThreshold ||
             activeFoodSupport < ProtoGenesisConstants.FaunaActiveFoodSupportThreshold)
         {
-            return ReduceGenesisPressure(substrate, isFlora: false, success: false);
+            return substrate;
         }
 
         var fullnessSuppression = ResolveFullnessSuppression(vacancy);
-        var triggerChance = Math.Min(
-            ProtoGenesisConstants.FaunaMonthlyTriggerChanceCap,
-            ((substrate.ProtoFaunaPressure - ProtoGenesisConstants.FaunaReadinessPressureThreshold) * 0.20f) +
-            ((substrate.ProtoFaunaReadinessMonths - ProtoGenesisConstants.FaunaReadinessMonthsRequired + 1) * 0.010f) +
-            (suitability * 0.04f) +
-            (foodSupport * 0.05f) +
-            (activeFoodSupport * 0.05f) +
-            (vacancy * 0.04f)) * fullnessSuppression;
-        if (!PassesTrigger(world, region.Id, "proto-fauna-genesis", triggerChance))
+        var triggerChance = ResolveFaunaGenesisTriggerChance(substrate, suitability, vacancy, foodSupport, activeFoodSupport, fullnessSuppression);
+        if (!PassesTrigger(world, region.Id, "proto-fauna-candidate", triggerChance))
         {
             return substrate;
         }
 
-        var dietLinks = BuildProtoFaunaDietLinks(floraPopulations, faunaPopulations, floraCatalog, faunaCatalog);
-        var seedStrength = Math.Clamp((substrate.ProtoFaunaPressure * 0.30f) + (suitability * 0.18f) + (foodSupport * 0.34f) + (activeFoodSupport * 0.10f) + (vacancy * 0.08f), 0.0f, 1.0f);
-        var startingPopulation = Math.Max(
-            3,
-            (int)Math.Round(seedStrength * EcologySeedingConstants.PopulationScale * 0.08f, MidpointRounding.AwayFromZero));
-        var viability = Math.Clamp((int)Math.Round((seedStrength * 52.0f) + (foodSupport * 30.0f) + (activeFoodSupport * 10.0f) + (vacancy * 8.0f), MidpointRounding.AwayFromZero), 0, 100);
-
-        if (dietLinks.Length == 0 ||
-            foodSupport < ProtoGenesisConstants.FaunaFoodSupportThreshold ||
-            activeFoodSupport < ProtoGenesisConstants.FaunaActiveFoodSupportThreshold ||
-            startingPopulation < 3 ||
-            viability < 60)
+        var dietLinks = BuildProtoFaunaDietLinks(region, floraPopulations, faunaPopulations, floraCatalog, faunaCatalog);
+        var establishment = EvaluateFaunaGenesisEstablishment(substrate, suitability, vacancy, foodSupport, activeFoodSupport, fullnessSuppression, dietLinks);
+        if (!establishment.CanEstablish)
         {
-            history.Add(CreateHistory(region.Id, $"failed-protofauna:{world.CurrentYear:D3}{world.CurrentMonth:D2}", "genesis-failed", world.CurrentYear, world.CurrentMonth, $"Proto-fauna lineage attempt in {region.Name} failed to establish."));
+            history.Add(CreateHistory(region.Id, $"failed-protofauna:{world.CurrentYear:D3}{world.CurrentMonth:D2}", "genesis-failed", world.CurrentYear, world.CurrentMonth, $"A proto-fauna lineage candidate appeared in {region.Name} but failed establishment."));
             return ReduceGenesisPressure(substrate, isFlora: false, success: false);
         }
 
         var species = CreateProtoFaunaSpecies(region, substrate, dietLinks, floraSupport, preySupport, world.CurrentYear, world.CurrentMonth);
         faunaCatalog.AddOrReplace(species);
-        faunaPopulations[species.Id] = startingPopulation;
+        faunaPopulations[species.Id] = establishment.StartingPopulation;
         faunaProfiles[species.Id] = new RegionalBiologicalProfile
         {
             SpeciesId = species.Id,
             RegionId = region.Id,
             Traits = species.BaselineTraits.Clone(),
-            LastPopulation = startingPopulation,
-            ViabilityScore = viability,
+            LastPopulation = establishment.StartingPopulation,
+            ViabilityScore = establishment.Viability,
             ContinuityMonths = 1,
             SuccessfulMonths = 1
         };
@@ -232,6 +214,80 @@ public sealed class BiologicalEvolutionSystem
             Message = $"{species.Name} emerged from proto-fauna conditions in {region.Name}."
         });
         return substrate;
+    }
+
+    private static float ResolveFloraGenesisTriggerChance(
+        ProtoLifeSubstrate substrate,
+        float suitability,
+        float vacancy,
+        float fullnessSuppression)
+    {
+        return Math.Min(
+            ProtoGenesisConstants.FloraMonthlyTriggerChanceCap,
+            ((substrate.ProtoFloraPressure - ProtoGenesisConstants.FloraReadinessPressureThreshold) * 0.32f) +
+            ((substrate.ProtoFloraReadinessMonths - ProtoGenesisConstants.FloraReadinessMonthsRequired + 1) * 0.012f) +
+            ((substrate.ProtoFloraCandidateMonths - ProtoGenesisConstants.FloraCandidateMonthsRequired + 1) * 0.020f) +
+            (suitability * 0.05f) +
+            (vacancy * 0.06f)) * fullnessSuppression;
+    }
+
+    private static float ResolveFaunaGenesisTriggerChance(
+        ProtoLifeSubstrate substrate,
+        float suitability,
+        float vacancy,
+        float foodSupport,
+        float activeFoodSupport,
+        float fullnessSuppression)
+    {
+        return Math.Min(
+            ProtoGenesisConstants.FaunaMonthlyTriggerChanceCap,
+            ((substrate.ProtoFaunaPressure - ProtoGenesisConstants.FaunaReadinessPressureThreshold) * 0.18f) +
+            ((substrate.ProtoFaunaReadinessMonths - ProtoGenesisConstants.FaunaReadinessMonthsRequired + 1) * 0.008f) +
+            ((substrate.ProtoFaunaCandidateMonths - ProtoGenesisConstants.FaunaCandidateMonthsRequired + 1) * 0.016f) +
+            (suitability * 0.04f) +
+            (foodSupport * 0.04f) +
+            (activeFoodSupport * 0.05f) +
+            (vacancy * 0.03f)) * fullnessSuppression;
+    }
+
+    private static GenesisEstablishment EvaluateFloraGenesisEstablishment(
+        ProtoLifeSubstrate substrate,
+        float suitability,
+        float vacancy,
+        float fullnessSuppression)
+    {
+        var seedStrength = Math.Clamp((substrate.ProtoFloraPressure * 0.46f) + (suitability * 0.30f) + (vacancy * 0.24f), 0.0f, 1.0f);
+        var startingPopulation = Math.Max(
+            ProtoGenesisConstants.FloraMinimumEstablishmentPopulation,
+            (int)Math.Round(seedStrength * EcologySeedingConstants.PopulationScale * 0.14f, MidpointRounding.AwayFromZero));
+        var viability = Math.Clamp((int)Math.Round((seedStrength * 56.0f) + (vacancy * 20.0f) + (suitability * 18.0f) + (fullnessSuppression * 6.0f), MidpointRounding.AwayFromZero), 0, 100);
+        var canEstablish = startingPopulation >= ProtoGenesisConstants.FloraMinimumEstablishmentPopulation &&
+                           viability >= ProtoGenesisConstants.FloraEstablishmentViabilityThreshold;
+        return new GenesisEstablishment(canEstablish, startingPopulation, viability);
+    }
+
+    private static GenesisEstablishment EvaluateFaunaGenesisEstablishment(
+        ProtoLifeSubstrate substrate,
+        float suitability,
+        float vacancy,
+        float foodSupport,
+        float activeFoodSupport,
+        float fullnessSuppression,
+        IReadOnlyList<FaunaDietLink> dietLinks)
+    {
+        var seedStrength = Math.Clamp((substrate.ProtoFaunaPressure * 0.30f) + (suitability * 0.18f) + (foodSupport * 0.34f) + (activeFoodSupport * 0.10f) + (vacancy * 0.08f), 0.0f, 1.0f);
+        var startingPopulation = Math.Max(
+            ProtoGenesisConstants.FaunaMinimumEstablishmentPopulation,
+            (int)Math.Round(seedStrength * EcologySeedingConstants.PopulationScale * 0.08f, MidpointRounding.AwayFromZero));
+        var viability = Math.Clamp((int)Math.Round((seedStrength * 46.0f) + (foodSupport * 28.0f) + (activeFoodSupport * 12.0f) + (vacancy * 8.0f) + (fullnessSuppression * 6.0f), MidpointRounding.AwayFromZero), 0, 100);
+        var hasPreferredDiet = dietLinks.Any(link => !link.IsFallback);
+        var canEstablish = dietLinks.Count > 0 &&
+                           hasPreferredDiet &&
+                           foodSupport >= ProtoGenesisConstants.FaunaFoodSupportThreshold &&
+                           activeFoodSupport >= ProtoGenesisConstants.FaunaActiveFoodSupportThreshold &&
+                           startingPopulation >= ProtoGenesisConstants.FaunaMinimumEstablishmentPopulation &&
+                           viability >= ProtoGenesisConstants.FaunaEstablishmentViabilityThreshold;
+        return new GenesisEstablishment(canEstablish, startingPopulation, viability);
     }
 
     private static float ResolveFloraSuitability(Region region)
@@ -337,6 +393,8 @@ public sealed class BiologicalEvolutionSystem
             RecentCollapseOpening = substrate.RecentCollapseOpening,
             ProtoFloraReadinessMonths = isFlora ? 0 : substrate.ProtoFloraReadinessMonths,
             ProtoFaunaReadinessMonths = isFlora ? substrate.ProtoFaunaReadinessMonths : 0,
+            ProtoFloraCandidateMonths = isFlora ? 0 : substrate.ProtoFloraCandidateMonths,
+            ProtoFaunaCandidateMonths = isFlora ? substrate.ProtoFaunaCandidateMonths : 0,
             ProtoFloraGenesisCooldownMonths = isFlora
                 ? (success ? ProtoGenesisConstants.FloraCooldownMonthsOnSuccess : ProtoGenesisConstants.CooldownMonthsOnFailure)
                 : substrate.ProtoFloraGenesisCooldownMonths,
@@ -347,6 +405,7 @@ public sealed class BiologicalEvolutionSystem
     }
 
     private static FaunaDietLink[] BuildProtoFaunaDietLinks(
+        Region region,
         IDictionary<string, int> floraPopulations,
         IDictionary<string, int> faunaPopulations,
         FloraSpeciesCatalog floraCatalog,
@@ -357,7 +416,7 @@ public sealed class BiologicalEvolutionSystem
             .Select(entry =>
             {
                 var flora = floraCatalog.GetById(entry.Key);
-                var support = flora is null ? 0.0f : entry.Value * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
+                var support = flora is null ? 0.0f : entry.Value * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, flora);
                 return new { entry.Key, Support = support };
             })
             .Where(entry => entry.Support > 0.0f)
@@ -704,6 +763,8 @@ public sealed class BiologicalEvolutionSystem
         profile.PressureMemory.CompetitionPressure = DriftPressure(profile.PressureMemory.CompetitionPressure, change.HabitatSupport < 0.85f && change.NewPopulation < change.PreviousPopulation);
         profile.PressureMemory.PredatorPressure = DriftPressure(profile.PressureMemory.PredatorPressure, carnivorePopulation > Math.Max(20, change.PreviousPopulation / 2));
         profile.PressureMemory.TerrainPressure = DriftPressure(profile.PressureMemory.TerrainPressure, change.HabitatSupport < 0.70f);
+        // Sapience convergence is driven only by long-run successful ecology.
+        // These counters should fall back quickly once a lineage enters collapse or weak support.
         profile.StableSupportMonths = change.FoodStressState == nameof(FoodStressState.FedStable) &&
                                       change.FulfillmentRatio >= 0.92f &&
                                       change.HabitatSupport >= 0.78f
@@ -726,6 +787,8 @@ public sealed class BiologicalEvolutionSystem
     {
         return change.NewPopulation >= SapienceEmergenceConstants.MinimumPopulation &&
                change.FoodStressState == nameof(FoodStressState.FedStable) &&
+               change.FulfillmentRatio >= 0.90f &&
+               change.HabitatSupport >= 0.74f &&
                baseline.Mobility >= SapienceEmergenceConstants.MinimumMobility &&
                baseline.Flexibility >= SapienceEmergenceConstants.MinimumFlexibility - 6 &&
                (profile.PressureMemory.PredatorPressure >= 10 || profile.PressureMemory.CompetitionPressure >= 10 || profile.PressureMemory.TerrainPressure >= 10);
@@ -735,6 +798,7 @@ public sealed class BiologicalEvolutionSystem
     {
         return change.FoodStressState == nameof(FoodStressState.FedStable) &&
                change.FulfillmentRatio >= 0.88f &&
+               change.BiologicalFit >= 0.72f &&
                baseline.Flexibility >= SapienceEmergenceConstants.MinimumFlexibility &&
                (profile.PressureMemory.ScarcityPressure >= 10 || profile.PressureMemory.TerrainPressure >= 10 || profile.DivergenceScore >= 42);
     }
@@ -797,8 +861,7 @@ public sealed class BiologicalEvolutionSystem
             profile.LastPopulation < SapienceEmergenceConstants.MinimumPopulation ||
             profile.FoodStressState is FoodStressState.SevereShortage or FoodStressState.Starvation ||
             sapientCatalog.Definitions.Any(definition =>
-                string.Equals(definition.EmergentFromFaunaSpeciesId, parent.Id, StringComparison.Ordinal) &&
-                string.Equals(definition.OriginRegionId, region.Id, StringComparison.Ordinal)))
+                string.Equals(definition.EmergentFromFaunaSpeciesId, parent.Id, StringComparison.Ordinal)))
         {
             return;
         }
@@ -1278,4 +1341,6 @@ public sealed class BiologicalEvolutionSystem
             Message = message
         };
     }
+
+    private sealed record GenesisEstablishment(bool CanEstablish, int StartingPopulation, int Viability);
 }

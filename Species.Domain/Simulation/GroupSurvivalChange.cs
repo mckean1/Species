@@ -20,6 +20,10 @@ public sealed class GroupSurvivalChange
 
     public required int MonthlyFoodNeed { get; init; }
 
+    public required int KnownGatheringSupport { get; init; }
+
+    public required int KnownHuntingSupport { get; init; }
+
     public required string PrimaryAction { get; init; }
 
     public required int PrimaryFoodGained { get; init; }

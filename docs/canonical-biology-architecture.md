@@ -39,6 +39,12 @@ Sapience emergence is intentionally rare and causally grounded. It requires a lo
 
 Most fauna lineages never meet this convergence. When one does, the fauna ancestry remains historically true while the newly emerged lineage becomes an active sapient lineage.
 
+Stability rule:
+
+- sapience progress should build slowly from long-run ecological success, not from short spikes
+- collapse, starvation, or weak viability should unwind progress
+- a fauna lineage should not repeatedly emit sapient branches as a routine outcome
+
 ## Proto-Life Substrate
 
 Regions now have an explicit proto-life substrate layer at the ecology boundary.
@@ -79,7 +85,7 @@ Boundary rule:
 - proto pressure alone does not directly create species
 - new flora/fauna species can emerge only through a staged genesis pipeline:
   - sustained proto-pressure readiness
-  - holding conditions over time
+  - a shorter candidate window after strong readiness has held
   - a rare lineage-candidate trigger
   - establishment viability
   - success or failure with cooldown and pressure reduction
@@ -90,6 +96,29 @@ Genesis boundary:
 - fauna genesis requires sustained proto-fauna pressure, suitable environment, real food-base support, open ecological room, and stability
 - genesis remains aggregate and region-based
 - genesis is intentionally rare and suppressed in already-full ecosystems
+- failed attempts spend some local opportunity through pressure loss and cooldown, but successful establishment spends more
+- successful genesis is not itself a collapse opening and must not behave like hidden respawn
+
+Flora boundary:
+
+- flora is the real regional producer layer and ecological energy base
+- flora abundance rises and falls from local support, consumption, harshness, spread, and recovery opportunity
+- weak flora should materially weaken fauna and sapient food support above it
+
+Fauna boundary:
+
+- fauna survive through actual resolved food access, not generic regional food totals
+- usable food means diet-resolved intake after access friction, conversion, and local availability are applied
+- explicit diet links are staged: preferred foods first, fallback foods only for remaining unmet intake
+- underfeeding first creates hunger pressure, then suppresses reproduction, then causes starvation and migration pressure
+
+Sapient ecology boundary:
+
+- sapients are intentional ecological actors, but they are still bound to usable-food truth
+- sapients may intentionally hunt or forage only species their polity knows at `Knowledge` level
+- `Encounter` and `Discovery` can support awareness and future progress, but not reliable extraction
+- sapient extraction depletes the same regional flora/fauna abundance used by the food web
+- if known usable species plus accessible reserves do not cover need, sapients accumulate hunger and then starve
 
 ## Encounter, Discovery, Knowledge
 
@@ -147,3 +176,13 @@ This foundation keeps the existing aggregate simulation design intact.
 - Monthly tick assumptions remain unchanged.
 - Population-level ecology remains aggregate and region-driven.
 - This phase does not add speculative future systems beyond the canonical biology/naming model.
+
+## Stability Controls
+
+The biology stack is tuned around a few explicit failure modes:
+
+- proto-life hidden respawn is controlled by decay, harshness drag, saturation suppression, readiness windows, candidate windows, and cooldowns
+- food-web oscillation is controlled by conversion inefficiency, prey refuge, fallback penalties, lagged reproduction, and migration relief
+- sapient food-truth violations are controlled by `Knowledge`-gated intentional use plus starvation from usable-food shortfall
+- discovery burstiness is controlled by staged awareness and monthly gain caps
+- starvation chaos is controlled by progressive hunger and shortage carryover rather than one-tick binary survival

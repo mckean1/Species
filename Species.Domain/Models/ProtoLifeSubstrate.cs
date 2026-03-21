@@ -28,6 +28,10 @@ public sealed class ProtoLifeSubstrate
 
     public int ProtoFaunaReadinessMonths { get; init; }
 
+    public int ProtoFloraCandidateMonths { get; init; }
+
+    public int ProtoFaunaCandidateMonths { get; init; }
+
     public int ProtoFloraGenesisCooldownMonths { get; init; }
 
     public int ProtoFaunaGenesisCooldownMonths { get; init; }
@@ -48,6 +52,8 @@ public sealed class ProtoLifeSubstrate
             RecentCollapseOpening = RecentCollapseOpening,
             ProtoFloraReadinessMonths = ProtoFloraReadinessMonths,
             ProtoFaunaReadinessMonths = ProtoFaunaReadinessMonths,
+            ProtoFloraCandidateMonths = ProtoFloraCandidateMonths,
+            ProtoFaunaCandidateMonths = ProtoFaunaCandidateMonths,
             ProtoFloraGenesisCooldownMonths = ProtoFloraGenesisCooldownMonths,
             ProtoFaunaGenesisCooldownMonths = ProtoFaunaGenesisCooldownMonths
         };

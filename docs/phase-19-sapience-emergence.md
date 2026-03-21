@@ -18,6 +18,7 @@ The emergence criteria are intentionally strict:
 - sustained learning or adaptation pressure
 - strong viability
 - no active collapse or starvation state
+- only one sapient emergence per qualifying fauna lineage branch, rather than repeated regional re-rolls from the same lineage
 
 Most fauna branches never satisfy this convergence.
 
@@ -34,6 +35,13 @@ Each month, fauna regional profiles now accumulate:
 
 Only when those conditions remain favorable for a long time can sapience progress climb high enough for a rare emergence trigger.
 
+This is intentionally a convergence pipeline, not a direct threshold unlock:
+
+1. long-run ecological stability accumulates
+2. coordination and learning pressure accumulate
+3. sapience progress advances slowly under those favorable conditions
+4. only then can a low monthly emergence chance fire
+
 ## Outcome
 
 When sapience emerges:
@@ -44,6 +52,18 @@ When sapience emerges:
 - biological history records the emergence
 
 The fauna ancestry remains conceptually true. The sapient lineage is new and downstream from that fauna branch rather than replacing fauna history.
+
+## Stability Note
+
+The first biology tuning pass now actively tries to suppress these long-run failure modes:
+
+- empty harsh regions quietly refilling through proto pressure alone
+- fauna genesis without real food-base support
+- repeated genesis retries from the same local opportunity
+- predator-prey overshoot from overly efficient predation
+- sapients bypassing ecological food truth
+- species awareness unlocking use too quickly
+- starvation swinging between too-soft persistence and binary collapse
 
 ## Deferred
 

@@ -27,13 +27,17 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Player-facing screens are focal-polity knowledge-aware rather than omniscient.
 - `Encounter -> Discovery -> Knowledge` is the canonical knowledge-state ladder for world familiarity.
 - Flora/fauna species awareness uses `Encounter -> Discovery -> Knowledge`, and intentional species exploitation requires `Knowledge`.
+- Sapient groups survive ecologically by intentionally hunting/foraging only known usable species, depleting real regional abundance, and starving when known usable food is insufficient.
 - Advancements remain capability.
 - `SpeciesClass` is the canonical biology classification model: `Flora`, `Fauna`, `Sapient`.
 - Regional ecology now has explicit proto-life substrate naming: `ProtoFloraCapacity`, `ProtoFaunaCapacity`, `ProtoFloraPressure`, `ProtoFaunaPressure`.
 - Proto-life capacity is latent ecological room; proto-life pressure is current monthly activation pressure, and the two are intentionally separate.
 - Proto-life is a regional substrate, not arbitrary species spawning.
+- Rare flora/fauna genesis now follows an explicit staged pipeline: readiness over time, candidate window, rare trigger, establishment viability, then success/failure with cooldown and pressure reduction.
+- Rare sapience emergence now comes from fauna lineage/history under long-run ecological convergence, not arbitrary sapient spawning.
 - Sapience is canonically a fauna-lineage emergence that becomes its own active `SpeciesClass` once present.
 - Starvation follows usable-food failure, not mere world-food totals.
+- The fauna food web is explicit: preferred diet targets feed first, fallback diets only cover unmet intake, and feeding depletes real flora/fauna abundance.
 - Laws, enacted-law monthly effects, political blocs, and polity-facing governance presentation are already implemented on explicit polity state.
 - Settlements, polity regional presence, and place-based anchoring are now implemented in lightweight form.
 - Aggregate material extraction, limited non-food stores, and simple production bridges are now implemented in lightweight form.

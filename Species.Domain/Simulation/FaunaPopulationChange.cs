@@ -14,9 +14,15 @@ public sealed class FaunaPopulationChange
 
     public required int NewPopulation { get; init; }
 
+    public required int Births { get; init; }
+
+    public required int Deaths { get; init; }
+
     public required float FoodNeeded { get; init; }
 
     public required float FoodConsumed { get; init; }
+
+    public required float FoodShortfall { get; init; }
 
     public required float FulfillmentRatio { get; init; }
 
@@ -29,6 +35,8 @@ public sealed class FaunaPopulationChange
     public required float HabitatSupport { get; init; }
 
     public required float BiologicalFit { get; init; }
+
+    public required float MigrationPressure { get; init; }
 
     public required int MigratedOut { get; init; }
 

@@ -126,6 +126,8 @@ public sealed class GroupSurvivalSystem
                 ExtractionPlan = state.PlanKind,
                 StartingPopulation = group.Population,
                 MonthlyFoodNeed = state.MonthlyFoodNeed,
+                KnownGatheringSupport = (int)MathF.Round((float)state.KnownGatheringSupport, MidpointRounding.AwayFromZero),
+                KnownHuntingSupport = (int)MathF.Round((float)state.KnownHuntingSupport, MidpointRounding.AwayFromZero),
                 PrimaryAction = state.PrimaryAction,
                 PrimaryFoodGained = state.PrimaryAcquisition.FoodGained,
                 PrimarySummary = state.PrimaryAcquisition.BuildSummary(),
@@ -201,7 +203,7 @@ public sealed class GroupSurvivalSystem
                     activeParticipants,
                     useFallback,
                     floraCatalog.GetById,
-                    SubsistenceSupportModel.ResolveFloraFoodPerPopulation,
+                    species => SubsistenceSupportModel.ResolveFloraFoodPerPopulation(regionState.Region, species),
                     SubsistenceSupportModel.ResolveGatheringMultiplier,
                     (state, sourceId) => state.KnowledgeContext.ResolveFloraUseMultiplier(regionState.Region, sourceId));
                 break;
@@ -661,6 +663,10 @@ public sealed class GroupSurvivalSystem
 
         public int StoredFoodBefore { get; }
 
+        public double KnownGatheringSupport { get; private set; }
+
+        public double KnownHuntingSupport { get; private set; }
+
         public AcquisitionState PrimaryAcquisition { get; }
 
         public AcquisitionState FallbackAcquisition { get; }
@@ -674,28 +680,10 @@ public sealed class GroupSurvivalSystem
         {
             // "Known support" is intentionally strict: only Knowledge-backed species use counts here.
             // Discovery can improve awareness and future progress, but it must not grant deliberate extraction.
-            var knownGatheringSupport = floraPopulations
-                .Where(entry => entry.Value > 0)
-                .Sum(entry =>
-                {
-                    var species = floraCatalog.GetById(entry.Key);
-                    var knowledgeMultiplier = KnowledgeContext.ResolveFloraUseMultiplier(region, entry.Key);
-                    return species is null || knowledgeMultiplier <= 0.0f
-                        ? 0.0
-                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(SubsistenceSupportModel.ResolveFloraFoodPerPopulation(species), SubsistenceSupportModel.ResolveGatheringMultiplier(Group, region) * knowledgeMultiplier);
-                });
-            var knownHuntingSupport = faunaPopulations
-                .Where(entry => entry.Value > 0)
-                .Sum(entry =>
-                {
-                    var species = faunaCatalog.GetById(entry.Key);
-                    var knowledgeMultiplier = KnowledgeContext.ResolveFaunaUseMultiplier(region, entry.Key);
-                    return species is null || knowledgeMultiplier <= 0.0f
-                        ? 0.0
-                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(species.FoodYield, SubsistenceSupportModel.ResolveHuntingMultiplier(Group, region) * knowledgeMultiplier);
-                });
+            KnownGatheringSupport = ResolveKnownGatheringSupport(region, floraPopulations, floraCatalog);
+            KnownHuntingSupport = ResolveKnownHuntingSupport(region, faunaPopulations, faunaCatalog);
 
-            var plan = ResolveExtractionPlan(Group, knownGatheringSupport, knownHuntingSupport);
+            var plan = ResolveExtractionPlan(Group, KnownGatheringSupport, KnownHuntingSupport);
             PrimaryAction = plan.PrimaryAction;
             FallbackAction = plan.FallbackAction;
             PlanKind = plan.PlanKind;
@@ -713,6 +701,44 @@ public sealed class GroupSurvivalSystem
             var foodGained = unitsTaken * foodPerUnit;
             acquisition.Add(sourceId, unitsTaken, foodGained);
             RemainingNeed = Math.Max(0, RemainingNeed - foodGained);
+        }
+
+        private double ResolveKnownGatheringSupport(
+            Region region,
+            IReadOnlyDictionary<string, int> floraPopulations,
+            FloraSpeciesCatalog floraCatalog)
+        {
+            return floraPopulations
+                .Where(entry => entry.Value > 0)
+                .Sum(entry =>
+                {
+                    var species = floraCatalog.GetById(entry.Key);
+                    var knowledgeMultiplier = KnowledgeContext.ResolveFloraUseMultiplier(region, entry.Key);
+                    return species is null || knowledgeMultiplier <= 0.0f
+                        ? 0.0
+                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
+                            SubsistenceSupportModel.ResolveFloraFoodPerPopulation(region, species),
+                            SubsistenceSupportModel.ResolveGatheringMultiplier(Group, region) * knowledgeMultiplier);
+                });
+        }
+
+        private double ResolveKnownHuntingSupport(
+            Region region,
+            IReadOnlyDictionary<string, int> faunaPopulations,
+            FaunaSpeciesCatalog faunaCatalog)
+        {
+            return faunaPopulations
+                .Where(entry => entry.Value > 0)
+                .Sum(entry =>
+                {
+                    var species = faunaCatalog.GetById(entry.Key);
+                    var knowledgeMultiplier = KnowledgeContext.ResolveFaunaUseMultiplier(region, entry.Key);
+                    return species is null || knowledgeMultiplier <= 0.0f
+                        ? 0.0
+                        : entry.Value * SubsistenceSupportModel.ResolveFoodPerUnit(
+                            species.FoodYield,
+                            SubsistenceSupportModel.ResolveHuntingMultiplier(Group, region) * knowledgeMultiplier);
+                });
         }
 
         private static ExtractionPlan ResolveExtractionPlan(PopulationGroup group, double knownGatheringSupport, double knownHuntingSupport)

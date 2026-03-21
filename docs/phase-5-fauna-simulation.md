@@ -28,19 +28,23 @@ For each fauna species already present in a region:
 2. calculate required intake from current population and `RequiredIntake`
 3. resolve explicit preferred diet links from `DietLinks`
 4. consume available named flora/prey targets from the actual regional ecology state
-5. measure the resulting feeding ratio
-6. convert that usable-food ratio into food stress state, hunger pressure, and shortage persistence
-7. apply reproduction or mortality from fedness, shortage pressure, and support
-8. migrate a bounded share outward if shortages persist and a better neighboring region exists
+5. only if preferred intake remains insufficient, attempt any grounded fallback links
+6. measure the resulting usable-food ratio and food shortfall
+7. convert that usable-food ratio into food stress state, hunger pressure, and shortage persistence
+8. apply reproduction or mortality from fedness, shortage pressure, and support
+9. derive migration pressure from persistent local survival failure
+10. migrate a bounded share outward if shortages persist and a better neighboring region exists
 
 Food present in a region is not automatically usable food for a fauna species. Usable food is the portion the species can actually convert into intake after diet-link targeting, encounter/refuge friction, fallback penalties, and conversion efficiency are applied.
 
 ### Herbivores
 
 - draw almost all intake from explicit flora targets
-- use current regional flora populations and flora support values
+- use current regional flora populations and live regional flora support values
 - flora `UsableBiomass`, `RegionalAbundance`, and recovery/resilience qualities influence usable flora support
 - consumed flora reduces the real regional flora populations
+
+If flora is environmentally weak or recently overconsumed, herbivore support falls with it. Flora is not a passive background number behind fauna feeding.
 
 ### Carnivores
 
@@ -55,7 +59,7 @@ Food present in a region is not automatically usable food for a fauna species. U
 ### Omnivores
 
 - draw intake from both flora and prey according to explicit weighted diet links
-- can fall back across sources when one side is weak, subject to availability and efficiency
+- can fall back across sources when one side is weak, but only after preferred links fail to cover enough intake
 - consumed flora and fauna both reduce the real regional ecology state
 
 ### Scavenge Share
@@ -63,6 +67,7 @@ Food present in a region is not automatically usable food for a fauna species. U
 - `FaunaDietTargetKind.ScavengePool` exists as a limited low-efficiency fallback source
 - it is intentionally weak and does not replace actual flora or prey abundance as the main ecological base
 - it helps prevent total brittleness without introducing a separate carcass simulation system
+- migration scoring and seeding viability also treat fallback support as residual support only, so emergency diet options do not masquerade as strong core ecology
 
 ## Habitat Support
 
@@ -86,11 +91,17 @@ Fauna habitat support remains intentionally simple and aggregate:
 - no usable food escalates starvation rapidly instead of allowing indefinite survival off nominal food presence
 - populations can recover when feeding improves because hunger pressure also decays
 
+This is intentionally progressive rather than binary:
+
+- partial shortfall creates hunger pressure
+- repeated shortfall suppresses reproduction and raises mortality
+- severe or prolonged shortfall becomes starvation
+
 ## Migration
 
 - migration is aggregate and region-based
 - only a bounded share of a population may migrate in a month
-- migration is driven by persistent shortages plus species `Mobility`
+- migration is driven by explicit migration pressure from hunger, shortage persistence, food-stress state, and species `Mobility`
 - migration is also a stability valve for predator-prey loops; hungry fauna can bleed outward instead of only amplifying local collapse
 - movement only occurs when a neighboring region offers materially better feeding/support conditions
 - migration does not create new fauna from nothing; it only redistributes existing population
@@ -115,10 +126,13 @@ Phase 5 adds debug output for:
 - prior and new population
 - required intake
 - food actually consumed
+- food shortfall
 - feeding ratio
 - habitat support
 - hunger pressure
 - shortage months
+- births and deaths
+- migration pressure
 - migrated-out amount
 - consumed flora summary
 - consumed fauna summary

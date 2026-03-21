@@ -76,6 +76,9 @@ public sealed class ProtoPressureSystem
             var newFaunaPressure = MovePressure(substrate.ProtoFaunaPressure, faunaTarget, ProtoLifePressureConstants.FaunaRiseRate, ProtoLifePressureConstants.FaunaDecayRate);
             var floraReadiness = ResolveFloraReadinessMonths(substrate, newFloraPressure, floraEnvironmentalSuitability, ecologicalVacancy, harshness);
             var faunaReadiness = ResolveFaunaReadinessMonths(substrate, newFaunaPressure, floraSupportForFauna, ecologicalVacancy, harshness);
+            var fullnessSuppression = ResolveFullnessSuppression(ecologicalVacancy);
+            var floraCandidateMonths = ResolveFloraCandidateMonths(substrate, floraReadiness, newFloraPressure, floraEnvironmentalSuitability, ecologicalVacancy, harshness, fullnessSuppression);
+            var faunaCandidateMonths = ResolveFaunaCandidateMonths(substrate, faunaReadiness, newFaunaPressure, floraSupportForFauna, ecologicalVacancy, harshness, fullnessSuppression);
 
             var updatedSubstrate = new ProtoLifeSubstrate
             {
@@ -91,6 +94,8 @@ public sealed class ProtoPressureSystem
                 RecentCollapseOpening = recentCollapseOpening,
                 ProtoFloraReadinessMonths = floraReadiness,
                 ProtoFaunaReadinessMonths = faunaReadiness,
+                ProtoFloraCandidateMonths = floraCandidateMonths,
+                ProtoFaunaCandidateMonths = faunaCandidateMonths,
                 ProtoFloraGenesisCooldownMonths = Math.Max(0, substrate.ProtoFloraGenesisCooldownMonths - 1),
                 ProtoFaunaGenesisCooldownMonths = Math.Max(0, substrate.ProtoFaunaGenesisCooldownMonths - 1)
             };
@@ -270,8 +275,76 @@ public sealed class ProtoPressureSystem
             : Math.Max(0, substrate.ProtoFaunaReadinessMonths - 1);
     }
 
+    private static int ResolveFloraCandidateMonths(
+        ProtoLifeSubstrate substrate,
+        int readinessMonths,
+        float pressure,
+        float suitability,
+        float vacancy,
+        float harshness,
+        float fullnessSuppression)
+    {
+        if (substrate.ProtoFloraGenesisCooldownMonths > 0)
+        {
+            return 0;
+        }
+
+        var readyForCandidate = readinessMonths >= ProtoGenesisConstants.FloraReadinessMonthsRequired &&
+                                pressure >= ProtoGenesisConstants.FloraReadinessPressureThreshold + ProtoGenesisConstants.FloraCandidatePressureMargin &&
+                                suitability >= ProtoGenesisConstants.FloraSuitabilityThreshold &&
+                                vacancy >= ProtoGenesisConstants.FloraVacancyThreshold &&
+                                harshness <= 0.48f &&
+                                fullnessSuppression >= ProtoGenesisConstants.CandidateSuppressionFloor;
+        return readyForCandidate
+            ? substrate.ProtoFloraCandidateMonths + 1
+            : Math.Max(0, substrate.ProtoFloraCandidateMonths - 1);
+    }
+
+    private static int ResolveFaunaCandidateMonths(
+        ProtoLifeSubstrate substrate,
+        int readinessMonths,
+        float pressure,
+        float floraSupportForFauna,
+        float vacancy,
+        float harshness,
+        float fullnessSuppression)
+    {
+        if (substrate.ProtoFaunaGenesisCooldownMonths > 0)
+        {
+            return 0;
+        }
+
+        var readyForCandidate = readinessMonths >= ProtoGenesisConstants.FaunaReadinessMonthsRequired &&
+                                pressure >= ProtoGenesisConstants.FaunaReadinessPressureThreshold + ProtoGenesisConstants.FaunaCandidatePressureMargin &&
+                                floraSupportForFauna >= ProtoGenesisConstants.FaunaFoodSupportThreshold &&
+                                vacancy >= ProtoGenesisConstants.FaunaVacancyThreshold &&
+                                harshness <= 0.50f &&
+                                fullnessSuppression >= ProtoGenesisConstants.CandidateSuppressionFloor;
+        return readyForCandidate
+            ? substrate.ProtoFaunaCandidateMonths + 1
+            : Math.Max(0, substrate.ProtoFaunaCandidateMonths - 1);
+    }
+
+    private static float ResolveFullnessSuppression(float vacancy)
+    {
+        var fullness = 1.0f - Math.Clamp(vacancy, 0.0f, 1.0f);
+        if (fullness <= ProtoGenesisConstants.FullnessSuppressionStart)
+        {
+            return 1.0f;
+        }
+
+        if (fullness >= ProtoGenesisConstants.FullnessSuppressionEnd)
+        {
+            return 0.12f;
+        }
+
+        var t = (fullness - ProtoGenesisConstants.FullnessSuppressionStart) /
+                (ProtoGenesisConstants.FullnessSuppressionEnd - ProtoGenesisConstants.FullnessSuppressionStart);
+        return 1.0f - (t * 0.94f);
+    }
+
     private static string BuildSummary(ProtoLifeSubstrate substrate)
     {
-        return $"ProtoFlora={substrate.ProtoFloraPressure:0.00} ({substrate.ProtoFloraReadinessMonths}m ready/{substrate.ProtoFloraGenesisCooldownMonths}m cd), ProtoFauna={substrate.ProtoFaunaPressure:0.00} ({substrate.ProtoFaunaReadinessMonths}m ready/{substrate.ProtoFaunaGenesisCooldownMonths}m cd), Vacancy={substrate.EcologicalVacancy:0.00}, Opening={substrate.RecentCollapseOpening:0.00}";
+        return $"ProtoFlora={substrate.ProtoFloraPressure:0.00} ({substrate.ProtoFloraReadinessMonths}m ready/{substrate.ProtoFloraCandidateMonths}m cand/{substrate.ProtoFloraGenesisCooldownMonths}m cd), ProtoFauna={substrate.ProtoFaunaPressure:0.00} ({substrate.ProtoFaunaReadinessMonths}m ready/{substrate.ProtoFaunaCandidateMonths}m cand/{substrate.ProtoFaunaGenesisCooldownMonths}m cd), Vacancy={substrate.EcologicalVacancy:0.00}, Opening={substrate.RecentCollapseOpening:0.00}";
     }
 }

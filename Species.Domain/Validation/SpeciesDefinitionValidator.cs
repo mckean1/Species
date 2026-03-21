@@ -182,6 +182,11 @@ public static class SpeciesDefinitionValidator
             return;
         }
 
+        if (!definition.DietLinks.Any(link => !link.IsFallback))
+        {
+            errors.Add($"Fauna species {definition.Id} must declare at least one preferred diet link.");
+        }
+
         foreach (var link in definition.DietLinks)
         {
             if (link.Weight <= 0.0f)
@@ -218,6 +223,11 @@ public static class SpeciesDefinitionValidator
                 !string.IsNullOrWhiteSpace(link.TargetSpeciesId))
             {
                 errors.Add($"Fauna species {definition.Id} scavenge links may not name a target species.");
+            }
+
+            if (link.TargetKind == Enums.FaunaDietTargetKind.ScavengePool && !link.IsFallback)
+            {
+                errors.Add($"Fauna species {definition.Id} scavenge links must be fallback-only.");
             }
         }
     }

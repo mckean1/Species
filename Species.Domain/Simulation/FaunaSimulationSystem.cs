@@ -40,6 +40,12 @@ public sealed class FaunaSimulationSystem
                 var profile = ResolveFaunaProfile(state, species);
                 var traits = profile.Traits;
                 var startingPopulation = faunaEntry.Value;
+
+                // Causal order:
+                // 1. resolve actual diet access from current regional ecology
+                // 2. convert feeding success into hunger / food-stress carryover
+                // 3. derive births and deaths from fedness vs shortage
+                // 4. let persistent shortage spill into migration pressure and movement
                 var habitatSupport = ResolveHabitatSupport(region, species, traits);
                 var foodNeeded = ResolveRequiredIntake(species, traits) * currentPopulation;
                 var feedingEfficiency = ResolveFeedingEfficiency(species, traits);
@@ -47,6 +53,7 @@ public sealed class FaunaSimulationSystem
                 var fulfillmentRatio = foodNeeded <= 0.0f
                     ? 1.0f
                     : Math.Clamp(consumption.FoodConsumed / foodNeeded, 0.0f, 1.0f);
+                var foodShortfall = Math.Max(0.0f, foodNeeded - consumption.FoodConsumed);
                 var feedingMomentum = ResolveFeedingMomentum(profile.FeedingMomentum, fulfillmentRatio);
                 var hungerPressure = FoodStressModel.ResolveHungerPressure(profile.HungerPressure, fulfillmentRatio, FaunaSimulationConstants.HungerRiseRate, FaunaSimulationConstants.HungerDecayRate);
                 var shortageMonths = FoodStressModel.ResolveShortageMonths(profile.ShortageMonths, fulfillmentRatio);
@@ -54,7 +61,8 @@ public sealed class FaunaSimulationSystem
                 var births = ResolveBirths(currentPopulation, species, habitatSupport, feedingMomentum, foodStressState);
                 var deaths = ResolveDeaths(currentPopulation, species, hungerPressure, shortageMonths, habitatSupport, traits, foodStressState, fulfillmentRatio);
                 var postMortalityPopulation = Math.Max(0, currentPopulation + births - deaths);
-                var migrationPlan = ResolveMigration(region, stateByRegionId, species, postMortalityPopulation, hungerPressure, shortageMonths, floraCatalog, faunaCatalog);
+                var migrationPressure = ResolveMigrationPressure(species, hungerPressure, shortageMonths, foodStressState);
+                var migrationPlan = ResolveMigration(region, stateByRegionId, species, postMortalityPopulation, migrationPressure, shortageMonths, floraCatalog, faunaCatalog);
                 var finalPopulation = Math.Max(0, postMortalityPopulation - migrationPlan.MigratedPopulation);
 
                 if (finalPopulation > 0)
@@ -87,14 +95,18 @@ public sealed class FaunaSimulationSystem
                     FaunaSpeciesName = species.Name,
                     PreviousPopulation = startingPopulation,
                     NewPopulation = finalPopulation,
+                    Births = births,
+                    Deaths = deaths,
                     FoodNeeded = MathF.Round(foodNeeded, 2),
                     FoodConsumed = MathF.Round(consumption.FoodConsumed, 2),
+                    FoodShortfall = MathF.Round(foodShortfall, 2),
                     FulfillmentRatio = MathF.Round(fulfillmentRatio, 2),
                     HungerPressure = MathF.Round(hungerPressure, 2),
                     ShortageMonths = shortageMonths,
                     FoodStressState = foodStressState.ToString(),
                     HabitatSupport = MathF.Round(habitatSupport, 2),
                     BiologicalFit = MathF.Round(consumption.FoodSourceFit, 2),
+                    MigrationPressure = MathF.Round(migrationPressure, 2),
                     MigratedOut = migrationPlan.MigratedPopulation,
                     Outcome = ResolveOutcome(startingPopulation, finalPopulation, migrationPlan.MigratedPopulation),
                     ConsumedFloraSummary = BuildConsumptionSummary(consumption.ConsumedFloraPopulations),
@@ -281,7 +293,7 @@ public sealed class FaunaSimulationSystem
     {
         return link.TargetKind switch
         {
-            FaunaDietTargetKind.FloraSpecies => ConsumeFloraTarget(requestedFood, feedingEfficiency, link, state.FloraPopulations, floraCatalog, includeFallbackPenalty),
+            FaunaDietTargetKind.FloraSpecies => ConsumeFloraTarget(requestedFood, feedingEfficiency, link, state.Region, state.FloraPopulations, floraCatalog, includeFallbackPenalty),
             FaunaDietTargetKind.FaunaSpecies => ConsumePreyTarget(requestedFood, feedingEfficiency, predator, predatorPopulation, predatorTraits, link, state, faunaCatalog, includeFallbackPenalty),
             FaunaDietTargetKind.ScavengePool => ConsumeScavengePool(requestedFood, feedingEfficiency, predator, predatorPopulation, predatorTraits, state, faunaCatalog, includeFallbackPenalty),
             _ => SourceConsumption.Empty()
@@ -292,6 +304,7 @@ public sealed class FaunaSimulationSystem
         float requestedFood,
         float feedingEfficiency,
         FaunaDietLink link,
+        Region region,
         IDictionary<string, int> floraPopulations,
         FloraSpeciesCatalog floraCatalog,
         bool includeFallbackPenalty)
@@ -307,7 +320,7 @@ public sealed class FaunaSimulationSystem
             return SourceConsumption.Empty();
         }
 
-        var foodPerPopulation = SubsistenceSupportModel.ResolveFloraFoodPerPopulation(flora) *
+        var foodPerPopulation = SubsistenceSupportModel.ResolveFloraFoodPerPopulation(region, flora) *
                                 feedingEfficiency *
                                 FaunaSimulationConstants.FloraConversionEfficiency;
         if (includeFallbackPenalty)
@@ -423,7 +436,8 @@ public sealed class FaunaSimulationSystem
                 }
 
                 var preyTraits = state.FaunaProfiles.GetValueOrDefault(preySpecies.Id)?.Traits ?? preySpecies.BaselineTraits;
-                var accessibleShare = ResolveAccessiblePreyShare(predator, predatorTraits, preySpecies, preyTraits, entry.Value, predatorPopulation) * 0.45f;
+                var accessibleShare = ResolveAccessiblePreyShare(predator, predatorTraits, preySpecies, preyTraits, entry.Value, predatorPopulation) *
+                                      FaunaSimulationConstants.ScavengeAccessibleShareMultiplier;
                 return new ScavengeCandidate(preySpecies, entry.Value, accessibleShare);
             })
             .Where(candidate => candidate is not null)
@@ -566,18 +580,43 @@ public sealed class FaunaSimulationSystem
         return Math.Min(currentPopulation, Math.Max(0, (int)MathF.Round(currentPopulation * mortality, MidpointRounding.AwayFromZero)));
     }
 
+    private static float ResolveMigrationPressure(
+        FaunaSpeciesDefinition species,
+        float hungerPressure,
+        int shortageMonths,
+        FoodStressState foodStressState)
+    {
+        if (species.Mobility <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        var stressBonus = foodStressState switch
+        {
+            FoodStressState.SevereShortage => FaunaSimulationConstants.MigrationPressureFoodStressBonus,
+            FoodStressState.Starvation => FaunaSimulationConstants.MigrationPressureFoodStressBonus * 1.5f,
+            _ => 0.0f
+        };
+
+        return ClampNormalized(
+            (hungerPressure * FaunaSimulationConstants.MigrationPressureHungerWeight) +
+            (Math.Min(shortageMonths, 4) * FaunaSimulationConstants.MigrationPressureShortageWeight) +
+            stressBonus +
+            (species.Mobility * 0.12f));
+    }
+
     private static MigrationPlan ResolveMigration(
         Region region,
         IReadOnlyDictionary<string, MutableRegionState> stateByRegionId,
         FaunaSpeciesDefinition species,
         int populationAfterMortality,
-        float hungerPressure,
+        float migrationPressure,
         int shortageMonths,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog)
     {
         if (populationAfterMortality <= FaunaSimulationConstants.MinimumMigrationPopulation ||
-            (hungerPressure < FaunaSimulationConstants.MigrationHungerThreshold &&
+            (migrationPressure < FaunaSimulationConstants.MigrationHungerThreshold &&
              shortageMonths < FaunaSimulationConstants.MigrationShortageMonthsThreshold) ||
             species.Mobility <= 0.0f)
         {
@@ -600,7 +639,7 @@ public sealed class FaunaSimulationSystem
 
         var share = Math.Min(
             FaunaSimulationConstants.MigrationShareCap,
-            (hungerPressure * 0.24f) +
+            (migrationPressure * 0.24f) +
             (Math.Min(shortageMonths, 4) * 0.03f) +
             (species.Mobility * FaunaSimulationConstants.MigrationShareWeight));
         var migratedPopulation = Math.Min(
@@ -630,39 +669,69 @@ public sealed class FaunaSimulationSystem
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog)
     {
-        var totalWeight = species.DietLinks.Sum(link => link.Weight);
-        if (totalWeight <= 0.0f)
+        // Migration and viability scoring should mirror the actual monthly food web:
+        // preferred links define the core diet, while fallback links only count toward any
+        // remaining unmet support budget after the preferred path is evaluated.
+        var preferredLinks = species.DietLinks.Where(link => !link.IsFallback).ToArray();
+        var fallbackLinks = species.DietLinks.Where(link => link.IsFallback).ToArray();
+        var preferredSupport = ResolveDietSupport(preferredLinks, state, floraCatalog, faunaCatalog, includeFallbackPenalty: false);
+        var remainingSupportNeed = Math.Max(0.0f, (species.RequiredIntake * 110.0f) - preferredSupport);
+        var fallbackSupport = remainingSupportNeed <= 0.01f
+            ? 0.0f
+            : Math.Min(
+                remainingSupportNeed,
+                ResolveDietSupport(fallbackLinks, state, floraCatalog, faunaCatalog, includeFallbackPenalty: true));
+        return preferredSupport + fallbackSupport;
+    }
+
+    private static float ResolveDietSupport(
+        IReadOnlyList<FaunaDietLink> links,
+        MutableRegionState state,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        bool includeFallbackPenalty)
+    {
+        var totalWeight = links.Sum(link => link.Weight);
+        if (links.Count == 0 || totalWeight <= 0.0f)
         {
             return 0.0f;
         }
 
         var support = 0.0f;
-        foreach (var link in species.DietLinks)
+        foreach (var link in links)
         {
-            var linkSupport = link.TargetKind switch
-            {
-                FaunaDietTargetKind.FloraSpecies => ResolveFloraSupport(link.TargetSpeciesId, state.FloraPopulations, floraCatalog),
-                FaunaDietTargetKind.FaunaSpecies => ResolvePreySupport(link.TargetSpeciesId, state.FaunaPopulations, faunaCatalog),
-                FaunaDietTargetKind.ScavengePool => state.FaunaPopulations.Sum(entry =>
-                {
-                    var prey = faunaCatalog.GetById(entry.Key);
-                    return prey is null ? 0.0 : entry.Value * prey.FoodYield * 0.20f;
-                }),
-                _ => 0.0
-            };
-
-            if (link.IsFallback)
-            {
-                linkSupport *= 1.0 - FaunaSimulationConstants.FallbackDietPenalty;
-            }
-
+            var linkSupport = ResolveDietLinkSupport(link, state, floraCatalog, faunaCatalog, includeFallbackPenalty);
             support += (float)(linkSupport * (link.Weight / totalWeight));
         }
 
         return support;
     }
 
+    private static double ResolveDietLinkSupport(
+        FaunaDietLink link,
+        MutableRegionState state,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        bool includeFallbackPenalty)
+    {
+        var linkSupport = link.TargetKind switch
+        {
+            FaunaDietTargetKind.FloraSpecies => ResolveFloraSupport(state.Region, link.TargetSpeciesId, state.FloraPopulations, floraCatalog),
+            FaunaDietTargetKind.FaunaSpecies => ResolvePreySupport(link.TargetSpeciesId, state.FaunaPopulations, faunaCatalog),
+            FaunaDietTargetKind.ScavengePool => ResolveScavengeSupport(state.FaunaPopulations, faunaCatalog),
+            _ => 0.0
+        };
+
+        if (includeFallbackPenalty)
+        {
+            linkSupport *= 1.0 - FaunaSimulationConstants.FallbackDietPenalty;
+        }
+
+        return linkSupport;
+    }
+
     private static double ResolveFloraSupport(
+        Region region,
         string floraSpeciesId,
         IReadOnlyDictionary<string, int> floraPopulations,
         FloraSpeciesCatalog floraCatalog)
@@ -673,7 +742,7 @@ public sealed class FaunaSimulationSystem
         }
 
         var flora = floraCatalog.GetById(floraSpeciesId);
-        return flora is null ? 0.0 : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(flora);
+        return flora is null ? 0.0 : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, flora);
     }
 
     private static double ResolvePreySupport(
@@ -687,7 +756,18 @@ public sealed class FaunaSimulationSystem
         }
 
         var fauna = faunaCatalog.GetById(faunaSpeciesId);
-        return fauna is null ? 0.0 : population * fauna.FoodYield * fauna.PredatorVulnerability * 0.70f;
+        return fauna is null ? 0.0 : population * fauna.FoodYield * fauna.PredatorVulnerability * FaunaSimulationConstants.PreySupportAccessMultiplier;
+    }
+
+    private static double ResolveScavengeSupport(
+        IReadOnlyDictionary<string, int> faunaPopulations,
+        FaunaSpeciesCatalog faunaCatalog)
+    {
+        return faunaPopulations.Sum(entry =>
+        {
+            var prey = faunaCatalog.GetById(entry.Key);
+            return prey is null ? 0.0 : entry.Value * prey.FoodYield * FaunaSimulationConstants.ScavengeSupportShareMultiplier;
+        });
     }
 
     private static void ApplyMigration(

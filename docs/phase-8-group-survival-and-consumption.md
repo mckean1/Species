@@ -2,9 +2,9 @@
 
 ## Scope
 
-Phase 8 adds the first real monthly group survival loop. Population groups now try to survive by gathering flora, hunting fauna, using `StoredFood`, suffering shortages, and starving when monthly need is not met.
+Phase 8 adds the first real monthly group survival loop. Sapient population groups now try to survive by intentionally gathering known flora, hunting known fauna, using `StoredFood`, suffering shortages, and starving when monthly need is not met.
 
-Food existing in the world is not the same thing as usable food for a group. Usable food is the amount the group can actually turn into survival this month after subsistence access, action order, storage access, and local reserve access are resolved.
+Food existing in the world is not the same thing as usable food for a group. Usable food is the amount the group can actually turn into survival this month after Knowledge-gated species access, action order, storage access, and local reserve access are resolved.
 
 This phase adds survival and consumption only. It does not add migration execution, discoveries, advancements, adaptation, settlements, diplomacy, or politics.
 
@@ -42,7 +42,7 @@ Realized monthly food acquisition still uses strict primary-then-fallback order:
 - `Hunter`: hunt first, then gather
 - `Mixed`: gather first, then hunt
 
-This stays aggregate and explicit. There is no deep planning system, but groups do shift behavior when their known usable support changes.
+This stays aggregate and explicit. There is no deep planning system, but groups do shift behavior when their known usable flora/fauna support changes.
 
 ## Gathering
 
@@ -54,7 +54,7 @@ Gathering:
 - uses flora `UsableBiomass`-driven gathering support to determine usable food
 - reduces actual flora populations in the region
 
-Gathering is aggregate only. There are no species preferences or detailed foraging behaviors yet.
+Gathering is aggregate only. There are no detailed foraging tactics, but gathering is still a real ecological action that depletes flora other actors may also need.
 
 ## Hunting
 
@@ -66,7 +66,7 @@ Hunting:
 - uses fauna `FoodYield` to determine usable food
 - reduces actual fauna populations in the region
 
-Hunting is aggregate only. There are no detailed prey strategies, weapon systems, or individual hunts yet.
+Hunting is aggregate only. There are no detailed prey strategies, weapon systems, or individual hunts yet, but hunting still depletes the same fauna abundance used by the food web.
 
 Groups cannot intentionally exploit species just because those species exist in the world. Intentional extraction is knowledge-gated and bound to polity species-awareness state:
 
@@ -80,10 +80,10 @@ Food in the world still is not the same thing as usable food for that actor. A s
 
 After acquisition:
 
-1. food gained this month is combined with `StoredFood`
+1. food gained this month is resolved from current ecological extraction first
 2. the group attempts to satisfy the full monthly need with usable food, not merely visible stock
-3. leftover food becomes the new `StoredFood`
-4. any deficit becomes a shortage
+3. preserved stock and settlement reserves can cover part of any remaining need
+4. any uncovered deficit becomes a shortage
 5. the group resolves into `FedStable`, `HungerPressure`, `SevereShortage`, or `Starvation`
 6. severe or prolonged shortage causes starvation loss
 
@@ -94,6 +94,13 @@ With persistent pressure in place, starvation and hardship tuning should read ef
 No usable food is treated as an emergency case and escalates starvation much faster than an ordinary partial shortage.
 
 `StoredFood` and settlement reserves can improve how much usable food a polity extracts from preserved stock, but preservation does not create food out of nothing. The simulation now consumes real stored stock and converts that stock into usable food through a multiplier, rather than multiplying the stock itself.
+
+The important ecology boundary is:
+
+- species presence is not enough
+- `Encounter` and `Discovery` are not enough
+- only `Knowledge` makes a flora/fauna species intentionally usable
+- if those known usable species and reserves do not cover monthly need, hunger and then starvation follow
 
 There is no automatic reintroduction or respawn.
 
