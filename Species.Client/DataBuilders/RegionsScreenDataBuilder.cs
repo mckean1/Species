@@ -3,6 +3,9 @@ using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Presentation;
+
+namespace Species.Client.DataBuilders;
 
 public static class RegionsScreenDataBuilder
 {

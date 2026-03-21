@@ -2,6 +2,9 @@ using Species.Domain.Catalogs;
 using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
+using Species.Client.Presentation;
+
+namespace Species.Client.DataBuilders;
 
 public static class KnownSpeciesScreenDataBuilder
 {

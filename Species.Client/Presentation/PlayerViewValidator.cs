@@ -1,6 +1,10 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.DataBuilders;
+using Species.Client.Enums;
+
+namespace Species.Client.Presentation;
 
 public static class PlayerViewValidator
 {
@@ -33,6 +37,7 @@ public static class PlayerViewValidator
 
         if (viewState.CurrentScreen != PlayerScreen.Chronicle &&
             viewState.CurrentScreen != PlayerScreen.Polity &&
+            viewState.CurrentScreen != PlayerScreen.Government &&
             viewState.CurrentScreen != PlayerScreen.Advancements &&
             viewState.CurrentScreen != PlayerScreen.Laws &&
             viewState.CurrentScreen != PlayerScreen.Regions &&
@@ -53,41 +58,41 @@ public static class PlayerViewValidator
         }
 
         var focalPolityId = focalPolity?.Id ?? string.Empty;
-        var regionCount = RegionsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count;
+        var regionCount = Species.Client.DataBuilders.RegionsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count;
         if (viewState.CurrentRegionIndex < 0 || (regionCount > 0 && viewState.CurrentRegionIndex >= regionCount))
         {
             errors.Add("Regions points at an invalid region.");
         }
 
-        var polityCount = KnownPolitiesScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
+        var polityCount = Species.Client.DataBuilders.KnownPolitiesScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
         if (viewState.CurrentKnownPolityIndex < 0 ||
             (polityCount > 0 && viewState.CurrentKnownPolityIndex >= polityCount))
         {
             errors.Add("Known Polities points at an invalid polity.");
         }
 
-        var advancementCount = AdvancementsScreenDataBuilder.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
+        var advancementCount = Species.Client.DataBuilders.AdvancementsScreenDataBuilder.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
         if (viewState.CurrentAdvancementIndex < 0 ||
             (advancementCount > 0 && viewState.CurrentAdvancementIndex >= advancementCount))
         {
             errors.Add("Advancements points at an invalid advancement.");
         }
 
-        var lawCount = LawsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentLawIndex).Laws.Count;
+        var lawCount = Species.Client.DataBuilders.LawsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentLawIndex).Laws.Count;
         if (viewState.CurrentLawIndex < 0 ||
             (lawCount > 0 && viewState.CurrentLawIndex >= lawCount))
         {
             errors.Add("Laws points at an invalid law.");
         }
 
-        var knownSpeciesCount = KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
+        var knownSpeciesCount = Species.Client.DataBuilders.KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
         if (viewState.CurrentKnownSpeciesIndex < 0 ||
             (knownSpeciesCount > 0 && viewState.CurrentKnownSpeciesIndex >= knownSpeciesCount))
         {
             errors.Add("Known Species points at an invalid species.");
         }
 
-        var chronicleData = ChronicleScreenDataBuilder.Build(world, focalPolityId, viewState);
+        var chronicleData = Species.Client.DataBuilders.ChronicleScreenDataBuilder.Build(world, focalPolityId, viewState);
         if (viewState.CurrentChronicleUrgentIndex < 0 ||
             (chronicleData.UrgentItems.Count > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleData.UrgentItems.Count))
         {

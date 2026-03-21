@@ -1,6 +1,10 @@
 using System.Text;
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
+using Species.Client.DataBuilders;
+using Species.Client.Presentation;
+
+namespace Species.Client.Renderers;
 
 public static class KnownPolitiesScreenRenderer
 {

@@ -1,6 +1,8 @@
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 
+namespace Species.Client.Presentation;
+
 public static class PlayerFocus
 {
     public static Polity? Resolve(World world, string focalPolityId)

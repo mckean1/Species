@@ -1,5 +1,10 @@
 using System.Text;
 using Species.Domain.Models;
+using Species.Client.DataBuilders;
+using Species.Client.Enums;
+using Species.Client.Presentation;
+
+namespace Species.Client.Renderers;
 
 public static class ChronicleScreenRenderer
 {

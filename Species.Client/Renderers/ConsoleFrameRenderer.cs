@@ -1,3 +1,7 @@
+using Species.Client.Presentation;
+
+namespace Species.Client.Renderers;
+
 public sealed class ConsoleFrameRenderer
 {
     private string _lastFrame = string.Empty;

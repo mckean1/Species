@@ -3,6 +3,10 @@ using Species.Domain.Generation;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Domain.Validation;
+using Species.Client.DataBuilders;
+using Species.Client.Enums;
+using Species.Client.Presentation;
+using Species.Client.Renderers;
 using System.Diagnostics;
 
 const int TickDelayMilliseconds = 1000;

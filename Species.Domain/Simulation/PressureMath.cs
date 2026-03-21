@@ -73,11 +73,10 @@ public static class PressureMath
     {
         return displayValue switch
         {
-            < 15 => "Calm",
-            < 35 => "Low",
-            < 55 => "Rising",
-            < 75 => "High",
-            < 90 => "Severe",
+            < 10 => "Inactive",
+            < 25 => "Active",
+            < 50 => "Moderate",
+            < 75 => "Severe",
             _ => "Critical"
         };
     }

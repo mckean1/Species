@@ -1,5 +1,7 @@
 using Species.Domain.Models;
 
+namespace Species.Client.Presentation;
+
 public static class PlayerScreenShell
 {
     private const string Reset = "\u001b[0m";
@@ -79,6 +81,49 @@ public static class PlayerScreenShell
         }
 
         return text + new string(' ', width - visibleLength);
+    }
+
+    public static string FitVisible(string text, int width)
+    {
+        if (width <= 0)
+        {
+            return string.Empty;
+        }
+
+        var builder = new System.Text.StringBuilder();
+        var visibleLength = 0;
+        var index = 0;
+
+        while (index < text.Length && visibleLength < width)
+        {
+            if (text[index] == '\u001b')
+            {
+                var start = index;
+                while (index < text.Length && text[index] != 'm')
+                {
+                    index++;
+                }
+
+                if (index < text.Length)
+                {
+                    index++;
+                }
+
+                builder.Append(text[start..index]);
+                continue;
+            }
+
+            builder.Append(text[index]);
+            index++;
+            visibleLength++;
+        }
+
+        if (visibleLength < width)
+        {
+            builder.Append(' ', width - visibleLength);
+        }
+
+        return builder.ToString();
     }
 
     public static int VisibleLength(string text)

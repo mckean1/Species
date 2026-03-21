@@ -8,7 +8,7 @@ public sealed class PressureValue
 
     public int DisplayValue { get; set; }
 
-    public string SeverityLabel { get; set; } = "Calm";
+    public string SeverityLabel { get; set; } = "Inactive";
 
     public PressureValue Clone()
     {

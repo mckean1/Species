@@ -11,4 +11,11 @@
     <ProjectReference Include="..\Species.Domain\Species.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Constants\" />
+    <Folder Include="DataBuilders\" />
+    <Folder Include="Presentation\" />
+    <Folder Include="Renderers\" />
+  </ItemGroup>
+
 </Project>

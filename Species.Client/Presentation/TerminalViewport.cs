@@ -1,3 +1,5 @@
+namespace Species.Client.Presentation;
+
 public readonly record struct TerminalViewport(int Width, int Height)
 {
     public static TerminalViewport GetCurrent()

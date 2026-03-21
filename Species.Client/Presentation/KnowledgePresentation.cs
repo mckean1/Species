@@ -1,5 +1,7 @@
 using Species.Domain.Knowledge;
 
+namespace Species.Client.Presentation;
+
 public static class KnowledgePresentation
 {
     public static string Describe(KnowledgeLevel level)

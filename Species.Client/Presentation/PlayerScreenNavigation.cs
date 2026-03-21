@@ -1,9 +1,14 @@
+using Species.Client.Enums;
+
+namespace Species.Client.Presentation;
+
 public static class PlayerScreenNavigation
 {
     private static readonly PlayerScreen[] OrderedScreens =
     [
         PlayerScreen.Chronicle,
         PlayerScreen.Polity,
+        PlayerScreen.Government,
         PlayerScreen.Regions,
         PlayerScreen.Laws,
         PlayerScreen.Advancements,
@@ -33,6 +38,7 @@ public static class PlayerScreenNavigation
             ConsoleKey.D5 or ConsoleKey.NumPad5 => 4,
             ConsoleKey.D6 or ConsoleKey.NumPad6 => 5,
             ConsoleKey.D7 or ConsoleKey.NumPad7 => 6,
+            ConsoleKey.D8 or ConsoleKey.NumPad8 => 7,
             _ => -1
         };
 
@@ -51,9 +57,9 @@ public static class PlayerScreenNavigation
         if (width >= 136)
         {
             var text =
-                $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Polity {dim}[3]{reset} Regions  |  " +
-                $"Governance: {dim}[4]{reset} Laws {dim}[5]{reset} Advancements  |  " +
-                $"Knowledge: {dim}[6]{reset} Known Polities {dim}[7]{reset} Known Species  " +
+                $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Overview {dim}[3]{reset} Government {dim}[4]{reset} Regions  |  " +
+                $"Civic: {dim}[5]{reset} Laws {dim}[6]{reset} Advancements  |  " +
+                $"Knowledge: {dim}[7]{reset} Known Polities {dim}[8]{reset} Known Species  " +
                 $"{dim}[TAB]{reset} Next {dim}[SPACE]{reset} Run/Pause {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -64,9 +70,9 @@ public static class PlayerScreenNavigation
         if (width >= 104)
         {
             var text =
-                $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Polity {dim}[3]{reset} Regions  |  " +
-                $"Gov: {dim}[4]{reset} Laws {dim}[5]{reset} Adv  |  " +
-                $"Know: {dim}[6]{reset} Polities {dim}[7]{reset} Species  " +
+                $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Overview {dim}[3]{reset} Gov {dim}[4]{reset} Regions  |  " +
+                $"Civic: {dim}[5]{reset} Laws {dim}[6]{reset} Adv  |  " +
+                $"Know: {dim}[7]{reset} Polities {dim}[8]{reset} Species  " +
                 $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -77,7 +83,7 @@ public static class PlayerScreenNavigation
         if (width >= 78)
         {
             var text =
-                $"Main {dim}[1]{reset}{dim}[2]{reset}{dim}[3]{reset} | Gov {dim}[4]{reset}{dim}[5]{reset} | Know {dim}[6]{reset}{dim}[7]{reset}  " +
+                $"Main {dim}[1]{reset}{dim}[2]{reset}{dim}[3]{reset}{dim}[4]{reset} | Civ {dim}[5]{reset}{dim}[6]{reset} | Know {dim}[7]{reset}{dim}[8]{reset}  " +
                 $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -86,7 +92,7 @@ public static class PlayerScreenNavigation
         }
 
         return selectionLabel is null
-            ? $"{dim}M{reset}[123] {dim}G{reset}[45] {dim}K{reset}[67]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}"
-            : $"{dim}M{reset}[123] {dim}G{reset}[45] {dim}K{reset}[67]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}  {dim}[< >]{reset}";
+            ? $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}K{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}"
+            : $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}K{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}  {dim}[< >]{reset}";
     }
 }

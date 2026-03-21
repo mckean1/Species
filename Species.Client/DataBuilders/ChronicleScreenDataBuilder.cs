@@ -2,6 +2,10 @@ using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Enums;
+using Species.Client.Presentation;
+
+namespace Species.Client.DataBuilders;
 
 public static class ChronicleScreenDataBuilder
 {
@@ -98,7 +102,7 @@ public static class ChronicleScreenDataBuilder
                 "Breakaway risk is rising on the periphery.",
                 context.ScaleState.Summary,
                 "If integration strain keeps climbing, the realm may lose outlying regions or attached polities.",
-                PlayerScreen.Polity,
+                PlayerScreen.Government,
                 null));
         }
 
@@ -109,7 +113,7 @@ public static class ChronicleScreenDataBuilder
                 "Governance is faltering as legitimacy and cohesion weaken.",
                 $"Legitimacy {context.Governance.Legitimacy}, cohesion {context.Governance.Cohesion}, authority {context.Governance.Authority}.",
                 "Weak governability makes laws, enforcement, and coordinated recovery less reliable.",
-                PlayerScreen.Laws,
+                PlayerScreen.Government,
                 null));
         }
 

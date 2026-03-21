@@ -89,7 +89,7 @@ Downgrade intent:
 
 ## UI Contract
 
-Polity-facing UI should consume the finalized `PolityConditionSnapshot` rather than rebuilding issue summaries from ad hoc pressure reads. This keeps:
+Polity-facing UI should consume the finalized `PolityConditionSnapshot` rather than rebuilding issue summaries from ad hoc pressure reads. The split between the `Polity Overview` and `Government` screens should still read from that same finalized source. This keeps:
 
 - current issues
 - strengths and problems

@@ -2,6 +2,9 @@ using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Presentation;
+
+namespace Species.Client.DataBuilders;
 
 public static class AdvancementsScreenDataBuilder
 {

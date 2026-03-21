@@ -1,5 +1,7 @@
 using Species.Domain.Enums;
 
+namespace Species.Client.Presentation;
+
 public static class PolityPresentation
 {
     public static string DescribeGovernmentForm(GovernmentForm governmentForm)

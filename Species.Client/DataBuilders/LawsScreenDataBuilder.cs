@@ -1,4 +1,7 @@
 using Species.Domain.Models;
+using Species.Client.Presentation;
+
+namespace Species.Client.DataBuilders;
 
 public static class LawsScreenDataBuilder
 {
