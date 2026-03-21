@@ -70,7 +70,8 @@ public static class PolityScreenRenderer
         lines.Add($"Population: {data.Population}");
         lines.Add($"Food Stores: {data.FoodStores}");
         lines.Add($"Net Food Change: {data.FoodBalance}");
-        lines.Add($"Food Access: {data.FoodAccess}");
+        lines.Add($"Food State: {data.FoodState}");
+        lines.Add($"Living Conditions: {data.LivingConditions}");
         lines.Add($"Materials: {data.MaterialStores}");
         lines.Add($"Runtime: {runningText}");
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
@@ -124,7 +125,7 @@ public static class PolityScreenRenderer
         }
 
         lines.Add($"{Dim}{new string('-', leftWidth + rightWidth + 3)}{Reset}");
-        lines.Add($"{PaneTitle}Material Condition{Reset}");
+        lines.Add($"{PaneTitle}Living Conditions{Reset}");
         foreach (var materialNote in BuildBulletLines(data.MaterialNotes, leftWidth + rightWidth + 3, Yellow))
         {
             lines.Add(materialNote);

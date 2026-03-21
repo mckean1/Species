@@ -216,13 +216,52 @@ public static class PolityData
             (collapseSignal * 0.35f),
             MidpointRounding.AwayFromZero);
 
-        // Polity food pressure is displayed as a current strain signal, so it must incorporate
-        // month-end food collapse states rather than only the pre-survival stored raw pressure average.
+        // Food pressure is an active month-end strain signal. It should track finalized food stress,
+        // shortage carryover, and reserve weakness without folding in non-food material fragility.
         return PressureMath.CreateValue(PressureDefinitions.Food, Math.Max(rawAverage, derivedRaw));
     }
 
     private static FoodAccountingSnapshot AggregateFoodAccounting(IReadOnlyList<PopulationGroup> groups, Polity polity)
     {
+        var resolvedGroups = groups
+            .Where(group =>
+                group.FoodAccounting.StartingTotalStores > 0 ||
+                group.FoodAccounting.EndingTotalStores > 0 ||
+                group.FoodAccounting.MonthlyDemand > 0 ||
+                group.FoodAccounting.FoodInflow > 0 ||
+                group.FoodAccounting.FoodConsumption > 0 ||
+                group.FoodAccounting.UnresolvedDeficit > 0 ||
+                group.StoredFood > 0)
+            .ToArray();
+
+        // The polity screen should read current member-group month-end food truth first.
+        // Cached polity food snapshots remain only as a fallback when no resolved group snapshot exists.
+        if (resolvedGroups.Length > 0)
+        {
+            var totalPopulation = Math.Max(1, resolvedGroups.Sum(group => Math.Max(1, group.Population)));
+            var weightedHunger = resolvedGroups.Sum(group => group.FoodAccounting.HungerPressure * Math.Max(1, group.Population));
+            var weightedShortageMonths = resolvedGroups.Sum(group => group.FoodAccounting.ShortageMonths * Math.Max(1, group.Population));
+            var worstFoodState = resolvedGroups.Max(group => group.FoodAccounting.FoodStressState);
+
+            return new FoodAccountingSnapshot
+            {
+                StartingCarriedStores = resolvedGroups.Sum(group => group.FoodAccounting.StartingCarriedStores),
+                StartingReserveStores = resolvedGroups.Sum(group => group.FoodAccounting.StartingReserveStores),
+                FoodInflow = resolvedGroups.Sum(group => group.FoodAccounting.FoodInflow),
+                FoodConsumption = resolvedGroups.Sum(group => group.FoodAccounting.FoodConsumption),
+                FoodLosses = resolvedGroups.Sum(group => group.FoodAccounting.FoodLosses),
+                NetFoodChange = resolvedGroups.Sum(group => group.FoodAccounting.NetFoodChange),
+                EndingCarriedStores = resolvedGroups.Sum(group => group.FoodAccounting.EndingCarriedStores),
+                EndingReserveStores = resolvedGroups.Sum(group => group.FoodAccounting.EndingReserveStores),
+                MonthlyDemand = resolvedGroups.Sum(group => group.FoodAccounting.MonthlyDemand),
+                UsableFoodConsumed = resolvedGroups.Sum(group => group.FoodAccounting.UsableFoodConsumed),
+                UnresolvedDeficit = resolvedGroups.Sum(group => group.FoodAccounting.UnresolvedDeficit),
+                HungerPressure = MathF.Round((float)(weightedHunger / totalPopulation), 2),
+                ShortageMonths = (int)Math.Round((double)weightedShortageMonths / totalPopulation, MidpointRounding.AwayFromZero),
+                FoodStressState = worstFoodState
+            };
+        }
+
         if (polity.FoodAccounting.EndingTotalStores > 0 ||
             polity.FoodAccounting.StartingTotalStores > 0 ||
             polity.FoodAccounting.MonthlyDemand > 0)

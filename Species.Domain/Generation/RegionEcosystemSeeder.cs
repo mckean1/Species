@@ -216,13 +216,14 @@ public static class RegionEcosystemSeeder
             ? 1.0f
             : EcologySeedingConstants.FaunaNonCoreBiomeMultiplier;
         var support = ResolveSeedDietSupport(region, species, floraPopulations, floraCatalog, preySupportBySpeciesId);
+        var supportFactor = ClampNormalized(ToPopulationSupport(support));
 
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FaunaRandomVarianceRange);
         var carryingSupport = Math.Clamp(
             support / Math.Max(0.01f, species.RequiredIntake * EcologySeedingConstants.PopulationScale * EcologySeedingConstants.FaunaSeedingSupportBuffer),
             0.0f,
             1.0f);
-        var abundance = (support * 0.42f) +
+        var abundance = (supportFactor * 0.42f) +
                         (fertilityFit * 0.14f) +
                         (species.ReproductionRate * 0.12f) +
                         ((1.0f - species.RequiredIntake) * 0.08f) +

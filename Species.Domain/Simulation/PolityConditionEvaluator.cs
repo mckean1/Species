@@ -56,11 +56,15 @@ public sealed class PolityConditionEvaluator
         {
             var defaultMaterial = new MaterialSurvivalAssessment(
                 PolityConditionSeverity.Stable,
+                "No food accounting is available.",
                 PolityConditionSeverity.Stable,
                 PolityConditionSeverity.Stable,
                 PolityConditionSeverity.Stable,
                 PolityConditionSeverity.Stable,
                 PolityConditionSeverity.Stable,
+                "No living conditions strain is visible.",
+                PolityConditionSeverity.Stable,
+                false,
                 false,
                 false,
                 false);
@@ -107,7 +111,7 @@ public sealed class PolityConditionEvaluator
         var governmentForm = ValidateGovernmentForm(context, material, spatial, integrity, governance, scaleForm);
         var currentIssues = BuildCurrentIssues(context, material, spatial, integrity, governance);
         var strengths = BuildStrengths(context, material, spatial, integrity, governance);
-        var problems = BuildProblems(material, spatial, integrity, governance);
+        var problems = BuildProblems(context, material, spatial, integrity, governance);
         var governanceNotes = BuildGovernanceNotes(governance, material, spatial, integrity);
         var scaleNotes = BuildScaleNotes(context, integrity, spatial, scaleForm);
         var summary = BuildSummary(material, spatial, integrity, governance, governmentForm, scaleForm);
@@ -131,22 +135,20 @@ public sealed class PolityConditionEvaluator
 
     private static MaterialSurvivalAssessment AssessMaterialSurvival(PolityContext context)
     {
-        var foodPressure = Math.Max(context.Pressures.Food.EffectiveValue, context.MaterialProduction.DeficitScore + (context.MaterialShortageMonths * 8));
+        // Food condition is food-only. It is derived from finalized food accounting and food pressure,
+        // while broader non-food material weakness is tracked separately as living conditions strain.
+        var food = ClassifyFoodCondition(context, out var foodReason);
         var waterPressure = context.Pressures.Water.EffectiveValue;
         var threatPressure = Math.Max(context.Pressures.Threat.EffectiveValue, context.ExternalPressure.Threat);
         var crowdingPressure = context.Pressures.Overcrowding.EffectiveValue;
         var migrationPressure = context.Pressures.Migration.EffectiveValue + Math.Max(0, context.SocialIdentity.Mobility - 55) / 3;
+        var materialFragility = ClassifyMaterialFragility(context, out var materialFragilityReason);
 
-        var food = ClassifyPressure(foodPressure, context.Pressures.Food.DisplayValue);
         var water = ClassifyPressure(waterPressure, context.Pressures.Water.DisplayValue);
         var threat = ClassifyPressure(threatPressure, context.Pressures.Threat.DisplayValue);
         var crowding = ClassifyPressure(crowdingPressure, context.Pressures.Overcrowding.DisplayValue);
         var migration = ClassifyPressure(migrationPressure, context.Pressures.Migration.DisplayValue);
         var sustainedShortage = context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold;
-        if (sustainedShortage && food == PolityConditionSeverity.Strained)
-        {
-            food = PolityConditionSeverity.Critical;
-        }
 
         var hasCriticalFoodWater = food >= PolityConditionSeverity.Critical || water >= PolityConditionSeverity.Critical;
         var hasExtremeMigration =
@@ -154,17 +156,22 @@ public sealed class PolityConditionEvaluator
             (context.Pressures.Migration.DisplayValue >= PolityConditionConstants.ElevatedMigrationPressureThreshold &&
              context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold);
         var hasMaterialShortage = sustainedShortage || context.MaterialProduction.DeficitScore >= PolityConditionConstants.StrainedPressureThreshold;
+        var overallSeverity = MaxSeverity(food, water, threat, crowding, migration, materialFragility);
 
         return new MaterialSurvivalAssessment(
             food,
+            foodReason,
             water,
             threat,
             crowding,
             migration,
-            MaxSeverity(food, water, threat, crowding, migration),
+            materialFragility,
+            materialFragilityReason,
+            overallSeverity,
             hasCriticalFoodWater,
             hasExtremeMigration,
-            hasMaterialShortage);
+            hasMaterialShortage,
+            materialFragility > PolityConditionSeverity.Stable);
     }
 
     private static SpatialStabilityAssessment AssessSpatialStability(PolityContext context, MaterialSurvivalAssessment material)
@@ -342,8 +349,8 @@ public sealed class PolityConditionEvaluator
         {
             GovernanceConditionBand.Functional => "Governance remains functionally intact.",
             GovernanceConditionBand.Strained => "Governance is under growing strain.",
-            GovernanceConditionBand.Failing => "Governance is faltering under present conditions.",
-            _ => "Governance is collapsing under current pressures."
+            GovernanceConditionBand.Failing => "Governance is failing as living conditions worsen.",
+            _ => "Governance is collapsing as living conditions and political integrity break down."
         };
 
         return new GovernanceConditionAssessment(
@@ -496,7 +503,7 @@ public sealed class PolityConditionEvaluator
         var issues = new List<(int Priority, string Text)>();
         if (material.FoodCondition >= PolityConditionSeverity.Critical)
         {
-            issues.Add((100, "Food access is in a critical state."));
+            issues.Add((100, DescribeFoodIssue(context.FoodAccounting, material.FoodCondition)));
         }
 
         if (material.WaterCondition >= PolityConditionSeverity.Critical)
@@ -524,9 +531,16 @@ public sealed class PolityConditionEvaluator
             issues.Add((72, "Governance is failing under current conditions."));
         }
 
+        if (material.MaterialFragilityCondition >= PolityConditionSeverity.Critical)
+        {
+            issues.Add((68, DescribeMaterialFragilityIssue(material, context)));
+        }
+
         if (material.OverallSeverity == PolityConditionSeverity.Strained && issues.Count == 0)
         {
-            issues.Add((40, "Material pressures are rising."));
+            issues.Add((40, material.MaterialFragilityCondition >= PolityConditionSeverity.Strained
+                ? DescribeMaterialFragilityIssue(material, context)
+                : "Living conditions are under growing strain."));
         }
 
         return issues.Count > 0
@@ -549,7 +563,7 @@ public sealed class PolityConditionEvaluator
         var strengths = new List<string>();
         if (material.FoodCondition == PolityConditionSeverity.Stable)
         {
-            strengths.Add("Food access remains stable.");
+            strengths.Add("Food stores and intake remain stable.");
         }
 
         if (material.WaterCondition == PolityConditionSeverity.Stable)
@@ -583,6 +597,7 @@ public sealed class PolityConditionEvaluator
     }
 
     private static IReadOnlyList<string> BuildProblems(
+        PolityContext context,
         MaterialSurvivalAssessment material,
         SpatialStabilityAssessment spatial,
         PolityIntegrityAssessment integrity,
@@ -591,7 +606,7 @@ public sealed class PolityConditionEvaluator
         var problems = new List<string>();
         if (material.FoodCondition >= PolityConditionSeverity.Strained)
         {
-            problems.Add($"Food conditions are {material.FoodCondition.ToString().ToLowerInvariant()}.");
+            problems.Add(DescribeFoodProblem(material, context.FoodAccounting));
         }
 
         if (material.WaterCondition >= PolityConditionSeverity.Strained)
@@ -619,8 +634,13 @@ public sealed class PolityConditionEvaluator
             problems.Add("Governance is no longer operating effectively.");
         }
 
+        if (material.MaterialFragilityCondition >= PolityConditionSeverity.Strained)
+        {
+            problems.Add(DescribeMaterialFragilityProblem(material, context));
+        }
+
         return problems.Count > 0
-            ? problems.Take(PolityConditionConstants.MaxDisplayedProblems).ToArray()
+            ? problems.Distinct(StringComparer.Ordinal).Take(PolityConditionConstants.MaxDisplayedProblems).ToArray()
             : ["No acute problems right now."];
     }
 
@@ -638,8 +658,8 @@ public sealed class PolityConditionEvaluator
             $"Governability: {governance.Governance.Governability}",
             $"Condition: {governance.Summary}",
             spatial.IsDisplaced || material.HasCriticalFoodWater || integrity.Band >= PolityIntegrityBand.Unstable
-                ? "Current survival and integrity failures are directly reducing governance performance."
-                : "Governance is still supported by current material and spatial conditions."
+                ? "Worsening living conditions and integrity failures are directly reducing governance performance."
+                : "Governance is still supported by workable living conditions and a stable footing."
         ];
     }
 
@@ -792,6 +812,142 @@ public sealed class PolityConditionEvaluator
     private static PolityConditionSeverity MaxSeverity(params PolityConditionSeverity[] values)
     {
         return values.Max();
+    }
+
+    private static PolityConditionSeverity ClassifyFoodCondition(PolityContext context, out string reason)
+    {
+        var accounting = context.FoodAccounting;
+        var demand = Math.Max(1, accounting.MonthlyDemand);
+        var endingStores = accounting.EndingTotalStores;
+        var reserveMonths = endingStores / (float)demand;
+        var deficitRatio = accounting.UnresolvedDeficit / (float)demand;
+        var pressure = Math.Max(context.Pressures.Food.EffectiveValue, context.Pressures.Food.DisplayValue);
+
+        if (accounting.UnresolvedDeficit > 0 &&
+            (accounting.FoodStressState == FoodStressState.Starvation ||
+             accounting.ShortageMonths >= PolityConditionConstants.SustainedCollapseMonthsThreshold ||
+             endingStores <= 0 ||
+             pressure >= PolityConditionConstants.CollapsePressureThreshold))
+        {
+            reason = $"Food collapse is driven by unresolved deficit {accounting.UnresolvedDeficit}, empty or exhausted cover, and sustained food stress ({accounting.FoodStressState}).";
+            return PolityConditionSeverity.Collapse;
+        }
+
+        if (accounting.UnresolvedDeficit > 0 ||
+            accounting.FoodStressState == FoodStressState.SevereShortage ||
+            accounting.ShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold ||
+            pressure >= PolityConditionConstants.CriticalPressureThreshold)
+        {
+            reason = accounting.UnresolvedDeficit > 0
+                ? $"Food remains critical because deficit {accounting.UnresolvedDeficit} is unresolved this month."
+                : $"Food remains critical because repeated shortage and strain have pushed the polity into {accounting.FoodStressState}.";
+            return PolityConditionSeverity.Critical;
+        }
+
+        if (pressure >= PolityConditionConstants.StrainedPressureThreshold ||
+            reserveMonths < 1.0f ||
+            accounting.ShortageMonths > 0 ||
+            accounting.HungerPressure >= 0.25f ||
+            accounting.NetFoodChange < 0 ||
+            deficitRatio > 0.0f)
+        {
+            reason = accounting.NetFoodChange < 0 && reserveMonths >= 1.0f
+                ? $"Food is strained because intake fell behind use this month despite stores still covering demand."
+                : $"Food is strained because stores cover only {reserveMonths:0.0} month(s) and recent food stress has not fully cleared.";
+            return PolityConditionSeverity.Strained;
+        }
+
+        reason = $"Food is stable because stores cover about {reserveMonths:0.0} month(s), net food changed by {accounting.NetFoodChange:+#;-#;0}, and no deficit remains.";
+        return PolityConditionSeverity.Stable;
+    }
+
+    private static PolityConditionSeverity ClassifyMaterialFragility(PolityContext context, out string reason)
+    {
+        var materialSignal = context.MaterialProduction.DeficitScore + (context.MaterialShortageMonths * 8);
+        var severity = ClassifyPressure(materialSignal, Math.Min(100, materialSignal));
+
+        reason = severity switch
+        {
+            PolityConditionSeverity.Collapse => $"Living conditions are collapsing: deficit score {context.MaterialProduction.DeficitScore} with shortages sustained for {context.MaterialShortageMonths} month(s).",
+            PolityConditionSeverity.Critical => $"Living conditions are failing: deficit score {context.MaterialProduction.DeficitScore} with shortages sustained for {context.MaterialShortageMonths} month(s).",
+            PolityConditionSeverity.Strained => $"Living conditions are strained: deficit score {context.MaterialProduction.DeficitScore} and shelter, storage, and tool support are weakening.",
+            _ => "Living conditions remain stable."
+        };
+
+        return severity;
+    }
+
+    private static string DescribeFoodIssue(FoodAccountingSnapshot accounting, PolityConditionSeverity severity)
+    {
+        if (accounting.UnresolvedDeficit > 0 && accounting.EndingTotalStores <= 0)
+        {
+            return "Food deficit is unresolved and stores are exhausted.";
+        }
+
+        if (accounting.UnresolvedDeficit > 0)
+        {
+            return accounting.EndingTotalStores > 0
+                ? "Food intake is failing, though stored food is still covering immediate demand."
+                : "Food deficit is unresolved this month.";
+        }
+
+        if (accounting.ShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold)
+        {
+            return "Repeated food shortage is keeping food conditions unstable.";
+        }
+
+        if (severity >= PolityConditionSeverity.Critical)
+        {
+            return "Food stores are low and shortage risk is rising.";
+        }
+
+        return "Food strain is rising.";
+    }
+
+    private static string DescribeFoodProblem(MaterialSurvivalAssessment material, FoodAccountingSnapshot accounting)
+    {
+        if (accounting.UnresolvedDeficit > 0)
+        {
+            return accounting.EndingTotalStores > 0
+                ? "Food deficit remains unresolved despite stored cover."
+                : "Food deficit is unresolved.";
+        }
+
+        if (accounting.ShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold)
+        {
+            return "Repeated food shortage is eroding food stability.";
+        }
+
+        return $"Food state is {material.FoodCondition.ToString().ToLowerInvariant()}.";
+    }
+
+    private static string DescribeMaterialFragilityIssue(MaterialSurvivalAssessment material, PolityContext context)
+    {
+        return context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold
+            ? "Living conditions are worsening and pulling wider stability down."
+            : "Shelter, storage, and tool weakness are dragging down living conditions.";
+    }
+
+    private static string DescribeMaterialFragilityProblem(MaterialSurvivalAssessment material, PolityContext? context)
+    {
+        if (context is not null && context.MaterialShortageMonths >= PolityConditionConstants.SustainedShortageMonthsThreshold)
+        {
+            return "Persistent material shortages are worsening living conditions.";
+        }
+
+        return $"Living conditions are {DescribeLivingConditions(material.MaterialFragilityCondition)}.";
+    }
+
+    private static string DescribeLivingConditions(PolityConditionSeverity severity)
+    {
+        return severity switch
+        {
+            PolityConditionSeverity.Stable => "stable",
+            PolityConditionSeverity.Strained => "strained",
+            PolityConditionSeverity.Critical => "failing",
+            PolityConditionSeverity.Collapse => "collapsing",
+            _ => "unclear"
+        };
     }
 
     private static string DescribeGovernmentForm(GovernmentForm form)

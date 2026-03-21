@@ -82,9 +82,7 @@ public static class RegionsScreenDataBuilder
         var topFlora = snapshot?.FloraKnowledge >= KnowledgeLevel.Discovery
             ? ResolveTopPopulationNames(region.Ecosystem.FloraPopulations, floraCatalog.GetById).Take(3).ToArray()
             : Array.Empty<string>();
-        var topFauna = snapshot?.FaunaKnowledge >= KnowledgeLevel.Discovery
-            ? ResolveTopPopulationNames(region.Ecosystem.FaunaPopulations, faunaCatalog.GetById).Take(3).ToArray()
-            : Array.Empty<string>();
+        var faunaVisibility = RegionFaunaVisibilityResolver.Resolve(region, snapshot, faunaCatalog);
         var knowledge = BuildKnowledge(region, snapshot, focusGroup, discoveryCatalog);
         var carnivoreThreat = region.Ecosystem.FaunaPopulations.Sum(entry =>
         {
@@ -231,7 +229,8 @@ public static class RegionsScreenDataBuilder
             exactPresenceVisible ? presencePopulation.ToString("N0") : (groupsHere.Length > 0 ? "Signs" : "None"),
             BuildGroupPresence(groupsHere, exactPresenceVisible),
             topFlora.Length > 0 ? topFlora : ["None known"],
-            topFauna.Length > 0 ? topFauna : ["None known"],
+            faunaVisibility.DisplayLabel,
+            faunaVisibility.VisibleEntries,
             BuildMaterialLines(region, snapshot),
             knowledge,
             context.Count > 0 ? context.ToArray() : ["No special connection noted"],
@@ -443,6 +442,7 @@ public sealed record RegionSummary(
     string PresenceText,
     IReadOnlyList<string> GroupPresence,
     IReadOnlyList<string> Flora,
+    string FaunaLabel,
     IReadOnlyList<string> Fauna,
     IReadOnlyList<string> Materials,
     IReadOnlyList<string> Knowledge,

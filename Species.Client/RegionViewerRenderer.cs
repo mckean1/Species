@@ -149,7 +149,7 @@ public static class RegionViewerRenderer
         };
 
         lines.AddRange(BuildBulletLines(selectedRegion.Flora.Select(item => $"Flora: {item}"), width, Green));
-        lines.AddRange(BuildBulletLines(selectedRegion.Fauna.Select(item => $"Fauna: {item}"), width, Cyan));
+        lines.AddRange(BuildBulletLines(selectedRegion.Fauna.Select(item => $"{selectedRegion.FaunaLabel}: {item}"), width, Cyan));
         lines.AddRange(BuildBulletLines(selectedRegion.Materials.Select(item => $"Material: {item}"), width, Yellow));
         lines.AddRange(BuildBulletLines(selectedRegion.Biology.Select(item => $"Biology: {item}"), width, Purple));
         lines.Add($"{Dim}{new string('-', width)}{Reset}");

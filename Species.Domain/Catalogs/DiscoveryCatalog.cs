@@ -109,7 +109,7 @@ public sealed class DiscoveryCatalog
                 Description = $"Knowledge of prey and dangerous animal patterns in {region.Name}.",
                 Category = DiscoveryCategory.Fauna,
                 DecisionEffectSummary = "Improves how the group recognizes fauna opportunity and danger in this region during decision-making.",
-                CausalSummary = "Emerges from repeated hunting and fauna observation in the region."
+                CausalSummary = "Emerges from repeated residence, fauna observation, threat signs, and hunting in the region."
             });
             definitions.Add(new DiscoveryDefinition
             {

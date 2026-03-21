@@ -62,6 +62,21 @@ public sealed class DiscoverySystem
                     Increment(evidence.SuccessfulHuntingMonthsByRegionId, livedRegionId);
                 }
 
+                if (livedRegion.Ecosystem.FaunaPopulations.Any(entry => entry.Value > 0))
+                {
+                    Increment(evidence.FaunaObservationMonthsByRegionId, livedRegionId);
+
+                    var carnivoreThreatPressure = SubsistenceSupportModel.NormalizeThreatPressure(
+                        SubsistenceSupportModel.CalculateCarnivoreThreat(livedRegion, faunaCatalog));
+                    if (carnivoreThreatPressure >= 30 ||
+                        group.Pressures.Threat.EffectiveValue >= 55 ||
+                        (survivalChange?.PrimaryAction == "Hunt" && survivalChange.PrimaryFoodGained > 0) ||
+                        (survivalChange?.FallbackAction == "Hunt" && survivalChange.FallbackFoodGained > 0))
+                    {
+                        Increment(evidence.FaunaThreatExposureMonthsByRegionId, livedRegionId);
+                    }
+                }
+
                 if (group.Pressures.Food.EffectiveValue >= 55 || survivalChange?.Shortage > 0)
                 {
                     evidence.RecurringFoodPressureMonths++;
@@ -165,13 +180,19 @@ public sealed class DiscoverySystem
                 updatedGroup,
                 discoveryCatalog,
                 discoveryCatalog.GetLocalFaunaDiscoveryId(livedRegionId),
-                evidence.SuccessfulHuntingMonthsByRegionId.GetValueOrDefault(livedRegionId),
+                evidence.FaunaObservationMonthsByRegionId.GetValueOrDefault(livedRegionId) +
+                evidence.SuccessfulHuntingMonthsByRegionId.GetValueOrDefault(livedRegionId) +
+                Math.Min(2, evidence.FaunaThreatExposureMonthsByRegionId.GetValueOrDefault(livedRegionId)),
                 DiscoveryConstants.LocalFaunaHuntingMonthsRequired,
                 unlockedThisMonth,
                 checks,
                 ref discoveryBudget,
-                extraGate: evidence.RecurringThreatPressureMonths > 0 || evidence.SuccessfulHuntingMonthsByRegionId.GetValueOrDefault(livedRegionId) > 1,
-                waitingReason: "needs repeat hunting exposure");
+                extraGate:
+                    evidence.FaunaObservationMonthsByRegionId.GetValueOrDefault(livedRegionId) > 0 &&
+                    (evidence.MonthsSpentByRegionId.GetValueOrDefault(livedRegionId) > 0 ||
+                     evidence.SuccessfulHuntingMonthsByRegionId.GetValueOrDefault(livedRegionId) > 0 ||
+                     evidence.FaunaThreatExposureMonthsByRegionId.GetValueOrDefault(livedRegionId) > 0),
+                waitingReason: "needs repeated fauna observation, threat signs, or hunting exposure");
 
             EvaluateRegionDiscovery(
                 updatedGroup,
@@ -831,7 +852,7 @@ public sealed class DiscoverySystem
 
     private static string BuildEvidenceSummary(DiscoveryEvidenceState evidence)
     {
-        return $"Gather=[{SummarizeCounters(evidence.SuccessfulGatheringMonthsByRegionId)}] | Hunt=[{SummarizeCounters(evidence.SuccessfulHuntingMonthsByRegionId)}] | Residence=[{SummarizeCounters(evidence.MonthsSpentByRegionId)}] | Water=[{SummarizeCounters(evidence.WaterExposureMonthsByRegionId)}] | Routes=[{SummarizeCounters(evidence.RouteTraversalCountsByRouteId)}] | Materials=[{SummarizeCounters(evidence.MaterialExposureMonthsByResourceId)}] | Contact=[{SummarizeCounters(evidence.ContactMonthsByPolityId)}] | Progress=[{SummarizeProgress(evidence.DiscoveryProgressByDiscoveryId)}] | Pressure=F{evidence.RecurringFoodPressureMonths}/T{evidence.RecurringThreatPressureMonths}/M{evidence.RecurringMaterialShortageMonths}";
+        return $"Gather=[{SummarizeCounters(evidence.SuccessfulGatheringMonthsByRegionId)}] | Hunt=[{SummarizeCounters(evidence.SuccessfulHuntingMonthsByRegionId)}] | FaunaObserve=[{SummarizeCounters(evidence.FaunaObservationMonthsByRegionId)}] | FaunaThreat=[{SummarizeCounters(evidence.FaunaThreatExposureMonthsByRegionId)}] | Residence=[{SummarizeCounters(evidence.MonthsSpentByRegionId)}] | Water=[{SummarizeCounters(evidence.WaterExposureMonthsByRegionId)}] | Routes=[{SummarizeCounters(evidence.RouteTraversalCountsByRouteId)}] | Materials=[{SummarizeCounters(evidence.MaterialExposureMonthsByResourceId)}] | Contact=[{SummarizeCounters(evidence.ContactMonthsByPolityId)}] | Progress=[{SummarizeProgress(evidence.DiscoveryProgressByDiscoveryId)}] | Pressure=F{evidence.RecurringFoodPressureMonths}/T{evidence.RecurringThreatPressureMonths}/M{evidence.RecurringMaterialShortageMonths}";
     }
 
     private static string SummarizeCounters(IReadOnlyDictionary<string, int> counters)

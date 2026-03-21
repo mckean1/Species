@@ -32,7 +32,11 @@ public sealed class FaunaPopulationChange
 
     public required float HungerPressure { get; init; }
 
+    public required float FeedingMomentum { get; init; }
+
     public required int ShortageMonths { get; init; }
+
+    public required int StableSupportMonths { get; init; }
 
     public required string FoodStressState { get; init; }
 

@@ -10,6 +10,10 @@ public sealed class DiscoveryEvidenceState
 
     public Dictionary<string, int> WaterExposureMonthsByRegionId { get; init; } = new(StringComparer.Ordinal);
 
+    public Dictionary<string, int> FaunaObservationMonthsByRegionId { get; init; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, int> FaunaThreatExposureMonthsByRegionId { get; init; } = new(StringComparer.Ordinal);
+
     public Dictionary<string, int> RouteTraversalCountsByRouteId { get; init; } = new(StringComparer.Ordinal);
 
     public Dictionary<string, int> MaterialExposureMonthsByResourceId { get; init; } = new(StringComparer.Ordinal);
@@ -40,6 +44,8 @@ public sealed class DiscoveryEvidenceState
             SuccessfulHuntingMonthsByRegionId = new Dictionary<string, int>(SuccessfulHuntingMonthsByRegionId, StringComparer.Ordinal),
             MonthsSpentByRegionId = new Dictionary<string, int>(MonthsSpentByRegionId, StringComparer.Ordinal),
             WaterExposureMonthsByRegionId = new Dictionary<string, int>(WaterExposureMonthsByRegionId, StringComparer.Ordinal),
+            FaunaObservationMonthsByRegionId = new Dictionary<string, int>(FaunaObservationMonthsByRegionId, StringComparer.Ordinal),
+            FaunaThreatExposureMonthsByRegionId = new Dictionary<string, int>(FaunaThreatExposureMonthsByRegionId, StringComparer.Ordinal),
             RouteTraversalCountsByRouteId = new Dictionary<string, int>(RouteTraversalCountsByRouteId, StringComparer.Ordinal),
             MaterialExposureMonthsByResourceId = new Dictionary<string, int>(MaterialExposureMonthsByResourceId, StringComparer.Ordinal),
             MaterialUseMonthsByResourceId = new Dictionary<string, int>(MaterialUseMonthsByResourceId, StringComparer.Ordinal),

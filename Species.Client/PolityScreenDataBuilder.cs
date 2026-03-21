@@ -29,6 +29,7 @@ public static class PolityScreenDataBuilder
                 "Unknown",
                 "Unknown",
                 "Unknown",
+                "Unknown",
                 "None",
                 "None",
                 Array.Empty<PolityPressureItem>(),
@@ -71,7 +72,8 @@ public static class PolityScreenDataBuilder
             context.TotalPopulation.ToString("N0"),
             BuildFoodStoresSummary(context.FoodAccounting),
             BuildFoodBalanceSummary(context.FoodAccounting),
-            DescribeFoodCondition(context.FoodAccounting, snapshot.MaterialSurvival.FoodCondition),
+            DescribeFoodState(context.FoodAccounting, snapshot.MaterialSurvival),
+            DescribeLivingConditions(snapshot.MaterialSurvival),
             BuildMaterialSummary(context),
             pressures,
             snapshot.CurrentIssues,
@@ -126,19 +128,31 @@ public static class PolityScreenDataBuilder
         return $"{sign}{accounting.NetFoodChange:N0} / month";
     }
 
-    private static string DescribeFoodCondition(FoodAccountingSnapshot accounting, PolityConditionSeverity severity)
+    private static string DescribeFoodState(FoodAccountingSnapshot accounting, MaterialSurvivalAssessment material)
     {
         if (accounting.UnresolvedDeficit > 0)
         {
             return $"Deficit {accounting.UnresolvedDeficit:N0}";
         }
 
-        return severity switch
+        return material.FoodCondition switch
         {
             PolityConditionSeverity.Stable => "Stable",
             PolityConditionSeverity.Strained => "Strained",
             PolityConditionSeverity.Critical => "Critical",
             PolityConditionSeverity.Collapse => "Collapse",
+            _ => "Unknown"
+        };
+    }
+
+    private static string DescribeLivingConditions(MaterialSurvivalAssessment material)
+    {
+        return material.MaterialFragilityCondition switch
+        {
+            PolityConditionSeverity.Stable => "Stable",
+            PolityConditionSeverity.Strained => "Strained",
+            PolityConditionSeverity.Critical => "Failing",
+            PolityConditionSeverity.Collapse => "Collapsing",
             _ => "Unknown"
         };
     }
@@ -355,7 +369,8 @@ public static class PolityScreenDataBuilder
         var notes = new List<string>
         {
             $"Condition: {context.MaterialProduction.ConditionSummary}",
-            $"Support [Shelter {context.MaterialProduction.ShelterSupport} | Storage {context.MaterialProduction.StorageSupport} | Tools {context.MaterialProduction.ToolSupport} | Goods {context.MaterialProduction.TextileSupport}]"
+            $"Support [Shelter {context.MaterialProduction.ShelterSupport} | Storage {context.MaterialProduction.StorageSupport} | Tools {context.MaterialProduction.ToolSupport} | Goods {context.MaterialProduction.TextileSupport}]",
+            $"Deficit score: {context.MaterialProduction.DeficitScore} | Surplus score: {context.MaterialProduction.SurplusScore}"
         };
 
         if (context.MaterialSurplusMonths > 0)
@@ -488,7 +503,8 @@ public sealed record PolityScreenData(
     string Population,
     string FoodStores,
     string FoodBalance,
-    string FoodAccess,
+    string FoodState,
+    string LivingConditions,
     string MaterialStores,
     IReadOnlyList<PolityPressureItem> Pressures,
     IReadOnlyList<string> Alerts,

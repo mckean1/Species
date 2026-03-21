@@ -29,14 +29,18 @@ public enum GovernanceConditionBand
 
 public sealed record MaterialSurvivalAssessment(
     PolityConditionSeverity FoodCondition,
+    string FoodConditionReason,
     PolityConditionSeverity WaterCondition,
     PolityConditionSeverity ThreatCondition,
     PolityConditionSeverity CrowdingCondition,
     PolityConditionSeverity MigrationCondition,
+    PolityConditionSeverity MaterialFragilityCondition,
+    string MaterialFragilityReason,
     PolityConditionSeverity OverallSeverity,
     bool HasCriticalFoodWater,
     bool HasExtremeMigration,
-    bool HasMaterialShortage);
+    bool HasMaterialShortage,
+    bool NonFoodMaterialWeaknessAffectsOverall);
 
 public sealed record SpatialStabilityAssessment(
     PolityAnchoringKind AnchoringKind,

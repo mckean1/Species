@@ -4,6 +4,8 @@ namespace Species.Domain.Diagnostics;
 
 public static class SimulationTickFormatter
 {
+    private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
+
     public static string Format(SimulationTickResult tickResult)
     {
         var lines = new List<string>
@@ -24,7 +26,7 @@ public static class SimulationTickFormatter
         foreach (var change in tickResult.FaunaChanges)
         {
             lines.Add(
-                $"{change.RegionId} | {change.RegionName} | {change.FaunaSpeciesId} ({change.FaunaSpeciesName}) | {change.PreviousPopulation} -> {change.NewPopulation} | Births={change.Births} | Deaths=Attrition:{change.AttritionDeaths}/Starvation:{change.StarvationDeaths}/Total:{change.Deaths} | Needed={change.FoodNeeded:0.00} | Consumed={change.FoodConsumed:0.00} | Shortfall={change.FoodShortfall:0.00} | Fulfillment={change.FulfillmentRatio:0.00} | FoodState={change.FoodStressState} | Hunger={change.HungerPressure:0.00}/{change.ShortageMonths}m | Habitat={change.HabitatSupport:0.00} | MigrationPressure={change.MigrationPressure:0.00} | Migrated={change.MigratedOut} | Outcome={change.Outcome} | FloraConsumed=[{change.ConsumedFloraSummary}] | FaunaConsumed=[{change.ConsumedFaunaSummary}] | Cause={change.PrimaryCause}");
+                $"{change.RegionId} | {change.RegionName} | {change.FaunaSpeciesId} ({change.FaunaSpeciesName}) | {change.PreviousPopulation} -> {change.NewPopulation} | Births={change.Births} | Deaths=Attrition:{change.AttritionDeaths}/Starvation:{change.StarvationDeaths}/Total:{change.Deaths} | Needed={change.FoodNeeded:0.00} | Consumed={change.FoodConsumed:0.00} | Shortfall={change.FoodShortfall:0.00} | Fulfillment={change.FulfillmentRatio:0.00} | FoodState={change.FoodStressState} | Hunger={change.HungerPressure:0.00}/{change.ShortageMonths}m | Momentum={change.FeedingMomentum:0.00} | Stable={change.StableSupportMonths}m | Habitat={change.HabitatSupport:0.00} | MigrationPressure={change.MigrationPressure:0.00} | Migrated={change.MigratedOut} | Outcome={change.Outcome} | FloraConsumed=[{change.ConsumedFloraSummary}] | FaunaConsumed=[{change.ConsumedFaunaSummary}] | Cause={change.PrimaryCause}");
         }
 
         lines.Add(string.Empty);
@@ -70,6 +72,22 @@ public static class SimulationTickFormatter
         {
             lines.Add(
                 $"{change.GroupId} | {change.GroupName} | RelevantDiscoveries=[{change.RelevantDiscoveriesSummary}] | Learned=[{change.LearnedAdvancementsSummary}] | Evidence={change.EvidenceSummary} | Checks={change.CheckSummary} | Unlocked=[{change.UnlockedAdvancementsSummary}] | Effect={change.PracticalEffectSummary}");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("Polity Conditions:");
+
+        foreach (var polity in tickResult.World.Polities.OrderBy(polity => polity.Name, StringComparer.Ordinal))
+        {
+            var context = PolityData.BuildContext(tickResult.World, polity);
+            if (context?.LeadGroup is null)
+            {
+                continue;
+            }
+
+            var snapshot = PolityConditionEvaluator.Evaluate(tickResult.World, polity);
+            lines.Add(
+                $"{polity.Id} | {polity.Name} | FoodStores={context.FoodAccounting.StartingTotalStores}->{context.FoodAccounting.EndingTotalStores} | Net={context.FoodAccounting.NetFoodChange:+#;-#;0} | Deficit={context.FoodAccounting.UnresolvedDeficit} | FoodPressure=raw:{context.Pressures.Food.RawValue}/eff:{context.Pressures.Food.EffectiveValue}/display:{context.Pressures.Food.DisplayValue}/{context.Pressures.Food.SeverityLabel} | FoodCondition={snapshot.MaterialSurvival.FoodCondition} | FoodReason={snapshot.MaterialSurvival.FoodConditionReason} | LivingConditions={snapshot.MaterialSurvival.MaterialFragilityCondition} | LivingConditionsReason={snapshot.MaterialSurvival.MaterialFragilityReason} | NonFoodAffectsOverall={snapshot.MaterialSurvival.NonFoodMaterialWeaknessAffectsOverall} | Issue={snapshot.CurrentIssues.FirstOrDefault() ?? "None"} | Problem={snapshot.Problems.FirstOrDefault() ?? "None"}");
         }
 
         return string.Join(Environment.NewLine, lines);

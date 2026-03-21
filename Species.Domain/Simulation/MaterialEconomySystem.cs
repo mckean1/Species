@@ -431,10 +431,10 @@ public sealed class MaterialEconomySystem
             SurplusScore = surplusScore,
             DeficitScore = deficitScore,
             ConditionSummary = deficitScore >= 65
-                ? "Material shortages are straining durability."
+                ? "Material shortages are straining living conditions."
                 : surplusScore >= 45
-                    ? "Local materials are reinforcing polity stability."
-                    : "Material conditions are mixed but workable."
+                    ? "Local materials are helping keep living conditions stable."
+                    : "Living conditions are mixed but workable."
         };
     }
 

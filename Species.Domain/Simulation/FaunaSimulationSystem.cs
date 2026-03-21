@@ -56,9 +56,10 @@ public sealed class FaunaSimulationSystem
                 var foodShortfall = Math.Max(0.0f, foodNeeded - consumption.FoodConsumed);
                 var feedingMomentum = ResolveFeedingMomentum(profile.FeedingMomentum, fulfillmentRatio);
                 var hungerPressure = FoodStressModel.ResolveHungerPressure(profile.HungerPressure, fulfillmentRatio, FaunaSimulationConstants.HungerRiseRate, FaunaSimulationConstants.HungerDecayRate);
-                var shortageMonths = FoodStressModel.ResolveShortageMonths(profile.ShortageMonths, fulfillmentRatio);
-                var foodStressState = FoodStressModel.ResolveState(fulfillmentRatio, hungerPressure, shortageMonths);
-                var births = ResolveBirths(currentPopulation, species, habitatSupport, feedingMomentum, foodStressState);
+                var shortageMonths = ResolveShortageMonths(profile.ShortageMonths, fulfillmentRatio, habitatSupport);
+                var foodStressState = ResolveFoodStressState(fulfillmentRatio, hungerPressure, shortageMonths);
+                var stableSupportMonths = ResolveStableSupportMonths(profile.StableSupportMonths, fulfillmentRatio, habitatSupport, foodStressState);
+                var births = ResolveBirths(currentPopulation, species, habitatSupport, feedingMomentum, fulfillmentRatio, stableSupportMonths, foodStressState);
                 var deaths = ResolveDeaths(currentPopulation, species, hungerPressure, shortageMonths, habitatSupport, traits, foodStressState, fulfillmentRatio);
                 var postMortalityPopulation = Math.Max(0, currentPopulation + births - deaths.TotalDeaths);
                 var migrationPressure = ResolveMigrationPressure(species, hungerPressure, shortageMonths, foodStressState);
@@ -78,6 +79,7 @@ public sealed class FaunaSimulationSystem
                 profile.HungerPressure = hungerPressure;
                 profile.ShortageMonths = shortageMonths;
                 profile.FoodStressState = foodStressState;
+                profile.StableSupportMonths = stableSupportMonths;
                 profile.LastPopulation = finalPopulation;
                 profile.IsExtinct = finalPopulation <= 0;
                 profile.ViabilityScore = Math.Clamp((int)Math.Round((feedingMomentum * 55.0f) + (habitatSupport * 25.0f) + ((1.0f - hungerPressure) * 20.0f), MidpointRounding.AwayFromZero), 0, 100);
@@ -104,7 +106,9 @@ public sealed class FaunaSimulationSystem
                     FoodShortfall = MathF.Round(foodShortfall, 2),
                     FulfillmentRatio = MathF.Round(fulfillmentRatio, 2),
                     HungerPressure = MathF.Round(hungerPressure, 2),
+                    FeedingMomentum = MathF.Round(feedingMomentum, 2),
                     ShortageMonths = shortageMonths,
+                    StableSupportMonths = stableSupportMonths,
                     FoodStressState = foodStressState.ToString(),
                     HabitatSupport = MathF.Round(habitatSupport, 2),
                     BiologicalFit = MathF.Round(consumption.FoodSourceFit, 2),
@@ -180,7 +184,7 @@ public sealed class FaunaSimulationSystem
         var climateFit = ResolveClimateFit(region, traits);
         var mobilityFit = 0.82f + ((traits.Mobility / 100.0f) * 0.18f);
 
-        return Math.Clamp((fertilityFit * 0.26f) + (biomeFit * 0.24f) + (climateFit * 0.28f) + (mobilityFit * 0.10f) + (species.RegionalAbundance * 0.12f), 0.12f, 1.20f);
+        return Math.Clamp((fertilityFit * 0.28f) + (biomeFit * 0.20f) + (climateFit * 0.30f) + (mobilityFit * 0.10f) + (species.RegionalAbundance * 0.12f), 0.18f, 1.20f);
     }
 
     private static float ResolveRequiredIntake(FaunaSpeciesDefinition species, BiologicalTraitProfile traits)
@@ -542,43 +546,135 @@ public sealed class FaunaSimulationSystem
         return ClampNormalized(currentMomentum + ((fulfillmentRatio - currentMomentum) * rate));
     }
 
-    private static int ResolveBirths(int currentPopulation, FaunaSpeciesDefinition species, float habitatSupport, float feedingMomentum, FoodStressState foodStressState)
+    private static int ResolveShortageMonths(int currentShortageMonths, float fulfillmentRatio, float habitatSupport)
     {
-        if (feedingMomentum < FaunaSimulationConstants.ReproductionFedThreshold || foodStressState != FoodStressState.FedStable)
+        // Fauna should absorb brief mediocre months before shortage carryover escalates into collapse.
+        if (fulfillmentRatio >= 0.98f)
+        {
+            return Math.Max(0, currentShortageMonths - 2);
+        }
+
+        if (fulfillmentRatio >= 0.90f)
+        {
+            return habitatSupport >= 0.50f
+                ? Math.Max(0, currentShortageMonths - 1)
+                : currentShortageMonths;
+        }
+
+        if (fulfillmentRatio >= 0.78f)
+        {
+            return currentShortageMonths + (habitatSupport < FaunaSimulationConstants.ReproductionHabitatThreshold ? 1 : 0);
+        }
+
+        if (fulfillmentRatio >= 0.55f)
+        {
+            return currentShortageMonths + 1;
+        }
+
+        if (fulfillmentRatio >= 0.25f)
+        {
+            return currentShortageMonths + 2;
+        }
+
+        return currentShortageMonths + 3;
+    }
+
+    private static FoodStressState ResolveFoodStressState(float fulfillmentRatio, float hungerPressure, int shortageMonths)
+    {
+        if (fulfillmentRatio <= 0.10f || hungerPressure >= 0.94f || shortageMonths >= 6)
+        {
+            return FoodStressState.Starvation;
+        }
+
+        if (fulfillmentRatio < 0.45f || hungerPressure >= 0.72f || shortageMonths >= 4)
+        {
+            return FoodStressState.SevereShortage;
+        }
+
+        if (fulfillmentRatio < 0.88f || hungerPressure >= 0.24f || shortageMonths >= 1)
+        {
+            return FoodStressState.HungerPressure;
+        }
+
+        return FoodStressState.FedStable;
+    }
+
+    private static int ResolveStableSupportMonths(int currentStableSupportMonths, float fulfillmentRatio, float habitatSupport, FoodStressState foodStressState)
+    {
+        if (foodStressState == FoodStressState.FedStable)
+        {
+            return currentStableSupportMonths + 1;
+        }
+
+        if (foodStressState == FoodStressState.HungerPressure &&
+            fulfillmentRatio >= 0.82f &&
+            habitatSupport >= FaunaSimulationConstants.ReproductionHabitatThreshold)
+        {
+            return currentStableSupportMonths + 1;
+        }
+
+        return Math.Max(0, currentStableSupportMonths - 1);
+    }
+
+    private static int ResolveBirths(
+        int currentPopulation,
+        FaunaSpeciesDefinition species,
+        float habitatSupport,
+        float feedingMomentum,
+        float fulfillmentRatio,
+        int stableSupportMonths,
+        FoodStressState foodStressState)
+    {
+        if (currentPopulation <= 0 ||
+            foodStressState is FoodStressState.SevereShortage or FoodStressState.Starvation ||
+            habitatSupport < FaunaSimulationConstants.ReproductionHabitatThreshold ||
+            fulfillmentRatio < 0.75f)
         {
             return 0;
         }
 
-        var momentumExcess = (feedingMomentum - FaunaSimulationConstants.ReproductionFedThreshold) /
-                             Math.Max(0.01f, 1.0f - FaunaSimulationConstants.ReproductionFedThreshold);
-        var reproductionFactor = species.ReproductionRate *
-                                 Math.Clamp(momentumExcess, 0.0f, 1.0f) *
-                                 habitatSupport *
-                                 FaunaSimulationConstants.ReproductionWeight;
+        var momentumFactor = Math.Clamp(
+            (feedingMomentum - FaunaSimulationConstants.ReproductionFedThreshold) /
+            Math.Max(0.01f, 1.0f - FaunaSimulationConstants.ReproductionFedThreshold),
+            0.0f,
+            1.0f);
+        var fulfillmentFactor = Math.Clamp((fulfillmentRatio - 0.75f) / 0.25f, 0.0f, 1.0f);
+        var habitatFactor = Math.Clamp((habitatSupport - FaunaSimulationConstants.ReproductionHabitatThreshold) / 0.55f, 0.18f, 1.0f);
+        var stabilityFactor = Math.Clamp(0.65f + (stableSupportMonths * 0.08f), 0.65f, 1.0f);
+        var stressFactor = foodStressState == FoodStressState.FedStable ? 1.0f : 0.55f;
+        var reproductionReadiness = (momentumFactor * 0.50f) + (fulfillmentFactor * 0.32f) + (habitatFactor * 0.18f);
+        var reproductionFactor = species.ReproductionRate * reproductionReadiness * habitatFactor * stabilityFactor * stressFactor * FaunaSimulationConstants.ReproductionWeight;
         return Math.Max(0, (int)MathF.Round(currentPopulation * reproductionFactor, MidpointRounding.AwayFromZero));
     }
 
     private static DeathBreakdown ResolveDeaths(int currentPopulation, FaunaSpeciesDefinition species, float hungerPressure, int shortageMonths, float habitatSupport, BiologicalTraitProfile traits, FoodStressState foodStressState, float usableFoodRatio)
     {
         var attritionRate = Math.Max(0.0f, hungerPressure - FaunaSimulationConstants.MortalityHungerThreshold) * species.MortalitySensitivity * FaunaSimulationConstants.HungerMortalityWeight;
-        attritionRate += shortageMonths * FaunaSimulationConstants.ShortageMortalityWeight * species.MortalitySensitivity;
-        attritionRate += Math.Max(0.0f, 0.35f - habitatSupport) * species.PredatorVulnerability * FaunaSimulationConstants.PredatorRiskPenaltyWeight;
+        attritionRate += ResolveShortageMortalityRate(shortageMonths) * species.MortalitySensitivity;
+        attritionRate += Math.Max(0.0f, 0.28f - habitatSupport) * species.PredatorVulnerability * FaunaSimulationConstants.PredatorRiskPenaltyWeight;
         var starvationRate = 0.0f;
 
         if (foodStressState == FoodStressState.SevereShortage)
         {
             starvationRate += FaunaSimulationConstants.SevereShortageMortalityWeight * species.MortalitySensitivity;
+            starvationRate += Math.Max(0, shortageMonths - 4) * 0.01f;
         }
         else if (foodStressState == FoodStressState.Starvation)
         {
             starvationRate += FaunaSimulationConstants.StarvationMortalityWeight * species.MortalitySensitivity;
+            starvationRate += Math.Max(0, shortageMonths - 6) * 0.02f;
             if (usableFoodRatio <= 0.05f)
             {
                 starvationRate += FaunaSimulationConstants.NoFoodMortalityBonus;
             }
         }
 
-        var resilienceFactor = 0.92f + ((100 - traits.Resilience) / 100.0f * 0.18f);
+        if (foodStressState == FoodStressState.HungerPressure && usableFoodRatio >= 0.75f)
+        {
+            attritionRate *= 0.70f;
+        }
+
+        var resilienceFactor = 0.86f + ((100 - traits.Resilience) / 100.0f * 0.18f);
         attritionRate *= resilienceFactor;
         starvationRate *= resilienceFactor;
 
@@ -603,6 +699,19 @@ public sealed class FaunaSimulationSystem
         return new DeathBreakdown(attritionDeaths, starvationDeaths);
     }
 
+    private static float ResolveShortageMortalityRate(int shortageMonths)
+    {
+        return shortageMonths switch
+        {
+            <= 1 => 0.0f,
+            2 => FaunaSimulationConstants.ShortageMortalityWeight * 0.50f,
+            3 => FaunaSimulationConstants.ShortageMortalityWeight,
+            4 => FaunaSimulationConstants.ShortageMortalityWeight * 1.60f,
+            5 => FaunaSimulationConstants.ShortageMortalityWeight * 2.20f,
+            _ => FaunaSimulationConstants.ShortageMortalityWeight * 2.80f
+        };
+    }
+
     private static float ResolveMigrationPressure(
         FaunaSpeciesDefinition species,
         float hungerPressure,
@@ -621,11 +730,15 @@ public sealed class FaunaSimulationSystem
             _ => 0.0f
         };
 
-        return ClampNormalized(
-            (hungerPressure * FaunaSimulationConstants.MigrationPressureHungerWeight) +
-            (Math.Min(shortageMonths, 4) * FaunaSimulationConstants.MigrationPressureShortageWeight) +
-            stressBonus +
-            (species.Mobility * 0.12f));
+        var hungerPressureContribution = Math.Max(0.0f, hungerPressure - 0.28f) * FaunaSimulationConstants.MigrationPressureHungerWeight;
+        var shortageContribution = Math.Max(0, shortageMonths - 1) * FaunaSimulationConstants.MigrationPressureShortageWeight;
+        var ecologicalPressure = hungerPressureContribution + shortageContribution + stressBonus;
+        if (foodStressState == FoodStressState.HungerPressure && shortageMonths < FaunaSimulationConstants.MigrationShortageMonthsThreshold)
+        {
+            ecologicalPressure *= 0.70f;
+        }
+
+        return ClampNormalized(ecologicalPressure * (0.78f + (species.Mobility * 0.22f)));
     }
 
     private static MigrationPlan ResolveMigration(
@@ -662,8 +775,8 @@ public sealed class FaunaSimulationSystem
 
         var share = Math.Min(
             FaunaSimulationConstants.MigrationShareCap,
-            (migrationPressure * 0.24f) +
-            (Math.Min(shortageMonths, 4) * 0.03f) +
+            (Math.Max(0.0f, migrationPressure - 0.35f) * 0.18f) +
+            (Math.Max(0, shortageMonths - 3) * 0.02f) +
             (species.Mobility * FaunaSimulationConstants.MigrationShareWeight));
         var migratedPopulation = Math.Min(
             populationAfterMortality - 1,

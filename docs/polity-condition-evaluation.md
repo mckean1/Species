@@ -15,15 +15,16 @@ Each polity is finalized in this order:
 
 The implementation lives in `Species.Domain/Simulation/PolityConditionEvaluator.cs`.
 
-## Material Survival
+## Material Survival and Living Conditions
 
-Material survival uses current effective pressure values plus material production deficits and shortage state. Display values may remain capped for presentation, but the evaluator uses the underlying simulation-facing condition bands to classify:
+Material survival uses current effective pressure values plus material production deficits and shortage state. In player-facing presentation, the non-food material condition is shown as **Living Conditions**. Display values may remain capped for presentation, but the evaluator uses the underlying simulation-facing condition bands to classify:
 
 - Food condition
 - Water condition
 - Threat condition
 - Crowding condition
 - Migration condition
+- Living conditions
 - Overall severity
 
 Food, water, and migration pressure are load-bearing inputs for all later condition checks.
