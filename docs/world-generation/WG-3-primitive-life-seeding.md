@@ -134,11 +134,17 @@ Primitive flora characteristics:
 - staple food or general-purpose biomass providers
 - not specialized or narrow-niche species
 
-Current primitive flora species:
+Current primitive flora seed roles:
 
-- `flora-grass` - foundational grassland/plains flora
-- `flora-shrub` - hardy, drought-tolerant baseline vegetation
-- `flora-reed` - wetland foundational flora
+- `GroundCover` - foundational baseline plant cover for open habitable regions
+- `HardyBrush` - tougher low-water baseline vegetation
+- `WetlandGrowth` - primitive wetland producer role
+
+Current starter catalog species opt into those roles through primitive seed metadata:
+
+- `flora-grass` currently fills `GroundCover`
+- `flora-shrub` currently fills `HardyBrush`
+- `flora-reed` currently fills `WetlandGrowth`
 
 Non-primitive flora (seeded later through simulation):
 
@@ -160,9 +166,13 @@ Primitive fauna characteristics:
 - not apex predators or specialized carnivores
 - not rare or high-complexity species
 
-Current primitive fauna species:
+Current primitive fauna seed roles:
 
-- `fauna-small-grazer` - foundational herbivore, eats primitive flora
+- `PrimaryHerbivore` - foundational herbivore role that can establish on primitive flora support
+
+Current starter catalog species opt into that role through primitive seed metadata:
+
+- `fauna-small-grazer` currently fills `PrimaryHerbivore`
 
 Non-primitive fauna (seeded later through simulation):
 
@@ -281,13 +291,12 @@ This ensures:
 
 ### 5.4 Species-specific physical filtering
 
-Each primitive species has habitat requirements:
+Each primitive candidate now combines two layers of metadata:
 
-- `SupportedWaterAvailabilities` - species will not seed in incompatible water regimes
-- `CoreBiomes` - species seed more strongly in core biomes
-- `HabitatFertilityMin/Max` - species seed more strongly in preferred fertility ranges
+- base species habitat fields such as `SupportedWaterAvailabilities`, `CoreBiomes`, and `HabitatFertilityMin/Max`
+- primitive seed metadata such as `Role`, optional `Priority`, optional temperature/terrain filters, and for fauna, supported primitive food roles
 
-These constraints are inherited from the existing species definition model and remain valid for primitive seeding.
+Candidate selection stays physically grounded by scoring fit against the current region's water, biome, fertility, temperature, and terrain before any population is seeded.
 
 ## 6. Seed-to-Simulation Handoff
 
@@ -364,7 +373,7 @@ Later phases will add:
 
 ### 7.2 Tightened elements
 
-- **Species seeding scope** - narrowed to primitive species only
+- **Species seeding scope** - narrowed to primitive seed candidates exposed through species metadata rather than hard-coded catalog IDs
 - **Seeding abundance** - reduced to 30-60% (flora) and 20-40% (fauna) of maximum viable levels
 - **ProtoLifeSubstrate → PrimitiveLifeSubstrate** - renamed and reconceptualized as the canonical primitive organic foundation rather than a post-hoc derived metric
 
@@ -374,11 +383,11 @@ The following elements remain transitional and are marked for future cleanup:
 
 #### Species catalog structure
 
-The current `FloraSpeciesCatalog` and `FaunaSpeciesCatalog` do not distinguish primitive from non-primitive species at the catalog level.
+`FloraSpeciesCatalog` and `FaunaSpeciesCatalog` now expose primitive seed candidates by metadata-defined role.
 
-WG-3 handles this by checking species characteristics (habitat tolerance, abundance, diet simplicity) during seeding.
+This removes the brittle worldgen dependency on exact species IDs while keeping WG-3 intentionally small. The current model is still transitional because it only supports a compact set of startup seed roles rather than a full ecology trait system.
 
-A future phase may add explicit `IsPrimitive` or `EmergenceTier` metadata to species definitions for cleaner primitive/non-primitive separation.
+Future phases may broaden this into richer emergence tiers or ecology traits if the simulation actually needs them.
 
 #### Regional biological profiles
 

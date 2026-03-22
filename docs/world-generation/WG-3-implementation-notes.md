@@ -18,15 +18,53 @@ WG-3 has been implemented to establish the canonical primitive life seeding mode
 - Sapient spawning is **removed** from world generation
 - World starts with 3-4 primitive species total and **no sapients**
 
+## Primitive Seed Candidate Refactor
+
+WG-3 no longer identifies primitive species through hard-coded catalog IDs inside `PrimitiveLifeSeeder`.
+
+### Why the old approach was weak
+
+- seeding logic depended on literals such as `flora-grass` and `fauna-small-grazer`
+- worldgen was tightly coupled to the current starter catalog naming
+- adding or swapping equivalent starter species required code changes instead of species data changes
+
+### New metadata model
+
+Species definitions can now opt into primitive seeding with `PrimitiveSeedMetadata`:
+
+- `Role` - the primitive seed role the species can fulfill
+- `Priority` - optional ordering when multiple candidates fit the same role
+- `SupportedTemperatureBands` - optional primitive-start temperature filter
+- `SupportedTerrainRuggednesses` - optional primitive-start terrain filter
+- `SupportedFoodRoles` - fauna-only primitive food-role support
+
+`PrimitiveSeedRole` is intentionally small. WG-3 currently uses:
+
+- `GroundCover`
+- `HardyBrush`
+- `WetlandGrowth`
+- `PrimaryHerbivore`
+
+### Candidate selection flow
+
+1. `PrimitiveLifeSeeder` asks the flora/fauna catalogs for candidates matching a primitive seed role.
+2. Candidates are scored against the region's fertility, water, biome, temperature, and terrain.
+3. Ties are resolved by metadata priority, then by stable species ordering.
+4. Fauna candidates also require primitive flora support from compatible primitive food roles.
+
+This keeps WG-3 aggregate-first while removing brittle ID coupling.
+
 ### Primitive Species
 
-**Primitive Flora** (seeded at world start):
-- `flora-grass` - foundational grassland flora
-- `flora-shrub` - hardy drought-tolerant vegetation
-- `flora-reed` - wetland foundational flora
+**Primitive Flora Roles** (seeded at world start):
+- `GroundCover`
+- `HardyBrush`
+- `WetlandGrowth`
 
-**Primitive Fauna** (seeded at world start):
-- `fauna-small-grazer` - foundational herbivore
+**Primitive Fauna Roles** (seeded at world start):
+- `PrimaryHerbivore`
+
+The current starter catalog still maps those roles to the same baseline species, but that mapping now lives in data.
 
 **Non-Primitive Species** (not seeded at world start):
 - `flora-berry-bush`, `flora-moss` - will need emergence mechanics in future

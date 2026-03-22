@@ -12,18 +12,16 @@ namespace Species.Domain.Generation;
 /// </summary>
 public static class PrimitiveLifeSeeder
 {
-    // Primitive flora species - hardy, widespread baseline plants
-    private static readonly HashSet<string> PrimitiveFloraSpeciesIds =
+    private static readonly PrimitiveSeedRole[] PrimitiveFloraRoles =
     [
-        "flora-grass",
-        "flora-shrub",
-        "flora-reed"
+        PrimitiveSeedRole.GroundCover,
+        PrimitiveSeedRole.HardyBrush,
+        PrimitiveSeedRole.WetlandGrowth
     ];
 
-    // Primitive fauna species - foundational herbivores that can survive on primitive flora
-    private static readonly HashSet<string> PrimitiveFaunaSpeciesIds =
+    private static readonly PrimitiveSeedRole[] PrimitiveFaunaRoles =
     [
-        "fauna-small-grazer"
+        PrimitiveSeedRole.PrimaryHerbivore
     ];
 
     // Conservative seeding targets - primitive life is a foothold, not saturation
@@ -39,8 +37,9 @@ public static class PrimitiveLifeSeeder
         Random random)
     {
         var primitiveCapacity = CalculatePrimitiveCapacity(region);
-        var floraPopulations = SeedPrimitiveFlora(region, floraCatalog, random);
-        var faunaPopulations = SeedPrimitiveFauna(region, floraPopulations, floraCatalog, faunaCatalog, random);
+        var floraSeed = SeedPrimitiveFlora(region, floraCatalog, random);
+        var faunaPopulations = SeedPrimitiveFauna(region, floraSeed.RoleSupports, faunaCatalog, random);
+        var floraPopulations = floraSeed.Populations;
         var primitiveStrength = CalculatePrimitiveStrength(floraPopulations, faunaPopulations);
         var primitiveSubstrate = new PrimitiveLifeSubstrate
         {
@@ -151,57 +150,107 @@ public static class PrimitiveLifeSeeder
         return (floraStrength, faunaStrength);
     }
 
-    private static IReadOnlyDictionary<string, int> SeedPrimitiveFlora(
+    private static (IReadOnlyDictionary<string, int> Populations, IReadOnlyDictionary<PrimitiveSeedRole, float> RoleSupports) SeedPrimitiveFlora(
         Region region,
         FloraSpeciesCatalog floraCatalog,
         Random random)
     {
         var populations = new Dictionary<string, int>(StringComparer.Ordinal);
+        var roleSupports = new Dictionary<PrimitiveSeedRole, float>();
 
-        foreach (var species in floraCatalog.Definitions.Where(s => PrimitiveFloraSpeciesIds.Contains(s.Id)))
+        foreach (var role in PrimitiveFloraRoles)
         {
+            var species = SelectPrimitiveFloraCandidate(region, floraCatalog, role);
+            if (species is null)
+            {
+                continue;
+            }
+
             var abundance = GetFloraAbundance(region, species, random);
             if (abundance < EcologySeedingConstants.MinimumSeededPopulation)
             {
                 continue;
             }
 
-            // Scale down to primitive seeding range
             var primitiveAbundance = abundance * random.NextSingle(PrimitiveFloraMinAbundance, PrimitiveFloraMaxAbundance);
+            var population = ToPopulationCount(primitiveAbundance);
+            populations[species.Id] = population;
+            roleSupports[role] = population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, species);
+        }
+
+        return (populations, roleSupports);
+    }
+
+    private static FloraSpeciesDefinition? SelectPrimitiveFloraCandidate(
+        Region region,
+        FloraSpeciesCatalog floraCatalog,
+        PrimitiveSeedRole role)
+    {
+        return floraCatalog.GetPrimitiveSeedCandidates(role)
+            .Select(species => new
+            {
+                Species = species,
+                Fit = GetPrimitiveEnvironmentalFit(region, species.HabitatFertilityMin, species.HabitatFertilityMax, species.CoreBiomes, species.SupportedWaterAvailabilities, species.PrimitiveSeedMetadata)
+            })
+            .Where(candidate => candidate.Fit > 0.0f)
+            .OrderByDescending(candidate => candidate.Fit)
+            .ThenByDescending(candidate => candidate.Species.PrimitiveSeedMetadata?.Priority ?? 0)
+            .ThenByDescending(candidate => candidate.Species.RegionalAbundance)
+            .ThenBy(candidate => candidate.Species.Id, StringComparer.Ordinal)
+            .Select(candidate => candidate.Species)
+            .FirstOrDefault();
+    }
+
+    private static IReadOnlyDictionary<string, int> SeedPrimitiveFauna(
+        Region region,
+        IReadOnlyDictionary<PrimitiveSeedRole, float> floraRoleSupports,
+        FaunaSpeciesCatalog faunaCatalog,
+        Random random)
+    {
+        var populations = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var role in PrimitiveFaunaRoles)
+        {
+            var species = SelectPrimitiveFaunaCandidate(region, floraRoleSupports, faunaCatalog, role);
+            if (species is null)
+            {
+                continue;
+            }
+
+            var abundance = GetFaunaAbundance(region, species, floraRoleSupports, random);
+            if (abundance < EcologySeedingConstants.MinimumSeededPopulation)
+            {
+                continue;
+            }
+
+            var primitiveAbundance = abundance * random.NextSingle(PrimitiveFaunaMinAbundance, PrimitiveFaunaMaxAbundance);
             populations[species.Id] = ToPopulationCount(primitiveAbundance);
         }
 
         return populations;
     }
 
-    private static IReadOnlyDictionary<string, int> SeedPrimitiveFauna(
+    private static FaunaSpeciesDefinition? SelectPrimitiveFaunaCandidate(
         Region region,
-        IReadOnlyDictionary<string, int> floraPopulations,
-        FloraSpeciesCatalog floraCatalog,
+        IReadOnlyDictionary<PrimitiveSeedRole, float> floraRoleSupports,
         FaunaSpeciesCatalog faunaCatalog,
-        Random random)
+        PrimitiveSeedRole role)
     {
-        var populations = new Dictionary<string, int>(StringComparer.Ordinal);
-
-        foreach (var species in faunaCatalog.Definitions.Where(s => PrimitiveFaunaSpeciesIds.Contains(s.Id)))
-        {
-            if (!species.SupportedWaterAvailabilities.Contains(region.WaterAvailability))
+        return faunaCatalog.GetPrimitiveSeedCandidates(role)
+            .Select(species => new
             {
-                continue;
-            }
-
-            var abundance = GetFaunaAbundance(region, species, floraPopulations, floraCatalog, random);
-            if (abundance < EcologySeedingConstants.MinimumSeededPopulation)
-            {
-                continue;
-            }
-
-            // Scale down to primitive seeding range
-            var primitiveAbundance = abundance * random.NextSingle(PrimitiveFaunaMinAbundance, PrimitiveFaunaMaxAbundance);
-            populations[species.Id] = ToPopulationCount(primitiveAbundance);
-        }
-
-        return populations;
+                Species = species,
+                Fit = GetPrimitiveEnvironmentalFit(region, species.HabitatFertilityMin, species.HabitatFertilityMax, species.CoreBiomes, species.SupportedWaterAvailabilities, species.PrimitiveSeedMetadata),
+                Support = ResolveSeedDietSupport(species, floraRoleSupports)
+            })
+            .Where(candidate => candidate.Fit > 0.0f && candidate.Support > 0.0f)
+            .OrderByDescending(candidate => candidate.Fit)
+            .ThenByDescending(candidate => candidate.Support)
+            .ThenByDescending(candidate => candidate.Species.PrimitiveSeedMetadata?.Priority ?? 0)
+            .ThenByDescending(candidate => candidate.Species.RegionalAbundance)
+            .ThenBy(candidate => candidate.Species.Id, StringComparer.Ordinal)
+            .Select(candidate => candidate.Species)
+            .FirstOrDefault();
     }
 
     private static float GetFloraAbundance(
@@ -244,15 +293,14 @@ public static class PrimitiveLifeSeeder
     private static float GetFaunaAbundance(
         Region region,
         FaunaSpeciesDefinition species,
-        IReadOnlyDictionary<string, int> floraPopulations,
-        FloraSpeciesCatalog floraCatalog,
+        IReadOnlyDictionary<PrimitiveSeedRole, float> floraRoleSupports,
         Random random)
     {
         var fertilityFit = GetFertilityFit((float)region.Fertility, species.HabitatFertilityMin, species.HabitatFertilityMax);
         var biomeMultiplier = species.CoreBiomes.Contains(region.Biome)
             ? 1.0f
             : EcologySeedingConstants.FaunaNonCoreBiomeMultiplier;
-        var support = ResolveSeedDietSupport(region, species, floraPopulations, floraCatalog);
+        var support = ResolveSeedDietSupport(species, floraRoleSupports);
         var supportFactor = ClampNormalized(ToPopulationSupport(support));
         var variance = 1.0f + NextSignedVariance(random, EcologySeedingConstants.FaunaRandomVarianceRange);
         var carryingSupport = Math.Clamp(
@@ -278,46 +326,68 @@ public static class PrimitiveLifeSeeder
     }
 
     private static float ResolveSeedDietSupport(
-        Region region,
         FaunaSpeciesDefinition species,
-        IReadOnlyDictionary<string, int> floraPopulations,
-        FloraSpeciesCatalog floraCatalog)
+        IReadOnlyDictionary<PrimitiveSeedRole, float> floraRoleSupports)
     {
-        var totalWeight = species.DietLinks.Sum(link => link.Weight);
-        if (totalWeight <= 0.0f)
+        var supportedRoles = species.PrimitiveSeedMetadata?.SupportedFoodRoles;
+        if (supportedRoles is null || supportedRoles.Count == 0)
         {
             return 0.0f;
         }
 
         var support = 0.0f;
-        foreach (var link in species.DietLinks)
+        foreach (var role in supportedRoles.Distinct())
         {
-            var share = link.Weight / totalWeight;
-            var linkSupport = link.TargetKind switch
+            if (floraRoleSupports.TryGetValue(role, out var roleSupport))
             {
-                FaunaDietTargetKind.FloraSpecies => ResolveSeedFloraSupport(region, link.TargetSpeciesId, floraPopulations, floraCatalog) * EcologySeedingConstants.HerbivoreFloraSupportMultiplier,
-                _ => 0.0f // Primitive fauna are herbivores only - no prey or scavenge support at world start
-            };
-
-            support += linkSupport * share;
+                support += roleSupport * EcologySeedingConstants.HerbivoreFloraSupportMultiplier;
+            }
         }
 
         return support;
     }
 
-    private static float ResolveSeedFloraSupport(
+    private static float GetPrimitiveEnvironmentalFit(
         Region region,
-        string floraSpeciesId,
-        IReadOnlyDictionary<string, int> floraPopulations,
-        FloraSpeciesCatalog floraCatalog)
+        float habitatFertilityMin,
+        float habitatFertilityMax,
+        IReadOnlyList<Biome> coreBiomes,
+        IReadOnlyList<WaterAvailability> supportedWaterAvailabilities,
+        PrimitiveSeedMetadata? seedMetadata)
     {
-        if (!floraPopulations.TryGetValue(floraSpeciesId, out var population))
+        if (seedMetadata is null)
         {
             return 0.0f;
         }
 
-        var flora = floraCatalog.GetById(floraSpeciesId);
-        return flora is null ? 0.0f : population * SubsistenceSupportModel.ResolveFloraSupportPerPopulation(region, flora);
+        var fertilityFit = GetFertilityFit((float)region.Fertility, habitatFertilityMin, habitatFertilityMax);
+        var waterFit = supportedWaterAvailabilities.Contains(region.WaterAvailability) ? 1.0f : 0.0f;
+        if (waterFit <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        var biomeFit = coreBiomes.Contains(region.Biome)
+            ? 1.0f
+            : 0.45f;
+        var temperatureFit = seedMetadata.SupportedTemperatureBands.Count == 0 || seedMetadata.SupportedTemperatureBands.Contains(region.TemperatureBand)
+            ? 1.0f
+            : 0.0f;
+        var terrainFit = seedMetadata.SupportedTerrainRuggednesses.Count == 0 || seedMetadata.SupportedTerrainRuggednesses.Contains(region.TerrainRuggedness)
+            ? 1.0f
+            : 0.0f;
+
+        if (temperatureFit <= 0.0f || terrainFit <= 0.0f)
+        {
+            return 0.0f;
+        }
+
+        return ClampNormalized(
+            (fertilityFit * 0.30f) +
+            (waterFit * 0.24f) +
+            (biomeFit * 0.22f) +
+            (temperatureFit * 0.14f) +
+            (terrainFit * 0.10f));
     }
 
     private static float GetFertilityFit(float fertility, float preferredMin, float preferredMax)

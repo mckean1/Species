@@ -22,6 +22,11 @@ public sealed class FaunaSpeciesCatalog
         return definitionsById.GetValueOrDefault(id);
     }
 
+    public IEnumerable<FaunaSpeciesDefinition> GetPrimitiveSeedCandidates(PrimitiveSeedRole role)
+    {
+        return definitions.Where(definition => definition.PrimitiveSeedMetadata?.Role == role);
+    }
+
     public void AddOrReplace(FaunaSpeciesDefinition definition)
     {
         definitionsById[definition.Id] = definition;
@@ -63,6 +68,14 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.76f,
                 Conspicuousness = 0.56f,
                 FoodYield = 0.35f,
+                PrimitiveSeedMetadata = new PrimitiveSeedMetadata
+                {
+                    Role = PrimitiveSeedRole.PrimaryHerbivore,
+                    Priority = 100,
+                    SupportedTemperatureBands = [TemperatureBand.Cold, TemperatureBand.Temperate, TemperatureBand.Hot],
+                    SupportedTerrainRuggednesses = [TerrainRuggedness.Flat, TerrainRuggedness.Rolling],
+                    SupportedFoodRoles = [PrimitiveSeedRole.GroundCover, PrimitiveSeedRole.HardyBrush, PrimitiveSeedRole.WetlandGrowth]
+                },
                 Tags = [FaunaTag.SmallPrey, FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {

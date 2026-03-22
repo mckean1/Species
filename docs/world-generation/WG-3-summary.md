@@ -40,15 +40,21 @@ Retained for backward compatibility with existing simulation systems. Will be ph
 
 **New Seeder:** `Species.Domain/Generation/PrimitiveLifeSeeder.cs`
 
-Seeds only primitive species at world start:
+Seeds only primitive seed candidates at world start:
 
-**Primitive Flora:**
-- `flora-grass` (30-60% abundance)
-- `flora-shrub` (30-60% abundance)
-- `flora-reed` (30-60% abundance)
+- worldgen now queries catalogs for species that opt into primitive seeding metadata
+- selection is resolved by primitive seed role, environmental fit, and priority ordering
+- worldgen no longer depends on exact species IDs embedded in the seeder
 
-**Primitive Fauna:**
-- `fauna-small-grazer` (20-40% abundance)
+**Primitive Flora Roles:**
+- `GroundCover`
+- `HardyBrush`
+- `WetlandGrowth`
+
+**Primitive Fauna Roles:**
+- `PrimaryHerbivore`
+
+Current starter catalog entries still map to the same baseline species, but that mapping now lives in species metadata instead of hard-coded seeder literals.
 
 **Non-Primitive Species:**
 - NOT seeded at world start
@@ -115,12 +121,18 @@ This is the **correct** causal sequence.
 3. `docs/world-generation/WG-3-summary.md` - this file
 4. `Species.Domain/Models/PrimitiveLifeSubstrate.cs` - primitive life model
 5. `Species.Domain/Generation/PrimitiveLifeSeeder.cs` - primitive life seeding implementation
+6. `Species.Domain/Models/PrimitiveSeedMetadata.cs` - primitive seeding metadata block
+7. `Species.Domain/Enums/PrimitiveSeedRole.cs` - primitive seeding role definitions
 
 ## Files Modified
 
 1. `Species.Domain/Models/RegionEcosystem.cs` - added `PrimitiveLifeSubstrate`
 2. `Species.Domain/Generation/WorldGenerator.cs` - use primitive seeder, remove sapient spawning
 3. `Species.Domain/Generation/RegionEcosystemSeeder.cs` - marked as transitional
+4. `Species.Domain/Models/FloraSpeciesDefinition.cs` - added primitive seed metadata
+5. `Species.Domain/Models/FaunaSpeciesDefinition.cs` - added primitive seed metadata
+6. `Species.Domain/Catalogs/FloraSpeciesCatalog.cs` - added primitive candidate queries and starter metadata
+7. `Species.Domain/Catalogs/FaunaSpeciesCatalog.cs` - added primitive candidate queries and starter metadata
 
 ---
 

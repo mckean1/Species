@@ -22,6 +22,11 @@ public sealed class FloraSpeciesCatalog
         return definitionsById.GetValueOrDefault(id);
     }
 
+    public IEnumerable<FloraSpeciesDefinition> GetPrimitiveSeedCandidates(PrimitiveSeedRole role)
+    {
+        return definitions.Where(definition => definition.PrimitiveSeedMetadata?.Role == role);
+    }
+
     public void AddOrReplace(FloraSpeciesDefinition definition)
     {
         definitionsById[definition.Id] = definition;
@@ -54,6 +59,13 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.84f,
                 RegionalAbundance = 0.88f,
                 Conspicuousness = 0.62f,
+                PrimitiveSeedMetadata = new PrimitiveSeedMetadata
+                {
+                    Role = PrimitiveSeedRole.GroundCover,
+                    Priority = 100,
+                    SupportedTemperatureBands = [TemperatureBand.Temperate, TemperatureBand.Hot],
+                    SupportedTerrainRuggednesses = [TerrainRuggedness.Flat, TerrainRuggedness.Rolling]
+                },
                 Tags = [FloraTag.Edible, FloraTag.StapleFood],
                 BaselineTraits = new BiologicalTraitProfile
                 {
@@ -83,6 +95,13 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.56f,
                 RegionalAbundance = 0.58f,
                 Conspicuousness = 0.48f,
+                PrimitiveSeedMetadata = new PrimitiveSeedMetadata
+                {
+                    Role = PrimitiveSeedRole.HardyBrush,
+                    Priority = 90,
+                    SupportedTemperatureBands = [TemperatureBand.Cold, TemperatureBand.Temperate, TemperatureBand.Hot],
+                    SupportedTerrainRuggednesses = [TerrainRuggedness.Flat, TerrainRuggedness.Rolling, TerrainRuggedness.Rugged]
+                },
                 Tags = [FloraTag.Edible, FloraTag.EmergencyFood, FloraTag.FiberSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
@@ -112,6 +131,13 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.74f,
                 RegionalAbundance = 0.72f,
                 Conspicuousness = 0.54f,
+                PrimitiveSeedMetadata = new PrimitiveSeedMetadata
+                {
+                    Role = PrimitiveSeedRole.WetlandGrowth,
+                    Priority = 95,
+                    SupportedTemperatureBands = [TemperatureBand.Temperate, TemperatureBand.Hot],
+                    SupportedTerrainRuggednesses = [TerrainRuggedness.Flat, TerrainRuggedness.Rolling]
+                },
                 Tags = [FloraTag.FiberSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {

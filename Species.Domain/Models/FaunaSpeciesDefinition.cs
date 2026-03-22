@@ -44,6 +44,8 @@ public sealed class FaunaSpeciesDefinition
 
     public BiologicalTraitProfile BaselineTraits { get; init; } = new();
 
+    public PrimitiveSeedMetadata? PrimitiveSeedMetadata { get; init; }
+
     public string ParentSpeciesId { get; init; } = string.Empty;
 
     public string OriginRegionId { get; init; } = string.Empty;
