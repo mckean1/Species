@@ -13,7 +13,7 @@ public static class ChronicleInputHandler
         {
             case ConsoleKey.Backspace:
                 {
-                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    var selectionInfo = ChronicleViewModelFactory.QuerySelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
                     context.ViewState.ReturnChronicleToLive(selectionInfo.UrgentCount);
                     return PlayerInputResult.Render;
                 }
@@ -25,19 +25,19 @@ public static class ChronicleInputHandler
                 return PlayerInputResult.Render;
             case ConsoleKey.UpArrow:
                 {
-                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    var selectionInfo = ChronicleViewModelFactory.QuerySelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
                     context.ViewState.MoveChronicleSelection(selectionInfo.UrgentCount, selectionInfo.EntryCount, -1);
                     return PlayerInputResult.Render;
                 }
             case ConsoleKey.DownArrow:
                 {
-                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    var selectionInfo = ChronicleViewModelFactory.QuerySelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
                     context.ViewState.MoveChronicleSelection(selectionInfo.UrgentCount, selectionInfo.EntryCount, 1);
                     return PlayerInputResult.Render;
                 }
             case ConsoleKey.Enter:
                 {
-                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    var selectionInfo = ChronicleViewModelFactory.QuerySelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
                     if (selectionInfo.SelectedUrgent is null)
                     {
                         return PlayerInputResult.None;

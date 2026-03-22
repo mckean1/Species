@@ -25,7 +25,7 @@ public static class PlayerViewStateCoordinator
 
         viewState.ClampAdvancementIndex(AdvancementViewModelFactory.GetAdvancementCount(advancementCatalog));
 
-        var lawSelection = LawsViewModelFactory.GetSelectionInfo(world, viewState.FocalPolityId, viewState.CurrentLawIndex);
+        var lawSelection = LawsViewModelFactory.QuerySelectionInfo(world, viewState.FocalPolityId, viewState.CurrentLawIndex);
         viewState.ClampLawIndex(lawSelection.LawCount);
         if (viewState.CurrentScreen != PlayerScreen.Laws || !lawSelection.HasSelectedPendingDecision)
         {
@@ -34,7 +34,7 @@ public static class PlayerViewStateCoordinator
 
         viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, faunaCatalog, viewState.FocalPolityId));
 
-        var chronicleSelection = ChronicleViewModelFactory.GetSelectionInfo(world, viewState.FocalPolityId, viewState.CreateChronicleViewRequest());
+        var chronicleSelection = ChronicleViewModelFactory.QuerySelectionInfo(world, viewState.FocalPolityId, viewState.CreateChronicleViewRequest());
         viewState.ClampChronicleSelection(chronicleSelection.UrgentCount, chronicleSelection.EntryCount);
     }
 }

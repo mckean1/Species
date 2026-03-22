@@ -9,6 +9,15 @@ public static class RendererTextWrap
         return Wrap(text, width, string.Empty, string.Empty, returnEmptyLineWhenBlank);
     }
 
+    public static IReadOnlyList<string> WrapColoredText(string text, int width, string color, string reset, bool returnEmptyLineWhenBlank = false)
+    {
+        return WrapText(text, width, returnEmptyLineWhenBlank)
+            .Select(line => string.IsNullOrEmpty(line)
+                ? line
+                : PlayerScreenShell.FitVisible($"{color}{line}{reset}", width))
+            .ToArray();
+    }
+
     public static IReadOnlyList<string> WrapBullet(string text, int width, string color, string reset)
     {
         return Wrap(text, width, $"{color}* {reset}", "  ");

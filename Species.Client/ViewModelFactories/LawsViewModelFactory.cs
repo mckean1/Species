@@ -7,15 +7,15 @@ namespace Species.Client.ViewModelFactories;
 
 public static class LawsViewModelFactory
 {
-    public static LawSelectionInfo GetSelectionInfo(World world, string focalPolityId, int selectedIndex)
+    public static LawSelectionInfo QuerySelectionInfo(World world, string focalPolityId, int selectedIndex)
     {
-        var items = BuildItems(PlayerFocus.Resolve(world, focalPolityId));
-        var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
-        var selected = items.Count == 0 ? null : items[clampedIndex];
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var lawCount = GetLawCount(focusPolity);
+        var clampedIndex = lawCount == 0 ? 0 : Math.Clamp(selectedIndex, 0, lawCount - 1);
 
         return new LawSelectionInfo(
-            items.Count,
-            selected?.Status == Species.Domain.Enums.LawProposalStatus.Active);
+            lawCount,
+            focusPolity?.ActiveLawProposal is not null && clampedIndex == 0);
     }
 
     public static LawsViewModel Build(
@@ -79,6 +79,16 @@ public static class LawsViewModelFactory
             .Select(ToItem));
 
         return items;
+    }
+
+    private static int GetLawCount(Polity? focusPolity)
+    {
+        if (focusPolity is null)
+        {
+            return 0;
+        }
+
+        return (focusPolity.ActiveLawProposal is null ? 0 : 1) + Math.Min(4, focusPolity.LawProposalHistory.Count);
     }
 
     private static LawScreenItem ToItem(LawProposal proposal)

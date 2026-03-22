@@ -78,7 +78,7 @@ public static class PlayerViewValidator
             errors.Add("Advancements points at an invalid advancement.");
         }
 
-        var lawSelection = LawsViewModelFactory.GetSelectionInfo(world, focalPolityId, viewState.CurrentLawIndex);
+        var lawSelection = LawsViewModelFactory.QuerySelectionInfo(world, focalPolityId, viewState.CurrentLawIndex);
         var lawCount = lawSelection.LawCount;
         if (viewState.CurrentLawIndex < 0 ||
             (lawCount > 0 && viewState.CurrentLawIndex >= lawCount))
@@ -94,7 +94,7 @@ public static class PlayerViewValidator
         }
 
         var chronicleRequest = viewState.CreateChronicleViewRequest();
-        var chronicleSelection = ChronicleViewModelFactory.GetSelectionInfo(world, focalPolityId, chronicleRequest);
+        var chronicleSelection = ChronicleViewModelFactory.QuerySelectionInfo(world, focalPolityId, chronicleRequest);
         var chronicleData = ChronicleViewModelFactory.Build(world, focalPolityId, chronicleRequest);
         if (viewState.CurrentChronicleUrgentIndex < 0 ||
             (chronicleSelection.UrgentCount > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleSelection.UrgentCount))

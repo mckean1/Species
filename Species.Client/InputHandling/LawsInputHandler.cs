@@ -7,7 +7,7 @@ public static class LawsInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
-        var lawSelection = LawsViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState.CurrentLawIndex);
+        var lawSelection = LawsViewModelFactory.QuerySelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState.CurrentLawIndex);
         var lawCount = lawSelection.LawCount;
 
         switch (key.Key)

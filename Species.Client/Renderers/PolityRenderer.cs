@@ -67,38 +67,9 @@ public static class PolityRenderer
 
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Reading{Reset}");
-        lines.AddRange(BuildWrappedLines($"Strength: {data.Strength}", width, Green, string.Empty, string.Empty));
-        lines.AddRange(BuildWrappedLines($"Concern: {data.Concern}", width, Orange, string.Empty, string.Empty));
+        lines.AddRange(RendererTextWrap.WrapColoredText($"Strength: {data.Strength}", width, Green, Reset));
+        lines.AddRange(RendererTextWrap.WrapColoredText($"Concern: {data.Concern}", width, Orange, Reset));
 
-        return lines;
-    }
-
-    private static IReadOnlyList<string> BuildWrappedLines(string text, int width, string color, string firstPrefix, string continuationPrefix)
-    {
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
-        {
-            return [string.Empty];
-        }
-
-        var lines = new List<string>();
-        var current = firstPrefix;
-
-        foreach (var word in words)
-        {
-            var separator = current == firstPrefix || current == continuationPrefix ? string.Empty : " ";
-            var candidate = current + separator + word;
-            if (PlayerScreenShell.VisibleLength(candidate) <= width)
-            {
-                current = candidate;
-                continue;
-            }
-
-            lines.Add(PlayerScreenShell.FitVisible($"{color}{current}{Reset}", width));
-            current = continuationPrefix + word;
-        }
-
-        lines.Add(PlayerScreenShell.FitVisible($"{color}{current}{Reset}", width));
         return lines;
     }
 

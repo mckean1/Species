@@ -31,16 +31,27 @@ public static class ChronicleViewModelFactory
             BuildModeNotes(request.Mode, selectionData.ArchiveEntryCount, selectionData.MilestoneEntryCount));
     }
 
-    public static ChronicleSelectionInfo GetSelectionInfo(World world, string focalPolityId, ChronicleViewRequest request)
+    public static ChronicleSelectionInfo QuerySelectionInfo(World world, string focalPolityId, ChronicleViewRequest request)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
-        var selectionData = BuildSelectionData(world, focusPolity, focusContext, request);
+        var urgentItems = BuildUrgentItems(focusPolity, focusContext);
+        var visibleEntries = GetVisibleEntries(world, focusPolity, focusContext);
+        var entryCount = request.Mode switch
+        {
+            ChronicleMode.Live => BuildLiveEntries(visibleEntries).Count,
+            ChronicleMode.Archive => visibleEntries.Count,
+            _ => visibleEntries.Count(IsMilestone)
+        };
+        var selectedArea = ResolveSelectionArea(request.SelectedArea, urgentItems.Count, entryCount);
+        var selectedUrgent = selectedArea == ChronicleSelectionArea.Urgent && urgentItems.Count > 0
+            ? urgentItems[ClampIndex(request.SelectedUrgentIndex, urgentItems.Count)]
+            : null;
 
         return new ChronicleSelectionInfo(
-            selectionData.UrgentItems.Count,
-            selectionData.ModeEntries.Count,
-            selectionData.SelectedUrgent);
+            urgentItems.Count,
+            entryCount,
+            selectedUrgent);
     }
 
     private static IReadOnlyList<ChronicleUrgentItem> BuildUrgentItems(Polity? polity, PolityContext? context)
