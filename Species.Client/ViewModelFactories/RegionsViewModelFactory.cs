@@ -11,6 +11,11 @@ namespace Species.Client.ViewModelFactories;
 
 public static class RegionsViewModelFactory
 {
+    public static int GetKnownRegionCount(World world, string focalPolityId)
+    {
+        return GetKnownRegions(world, PlayerFocus.ResolveLeadGroup(world, focalPolityId)).Count;
+    }
+
     public static RegionsViewModel Build(
         World world,
         string focalPolityId,

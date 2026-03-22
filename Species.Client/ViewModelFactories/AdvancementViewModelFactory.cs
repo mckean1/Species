@@ -11,6 +11,11 @@ namespace Species.Client.ViewModelFactories;
 
 public static class AdvancementViewModelFactory
 {
+    public static int GetAdvancementCount(AdvancementCatalog advancementCatalog)
+    {
+        return advancementCatalog.Definitions.Count;
+    }
+
     public static AdvancementsViewModel Build(
         World world,
         string focalPolityId,

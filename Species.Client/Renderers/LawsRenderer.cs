@@ -1,4 +1,3 @@
-using System.Text;
 using Species.Domain.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
@@ -36,21 +35,21 @@ public static class LawsRenderer
         {
             var left = row < listLines.Count ? listLines[row] : string.Empty;
             var right = row < detailLines.Count ? detailLines[row] : string.Empty;
-            lines.Add(BorderLine($"{FitVisible(left, leftWidth)} | {FitVisible(right, rightWidth)}", innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PlayerScreenShell.FitVisible(left, leftWidth)} | {PlayerScreenShell.FitVisible(right, rightWidth)}", innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(BorderLine($"{PaneTitle}Governance Condition{Reset}", innerWidth));
+        lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PaneTitle}Governance Condition{Reset}", innerWidth), innerWidth));
         foreach (var line in BuildBulletLines(data.GovernanceSummary, innerWidth, Blue))
         {
-            lines.Add(BorderLine(line, innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(BorderLine($"{PaneTitle}Active Laws{Reset}", innerWidth));
+        lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PaneTitle}Active Laws{Reset}", innerWidth), innerWidth));
         foreach (var line in BuildEnactedLawLines(data.EnactedLaws, innerWidth))
         {
-            lines.Add(BorderLine(line, innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
@@ -93,7 +92,7 @@ public static class LawsRenderer
 
         if (data.PendingDecisions.Count == 0)
         {
-            lines.Add(FitVisible($"{Dim}No pending decision is waiting right now.{Reset}", width));
+            lines.Add(PlayerScreenShell.FitVisible($"{Dim}No pending decision is waiting right now.{Reset}", width));
         }
         else
         {
@@ -102,8 +101,8 @@ public static class LawsRenderer
                 var selected = data.SelectedLaw is not null && string.Equals(data.SelectedLaw.Id, law.Id, StringComparison.Ordinal);
                 var row = $"{ColorProposalStatus(law.Status)} {Blue}{law.Name}{Reset} {Dim}[{law.Category}]{Reset}";
                 lines.Add(selected
-                    ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{FitVisible(row, Math.Max(0, width - 2))}{Reset}"
-                    : FitVisible($"  {row}", width));
+                    ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2))}{Reset}"
+                    : PlayerScreenShell.FitVisible($"  {row}", width));
             }
         }
 
@@ -112,7 +111,7 @@ public static class LawsRenderer
 
         if (data.RecentDecisions.Count == 0)
         {
-            lines.Add(FitVisible($"{Dim}No recent law outcomes are visible.{Reset}", width));
+            lines.Add(PlayerScreenShell.FitVisible($"{Dim}No recent law outcomes are visible.{Reset}", width));
         }
         else
         {
@@ -121,8 +120,8 @@ public static class LawsRenderer
                 var selected = data.SelectedLaw is not null && string.Equals(data.SelectedLaw.Id, law.Id, StringComparison.Ordinal);
                 var row = $"{ColorProposalStatus(law.Status)} {Blue}{law.Name}{Reset} {Dim}[{law.Category}]{Reset}";
                 lines.Add(selected
-                    ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{FitVisible(row, Math.Max(0, width - 2))}{Reset}"
-                    : FitVisible($"  {row}", width));
+                    ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2))}{Reset}"
+                    : PlayerScreenShell.FitVisible($"  {row}", width));
             }
         }
 
@@ -157,16 +156,16 @@ public static class LawsRenderer
             $"{Dim}{new string('-', width)}{Reset}"
         };
 
-        lines.AddRange(WrapText(law.Summary, width));
+        lines.AddRange(RendererTextWrap.WrapText(law.Summary, width));
 
         if (!string.IsNullOrWhiteSpace(law.ReasonSummary))
         {
-            lines.AddRange(WrapText($"Why now: {law.ReasonSummary}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"Why now: {law.ReasonSummary}", width));
         }
 
         if (!string.IsNullOrWhiteSpace(law.TradeoffSummary))
         {
-            lines.AddRange(WrapText($"Tradeoff: {law.TradeoffSummary}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"Tradeoff: {law.TradeoffSummary}", width));
         }
 
         if (law.Status == LawProposalStatus.Active)
@@ -175,17 +174,17 @@ public static class LawsRenderer
             lines.Add($"{PaneTitle}Decision Actions{Reset}");
             if (data.IsSimulationRunning)
             {
-                lines.AddRange(WrapText("Pause the simulation to Pass or Veto this proposal.", width));
+                lines.AddRange(RendererTextWrap.WrapText("Pause the simulation to Pass or Veto this proposal.", width));
             }
             else if (!data.IsActionMenuOpen)
             {
-                lines.AddRange(WrapText("Press Enter to open the Pass / Veto decision.", width));
+                lines.AddRange(RendererTextWrap.WrapText("Press Enter to open the Pass / Veto decision.", width));
             }
             else
             {
                 lines.Add(RenderActionRow("Pass", data.SelectedActionIndex == 0, width));
                 lines.Add(RenderActionRow("Veto", data.SelectedActionIndex == 1, width));
-                lines.AddRange(WrapText("Enter confirms the highlighted action.", width));
+                lines.AddRange(RendererTextWrap.WrapText("Enter confirms the highlighted action.", width));
             }
         }
 
@@ -225,54 +224,13 @@ public static class LawsRenderer
         };
 
         return selected
-            ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{FitVisible(row, Math.Max(0, width - 2))}{Reset}"
-            : FitVisible($"  {row}", width);
+            ? $"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2))}{Reset}"
+            : PlayerScreenShell.FitVisible($"  {row}", width);
     }
 
     private static IReadOnlyList<string> BuildBulletLines(IReadOnlyList<string> items, int width, string color)
     {
-        var lines = new List<string>();
-        foreach (var item in items)
-        {
-            lines.AddRange(Wrap(item, width, $"{color}* {Reset}", "  "));
-        }
-
-        return lines.Count > 0 ? lines : [FitVisible($"{Dim}None{Reset}", width)];
-    }
-
-    private static IReadOnlyList<string> WrapText(string text, int width)
-    {
-        return Wrap(text, width, string.Empty, string.Empty);
-    }
-
-    private static IReadOnlyList<string> Wrap(string text, int width, string firstPrefix, string nextPrefix)
-    {
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
-        {
-            return [FitVisible(firstPrefix, width)];
-        }
-
-        var lines = new List<string>();
-        var current = firstPrefix;
-
-        foreach (var word in words)
-        {
-            var candidate = string.IsNullOrEmpty(current) || current.EndsWith(' ')
-                ? $"{current}{word}"
-                : $"{current} {word}";
-            if (VisibleLength(candidate) <= width)
-            {
-                current = candidate;
-                continue;
-            }
-
-            lines.Add(FitVisible(current, width));
-            current = string.IsNullOrEmpty(nextPrefix) ? word : $"{nextPrefix}{word}";
-        }
-
-        lines.Add(FitVisible(current, width));
-        return lines;
+        return RendererTextWrap.BuildBulletLines(items, width, color, Reset, $"{Dim}None{Reset}");
     }
 
     private static string ColorProposalStatus(LawProposalStatus status)
@@ -299,71 +257,4 @@ public static class LawsRenderer
         };
     }
 
-    private static string FitVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder();
-        var visibleLength = 0;
-        var index = 0;
-        while (index < text.Length && visibleLength < width)
-        {
-            if (text[index] == '\u001b')
-            {
-                var start = index;
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                if (index < text.Length)
-                {
-                    index++;
-                }
-
-                builder.Append(text[start..index]);
-                continue;
-            }
-
-            builder.Append(text[index]);
-            index++;
-            visibleLength++;
-        }
-
-        if (visibleLength < width)
-        {
-            builder.Append(' ', width - visibleLength);
-        }
-
-        return builder.ToString();
-    }
-
-    private static int VisibleLength(string text)
-    {
-        var length = 0;
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] == '\u001b')
-            {
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                continue;
-            }
-
-            length++;
-        }
-
-        return length;
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {FitVisible(content, innerWidth)} |";
-    }
 }

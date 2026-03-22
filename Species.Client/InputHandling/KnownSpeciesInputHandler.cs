@@ -6,11 +6,7 @@ public static class KnownSpeciesInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
-        var speciesCount = KnownSpeciesViewModelFactory.Build(
-            context.CurrentWorld,
-            context.FaunaCatalog,
-            context.ViewState.FocalPolityId,
-            context.ViewState.CurrentKnownSpeciesIndex).Species.Count;
+        var speciesCount = KnownSpeciesViewModelFactory.GetKnownSpeciesCount(context.CurrentWorld, context.FaunaCatalog, context.ViewState.FocalPolityId);
 
         if (speciesCount == 0)
         {

@@ -1,4 +1,3 @@
-using System.Text;
 using Species.Client.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
@@ -31,10 +30,10 @@ public static class ChronicleRenderer
 
         var lines = new List<string>();
         lines.AddRange(PlayerScreenShell.BuildHeader(headerTitle, data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
-        lines.Add(BorderLine($"{PaneTitle}Urgent{Reset}", innerWidth));
-        lines.AddRange(BuildUrgentSection(data, innerWidth, urgentHeight).Select(line => BorderLine(line, innerWidth)));
+        lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PaneTitle}Urgent{Reset}", innerWidth), innerWidth));
+        lines.AddRange(BuildUrgentSection(data, innerWidth, urgentHeight).Select(line => PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
-        lines.Add(BorderLine($"{FitVisible($"{PaneTitle}{DescribeMode(data.Mode)}{Reset}", leftWidth)} | {FitVisible($"{PaneTitle}Selected / Current State{Reset}", rightWidth)}", innerWidth));
+        lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PlayerScreenShell.FitVisible($"{PaneTitle}{DescribeMode(data.Mode)}{Reset}", leftWidth)} | {PlayerScreenShell.FitVisible($"{PaneTitle}Selected / Current State{Reset}", rightWidth)}", innerWidth), innerWidth));
 
         var leftLines = BuildEntryPane(data, leftWidth, bodyHeight);
         var rightLines = BuildDetailPane(data, rightWidth, bodyHeight);
@@ -42,7 +41,7 @@ public static class ChronicleRenderer
         {
             var left = row < leftLines.Count ? leftLines[row] : string.Empty;
             var right = row < rightLines.Count ? rightLines[row] : string.Empty;
-            lines.Add(BorderLine($"{FitVisible(left, leftWidth)} | {FitVisible(right, rightWidth)}", innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PlayerScreenShell.FitVisible(left, leftWidth)} | {PlayerScreenShell.FitVisible(right, rightWidth)}", innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
@@ -59,12 +58,12 @@ public static class ChronicleRenderer
     {
         var lines = new List<string>
         {
-            FitVisible($"{Dim}Current alerts stay visible in every Chronicle mode.{Reset}", width)
+            PlayerScreenShell.FitVisible($"{Dim}Current alerts stay visible in every Chronicle mode.{Reset}", width)
         };
 
         if (data.UrgentItems.Count == 0)
         {
-            lines.AddRange(Wrap($"{Dim}No urgent developments need immediate action.{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Dim}No urgent developments need immediate action.{Reset}", width, returnEmptyLineWhenBlank: true));
         }
         else
         {
@@ -76,12 +75,12 @@ public static class ChronicleRenderer
                     data.SelectedUrgent is not null &&
                     string.Equals(data.SelectedUrgent.Id, item.Id, StringComparison.Ordinal))
                 {
-                    text = $"{HighlightBackground}{FitVisible(text, Math.Max(0, width - 2))}{Reset}";
+                    text = $"{HighlightBackground}{PlayerScreenShell.FitVisible(text, Math.Max(0, width - 2))}{Reset}";
                     lines.Add(text);
                     continue;
                 }
 
-                lines.AddRange(Wrap(text, width));
+                lines.AddRange(RendererTextWrap.WrapText(text, width, returnEmptyLineWhenBlank: true));
             }
         }
 
@@ -103,7 +102,7 @@ public static class ChronicleRenderer
 
         if (data.Entries.Count == 0)
         {
-            lines.AddRange(Wrap($"{Dim}No visible entries are available in this mode yet.{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Dim}No visible entries are available in this mode yet.{Reset}", width, returnEmptyLineWhenBlank: true));
         }
         else
         {
@@ -122,11 +121,11 @@ public static class ChronicleRenderer
                 var row = $"{milestoneBadge}{Dim}{entry.DateText}{Reset} {entry.Headline}";
                 if (index == selectedIndex && data.SelectedArea == ChronicleSelectionArea.Entries)
                 {
-                    lines.Add($"{prefix}{FitVisible(row, Math.Max(0, width - 2))}{Reset}");
+                    lines.Add($"{prefix}{PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2))}{Reset}");
                 }
                 else
                 {
-                    lines.Add(FitVisible($"{prefix}{row}", width));
+                    lines.Add(PlayerScreenShell.FitVisible($"{prefix}{row}", width));
                 }
             }
         }
@@ -146,50 +145,50 @@ public static class ChronicleRenderer
         if (data.SelectedArea == ChronicleSelectionArea.Urgent && data.SelectedUrgent is not null)
         {
             lines.Add($"{PaneTitle}Selected Urgent Item{Reset}");
-            lines.AddRange(Wrap($"{Red}{data.SelectedUrgent.Text}{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Red}{data.SelectedUrgent.Text}{Reset}", width, returnEmptyLineWhenBlank: true));
             if (!string.IsNullOrWhiteSpace(data.SelectedUrgent.Cause))
             {
                 lines.Add($"{Dim}{new string('-', width)}{Reset}");
-                lines.AddRange(Wrap($"Cause: {data.SelectedUrgent.Cause}", width));
+                lines.AddRange(RendererTextWrap.WrapText($"Cause: {data.SelectedUrgent.Cause}", width, returnEmptyLineWhenBlank: true));
             }
 
             if (!string.IsNullOrWhiteSpace(data.SelectedUrgent.Impact))
             {
-                lines.AddRange(Wrap($"Why it matters: {data.SelectedUrgent.Impact}", width));
+                lines.AddRange(RendererTextWrap.WrapText($"Why it matters: {data.SelectedUrgent.Impact}", width, returnEmptyLineWhenBlank: true));
             }
 
             if (data.SelectedUrgent.TargetScreen == PlayerScreen.Laws)
             {
                 lines.Add($"{Dim}{new string('-', width)}{Reset}");
-                lines.AddRange(Wrap($"Enter opens Laws and selects the pending decision.", width));
+                lines.AddRange(RendererTextWrap.WrapText($"Enter opens Laws and selects the pending decision.", width, returnEmptyLineWhenBlank: true));
             }
         }
         else if (data.SelectedEntry is not null)
         {
             lines.Add($"{PaneTitle}Selected Entry{Reset}");
-            lines.AddRange(Wrap($"{Blue}{data.SelectedEntry.Headline}{Reset}", width));
-            lines.AddRange(Wrap($"{Dim}{data.SelectedEntry.DateText}{Reset}  {Purple}{data.SelectedEntry.Category}{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Blue}{data.SelectedEntry.Headline}{Reset}", width, returnEmptyLineWhenBlank: true));
+            lines.AddRange(RendererTextWrap.WrapText($"{Dim}{data.SelectedEntry.DateText}{Reset}  {Purple}{data.SelectedEntry.Category}{Reset}", width, returnEmptyLineWhenBlank: true));
             lines.Add($"{Dim}{new string('-', width)}{Reset}");
-            lines.AddRange(Wrap(data.SelectedEntry.Impact, width));
+            lines.AddRange(RendererTextWrap.WrapText(data.SelectedEntry.Impact, width, returnEmptyLineWhenBlank: true));
         }
         else
         {
             lines.Add($"{PaneTitle}Selected Entry{Reset}");
-            lines.AddRange(Wrap($"{Dim}Nothing is selected yet.{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Dim}Nothing is selected yet.{Reset}", width, returnEmptyLineWhenBlank: true));
         }
 
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Current State{Reset}");
         foreach (var line in data.ConditionSummary)
         {
-            lines.AddRange(Wrap($"{Yellow}* {Reset}{line}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Yellow}* {Reset}{line}", width, returnEmptyLineWhenBlank: true));
         }
 
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
         lines.Add($"{PaneTitle}Mode Notes{Reset}");
         foreach (var line in data.ModeNotes)
         {
-            lines.AddRange(Wrap($"{Dim}* {line}{Reset}", width));
+            lines.AddRange(RendererTextWrap.WrapText($"{Dim}* {line}{Reset}", width, returnEmptyLineWhenBlank: true));
         }
 
         while (lines.Count < height)
@@ -218,38 +217,6 @@ public static class ChronicleRenderer
         return 0;
     }
 
-    private static IReadOnlyList<string> Wrap(string text, int width)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return [string.Empty];
-        }
-
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var lines = new List<string>();
-        var current = string.Empty;
-
-        foreach (var word in words)
-        {
-            var candidate = string.IsNullOrEmpty(current) ? word : $"{current} {word}";
-            if (VisibleLength(candidate) <= width)
-            {
-                current = candidate;
-                continue;
-            }
-
-            lines.Add(FitVisible(current, width));
-            current = word;
-        }
-
-        if (!string.IsNullOrEmpty(current))
-        {
-            lines.Add(FitVisible(current, width));
-        }
-
-        return lines;
-    }
-
     private static string DescribeMode(ChronicleMode mode)
     {
         return mode switch
@@ -270,72 +237,4 @@ public static class ChronicleRenderer
         };
     }
 
-    private static string FitVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder();
-        var visibleLength = 0;
-        var index = 0;
-
-        while (index < text.Length && visibleLength < width)
-        {
-            if (text[index] == '\u001b')
-            {
-                var start = index;
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                if (index < text.Length)
-                {
-                    index++;
-                }
-
-                builder.Append(text[start..index]);
-                continue;
-            }
-
-            builder.Append(text[index]);
-            index++;
-            visibleLength++;
-        }
-
-        if (visibleLength < width)
-        {
-            builder.Append(' ', width - visibleLength);
-        }
-
-        return builder.ToString();
-    }
-
-    private static int VisibleLength(string text)
-    {
-        var length = 0;
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] == '\u001b')
-            {
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                continue;
-            }
-
-            length++;
-        }
-
-        return length;
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {FitVisible(content, innerWidth)} |";
-    }
 }

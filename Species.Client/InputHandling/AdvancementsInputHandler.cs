@@ -6,12 +6,7 @@ public static class AdvancementsInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
-        var advancementCount = AdvancementViewModelFactory.Build(
-            context.CurrentWorld,
-            context.ViewState.FocalPolityId,
-            context.DiscoveryCatalog,
-            context.AdvancementCatalog,
-            context.ViewState.CurrentAdvancementIndex).Items.Count;
+        var advancementCount = AdvancementViewModelFactory.GetAdvancementCount(context.AdvancementCatalog);
 
         if (advancementCount == 0)
         {

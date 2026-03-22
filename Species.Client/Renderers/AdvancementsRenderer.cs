@@ -1,4 +1,3 @@
-using System.Text;
 using Species.Client.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
@@ -36,7 +35,7 @@ public static class AdvancementsRenderer
         {
             var left = row < listLines.Count ? listLines[row] : string.Empty;
             var right = row < detailLines.Count ? detailLines[row] : string.Empty;
-            lines.Add(BorderLine($"{FitVisible(left, listWidth)} | {FitVisible(right, detailWidth)}", innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PlayerScreenShell.FitVisible(left, listWidth)} | {PlayerScreenShell.FitVisible(right, detailWidth)}", innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
@@ -82,12 +81,12 @@ public static class AdvancementsRenderer
 
                 if (index == data.SelectedIndex)
                 {
-                    var selectedRow = FitVisible(row, Math.Max(0, width - 2));
+                    var selectedRow = PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2));
                     lines.Add($"{HighlightBackground}{Yellow}> {Reset}{HighlightBackground}{selectedRow}{Reset}");
                 }
                 else
                 {
-                    lines.Add(FitVisible($"  {row}", width));
+                    lines.Add(PlayerScreenShell.FitVisible($"  {row}", width));
                 }
             }
         }
@@ -126,7 +125,7 @@ public static class AdvancementsRenderer
         lines.Add($"Category: {Purple}{item.Category}{Reset}");
         lines.Add($"Simulation: {(isSimulationRunning ? $"{Green}Running{Reset}" : $"{Dim}Paused{Reset}")}");
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
-        lines.AddRange(WrapText(item.Description, width));
+        lines.AddRange(RendererTextWrap.WrapText(item.Description, width));
         lines.Add(string.Empty);
         lines.Add($"{PaneTitle}Advancements{Reset}");
         lines.AddRange(BuildBulletLines([item.CapabilitySummary], width, Green));
@@ -174,69 +173,7 @@ public static class AdvancementsRenderer
 
     private static IReadOnlyList<string> BuildBulletLines(IEnumerable<string> items, int width, string color)
     {
-        var lines = new List<string>();
-
-        foreach (var item in items)
-        {
-            lines.AddRange(WrapBullet(item, width, color));
-        }
-
-        if (lines.Count == 0)
-        {
-            lines.Add(FitVisible($"{Dim}None{Reset}", width));
-        }
-
-        return lines;
-    }
-
-    private static IReadOnlyList<string> WrapText(string text, int width)
-    {
-        return Wrap(text, width, string.Empty, string.Empty);
-    }
-
-    private static IReadOnlyList<string> WrapBullet(string text, int width, string color)
-    {
-        return Wrap(text, width, $"{color}* {Reset}", "  ");
-    }
-
-    private static IReadOnlyList<string> Wrap(string text, int width, string firstPrefix, string nextPrefix)
-    {
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
-        {
-            return [FitVisible(firstPrefix, width)];
-        }
-
-        var lines = new List<string>();
-        var current = firstPrefix;
-
-        foreach (var word in words)
-        {
-            var candidate = BuildCandidate(current, word);
-            if (VisibleLength(candidate) <= width)
-            {
-                current = candidate;
-                continue;
-            }
-
-            lines.Add(FitVisible(current, width));
-            current = string.IsNullOrEmpty(nextPrefix) ? word : $"{nextPrefix}{word}";
-        }
-
-        lines.Add(FitVisible(current, width));
-        return lines;
-    }
-
-    private static string BuildCandidate(string current, string word)
-    {
-        if (string.IsNullOrEmpty(current))
-        {
-            return word;
-        }
-
-        return current.EndsWith(' ')
-            ? $"{current}{word}"
-            : $"{current} {word}";
+        return RendererTextWrap.BuildBulletLines(items, width, color, Reset, $"{Dim}None{Reset}");
     }
 
     private static string ColorStatusBadge(AdvancementStatus status)
@@ -259,84 +196,4 @@ public static class AdvancementsRenderer
         };
     }
 
-    private static string FitVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder();
-        var visibleLength = 0;
-        var index = 0;
-
-        while (index < text.Length && visibleLength < width)
-        {
-            if (text[index] == '\u001b')
-            {
-                var start = index;
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                if (index < text.Length)
-                {
-                    index++;
-                }
-
-                builder.Append(text[start..index]);
-                continue;
-            }
-
-            builder.Append(text[index]);
-            index++;
-            visibleLength++;
-        }
-
-        if (visibleLength < width)
-        {
-            builder.Append(' ', width - visibleLength);
-        }
-
-        return builder.ToString();
-    }
-
-    private static int VisibleLength(string text)
-    {
-        var length = 0;
-
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] == '\u001b')
-            {
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                continue;
-            }
-
-            length++;
-        }
-
-        return length;
-    }
-
-    private static string PadBetween(string left, string right, int width)
-    {
-        var spaces = Math.Max(1, width - VisibleLength(left) - VisibleLength(right));
-        return left + new string(' ', spaces) + right;
-    }
-
-    private static string HorizontalBorder(int innerWidth)
-    {
-        return "+" + new string('-', innerWidth + 2) + "+";
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {FitVisible(content, innerWidth)} |";
-    }
 }

@@ -19,42 +19,22 @@ public static class PlayerViewStateCoordinator
         viewState.EnsureFocalPolity(world);
         simulationEngine.PlayerPolityId = viewState.FocalPolityId;
 
-        viewState.ClampRegionIndex(RegionsViewModelFactory.Build(
-            world,
-            viewState.FocalPolityId,
-            viewState.CurrentRegionIndex,
-            floraCatalog,
-            faunaCatalog,
-            discoveryCatalog).Regions.Count);
+        viewState.ClampRegionIndex(RegionsViewModelFactory.GetKnownRegionCount(world, viewState.FocalPolityId));
 
-        viewState.ClampKnownPolityIndex(KnownPolitiesViewModelFactory.Build(
-            world,
-            viewState.FocalPolityId,
-            viewState.CurrentKnownPolityIndex,
-            discoveryCatalog,
-            advancementCatalog).Polities.Count);
+        viewState.ClampKnownPolityIndex(KnownPolitiesViewModelFactory.GetKnownPolityCount(world, viewState.FocalPolityId));
 
-        viewState.ClampAdvancementIndex(AdvancementViewModelFactory.Build(
-            world,
-            viewState.FocalPolityId,
-            discoveryCatalog,
-            advancementCatalog,
-            viewState.CurrentAdvancementIndex).Items.Count);
+        viewState.ClampAdvancementIndex(AdvancementViewModelFactory.GetAdvancementCount(advancementCatalog));
 
-        var lawsViewModel = LawsViewModelFactory.Build(world, viewState.FocalPolityId, viewState.CurrentLawIndex);
-        viewState.ClampLawIndex(lawsViewModel.Laws.Count);
-        if (viewState.CurrentScreen != PlayerScreen.Laws || !lawsViewModel.HasSelectedPendingDecision)
+        var lawSelection = LawsViewModelFactory.GetSelectionInfo(world, viewState.FocalPolityId, viewState.CurrentLawIndex);
+        viewState.ClampLawIndex(lawSelection.LawCount);
+        if (viewState.CurrentScreen != PlayerScreen.Laws || !lawSelection.HasSelectedPendingDecision)
         {
             viewState.CloseLawActionMenu();
         }
 
-        viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.Build(
-            world,
-            faunaCatalog,
-            viewState.FocalPolityId,
-            viewState.CurrentKnownSpeciesIndex).Species.Count);
+        viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, faunaCatalog, viewState.FocalPolityId));
 
-        var chronicleViewModel = ChronicleViewModelFactory.Build(world, viewState.FocalPolityId, viewState);
-        viewState.ClampChronicleSelection(chronicleViewModel.UrgentItems.Count, chronicleViewModel.Entries.Count);
+        var chronicleSelection = ChronicleViewModelFactory.GetSelectionInfo(world, viewState.FocalPolityId, viewState.CreateChronicleViewRequest());
+        viewState.ClampChronicleSelection(chronicleSelection.UrgentCount, chronicleSelection.EntryCount);
     }
 }

@@ -20,7 +20,7 @@ public static class PlayerScreenRouter
         return viewState.CurrentScreen switch
         {
             PlayerScreen.Chronicle => ChronicleRenderer.Render(
-                ChronicleViewModelFactory.Build(world, viewState.FocalPolityId, viewState, viewState.IsSimulationRunning),
+                ChronicleViewModelFactory.Build(world, viewState.FocalPolityId, viewState.CreateChronicleViewRequest(), viewState.IsSimulationRunning),
                 viewport),
             PlayerScreen.Polity => PolityRenderer.Render(
                 PolityViewModelFactory.Build(world, viewState.FocalPolityId, viewState.IsSimulationRunning),

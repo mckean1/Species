@@ -1,4 +1,3 @@
-using System.Text;
 using Species.Client.Models;
 using Species.Client.Presentation;
 using Species.Client.ViewModels;
@@ -35,7 +34,7 @@ public static class KnownPolitiesRenderer
         {
             var left = row < listLines.Count ? listLines[row] : string.Empty;
             var right = row < detailLines.Count ? detailLines[row] : string.Empty;
-            lines.Add(BorderLine($"{FitVisible(left, listWidth)} | {FitVisible(right, detailWidth)}", innerWidth));
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PlayerScreenShell.FitVisible(left, listWidth)} | {PlayerScreenShell.FitVisible(right, detailWidth)}", innerWidth), innerWidth));
         }
 
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
@@ -54,10 +53,10 @@ public static class KnownPolitiesRenderer
         var lines = new List<string> { $"{PaneTitle}Polities{Reset}" };
         var columnWidths = new[] { 24, 18, 14, 12 };
         lines.Add(
-            FitVisible("Name", columnWidths[0]) + " | " +
-            FitVisible("Region", columnWidths[1]) + " | " +
-            FitVisible("Population", columnWidths[2]) + " | " +
-            FitVisible("Stance", columnWidths[3]));
+            PlayerScreenShell.FitVisible("Name", columnWidths[0]) + " | " +
+            PlayerScreenShell.FitVisible("Region", columnWidths[1]) + " | " +
+            PlayerScreenShell.FitVisible("Population", columnWidths[2]) + " | " +
+            PlayerScreenShell.FitVisible("Stance", columnWidths[3]));
 
         if (data.Polities.Count == 0)
         {
@@ -72,16 +71,16 @@ public static class KnownPolitiesRenderer
             for (var index = startIndex; index < endIndex; index++)
             {
                 var polity = data.Polities[index];
-                var row = FitVisible(polity.Name, columnWidths[0]) + " | " +
-                          FitVisible(polity.CoreRegion, columnWidths[1]) + " | " +
-                          FitVisible(polity.Population, columnWidths[2]) + " | " +
-                          FitVisible(ColorRelationship(polity.Relationship), columnWidths[3]);
+                var row = PlayerScreenShell.FitVisible(polity.Name, columnWidths[0]) + " | " +
+                          PlayerScreenShell.FitVisible(polity.CoreRegion, columnWidths[1]) + " | " +
+                          PlayerScreenShell.FitVisible(polity.Population, columnWidths[2]) + " | " +
+                          PlayerScreenShell.FitVisible(ColorRelationship(polity.Relationship), columnWidths[3]);
 
                 row = index == data.SelectedIndex
                     ? $"{HighlightBackground}{Blue}> {Reset}{HighlightBackground}{row}{Reset}"
                     : $"  {row}";
 
-                lines.Add(FitVisible(row, width));
+                lines.Add(PlayerScreenShell.FitVisible(row, width));
             }
         }
 
@@ -139,35 +138,7 @@ public static class KnownPolitiesRenderer
 
     private static IReadOnlyList<string> BuildBulletLines(IEnumerable<string> items, int width, string color)
     {
-        var lines = new List<string>();
-
-        foreach (var item in items)
-        {
-            var words = item.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var current = "*";
-
-            foreach (var word in words)
-            {
-                var candidate = $"{current} {word}";
-                if (candidate.Length <= width)
-                {
-                    current = candidate;
-                    continue;
-                }
-
-                lines.Add(FitVisible($"{color}{current}{Reset}", width));
-                current = $"  {word}";
-            }
-
-            lines.Add(FitVisible($"{color}{current}{Reset}", width));
-        }
-
-        if (lines.Count == 0)
-        {
-            lines.Add(FitVisible($"{Dim}None{Reset}", width));
-        }
-
-        return lines;
+        return RendererTextWrap.BuildBulletLines(items, width, color, Reset, $"{Dim}None{Reset}");
     }
 
     private static string ColorRelationship(string relationship)
@@ -184,84 +155,4 @@ public static class KnownPolitiesRenderer
         return $"{color}{relationship}{Reset}";
     }
 
-    private static string FitVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder();
-        var visibleLength = 0;
-        var index = 0;
-
-        while (index < text.Length && visibleLength < width)
-        {
-            if (text[index] == '\u001b')
-            {
-                var start = index;
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                if (index < text.Length)
-                {
-                    index++;
-                }
-
-                builder.Append(text[start..index]);
-                continue;
-            }
-
-            builder.Append(text[index]);
-            index++;
-            visibleLength++;
-        }
-
-        if (visibleLength < width)
-        {
-            builder.Append(' ', width - visibleLength);
-        }
-
-        return builder.ToString();
-    }
-
-    private static int VisibleLength(string text)
-    {
-        var length = 0;
-
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] == '\u001b')
-            {
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                continue;
-            }
-
-            length++;
-        }
-
-        return length;
-    }
-
-    private static string PadBetween(string left, string right, int width)
-    {
-        var spaces = Math.Max(1, width - VisibleLength(left) - VisibleLength(right));
-        return left + new string(' ', spaces) + right;
-    }
-
-    private static string HorizontalBorder(int innerWidth)
-    {
-        return "+" + new string('-', innerWidth + 2) + "+";
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {FitVisible(content, innerWidth)} |";
-    }
 }

@@ -7,6 +7,17 @@ namespace Species.Client.ViewModelFactories;
 
 public static class LawsViewModelFactory
 {
+    public static LawSelectionInfo GetSelectionInfo(World world, string focalPolityId, int selectedIndex)
+    {
+        var items = BuildItems(PlayerFocus.Resolve(world, focalPolityId));
+        var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
+        var selected = items.Count == 0 ? null : items[clampedIndex];
+
+        return new LawSelectionInfo(
+            items.Count,
+            selected?.Status == Species.Domain.Enums.LawProposalStatus.Active);
+    }
+
     public static LawsViewModel Build(
         World world,
         string focalPolityId,

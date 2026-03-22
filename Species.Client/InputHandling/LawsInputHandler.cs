@@ -7,14 +7,8 @@ public static class LawsInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
-        var lawsData = LawsViewModelFactory.Build(
-            context.CurrentWorld,
-            context.ViewState.FocalPolityId,
-            context.ViewState.CurrentLawIndex,
-            context.ViewState.IsSimulationRunning,
-            context.ViewState.IsLawActionMenuOpen,
-            context.ViewState.CurrentLawActionIndex);
-        var lawCount = lawsData.Laws.Count;
+        var lawSelection = LawsViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState.CurrentLawIndex);
+        var lawCount = lawSelection.LawCount;
 
         switch (key.Key)
         {
@@ -47,7 +41,7 @@ public static class LawsInputHandler
 
                 return PlayerInputResult.None;
             case ConsoleKey.Enter:
-                if (!context.ViewState.IsSimulationRunning && lawsData.HasSelectedPendingDecision)
+                if (!context.ViewState.IsSimulationRunning && lawSelection.HasSelectedPendingDecision)
                 {
                     if (!context.ViewState.IsLawActionMenuOpen)
                     {

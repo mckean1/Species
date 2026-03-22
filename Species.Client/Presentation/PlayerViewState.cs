@@ -36,6 +36,17 @@ public sealed class PlayerViewState
 
     public int CurrentLawActionIndex { get; private set; }
 
+    public ChronicleViewRequest CreateChronicleViewRequest()
+    {
+        return new ChronicleViewRequest(
+            CurrentChronicleMode,
+            CurrentChronicleSelectionArea,
+            CurrentChronicleUrgentIndex,
+            CurrentChronicleLiveIndex,
+            CurrentChronicleArchiveIndex,
+            CurrentChronicleMilestoneIndex);
+    }
+
     public void EnsureFocalPolity(Species.Domain.Models.World world)
     {
         FocalPolityId = PlayerFocus.ResolveId(world, FocalPolityId);

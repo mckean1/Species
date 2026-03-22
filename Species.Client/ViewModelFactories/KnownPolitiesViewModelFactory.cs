@@ -11,6 +11,25 @@ public static class KnownPolitiesViewModelFactory
 {
     private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
+    public static int GetKnownPolityCount(World world, string focalPolityId)
+    {
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
+        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+        var knownRegionIds = focusContext?.KnownRegionIds ?? new HashSet<string>(StringComparer.Ordinal);
+
+        return world.Polities
+            .Where(polity => focusPolity is null || !string.Equals(polity.Id, focusPolity.Id, StringComparison.Ordinal))
+            .Select(polity => PolityData.BuildContext(world, polity))
+            .Where(context => context?.LeadGroup is not null)
+            .Count(context =>
+                focusContext is null ||
+                knownRegionIds.Contains(context!.CurrentRegionId) ||
+                knownRegionIds.Contains(context!.OriginRegionId) ||
+                (regionsById.TryGetValue(context!.CurrentRegionId, out var region) &&
+                 region.NeighborIds.Contains(focusContext.CurrentRegionId, StringComparer.Ordinal)));
+    }
+
     public static KnownPolitiesViewModel Build(
         World world,
         string focalPolityId,

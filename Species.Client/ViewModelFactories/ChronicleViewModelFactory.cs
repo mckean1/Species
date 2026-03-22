@@ -11,48 +11,36 @@ namespace Species.Client.ViewModelFactories;
 
 public static class ChronicleViewModelFactory
 {
-    public static ChronicleViewModel Build(World world, string focalPolityId, PlayerViewState viewState, bool isSimulationRunning = false)
+    public static ChronicleViewModel Build(World world, string focalPolityId, ChronicleViewRequest request, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
-        var urgentItems = BuildUrgentItems(focusPolity, focusContext);
-        var visibleEntries = GetVisibleEntries(world, focusPolity, focusContext);
-        var liveEntries = BuildLiveEntries(visibleEntries);
-        var milestoneEntries = visibleEntries
-            .Where(IsMilestone)
-            .Select(BuildListItem)
-            .ToArray();
-
-        var modeEntries = viewState.CurrentChronicleMode switch
-        {
-            ChronicleMode.Live => liveEntries,
-            ChronicleMode.Archive => visibleEntries.Select(BuildListItem).ToArray(),
-            _ => milestoneEntries
-        };
-
-        var selectedArea = ResolveSelectionArea(viewState.CurrentChronicleSelectionArea, urgentItems.Count, modeEntries.Count);
-        var selectedUrgentIndex = ClampIndex(viewState.CurrentChronicleUrgentIndex, urgentItems.Count);
-        var selectedEntryIndex = ClampIndex(GetEntryIndex(viewState), modeEntries.Count);
-
-        var selectedUrgent = selectedArea == ChronicleSelectionArea.Urgent && urgentItems.Count > 0
-            ? urgentItems[selectedUrgentIndex]
-            : null;
-        var selectedEntry = selectedArea == ChronicleSelectionArea.Entries && modeEntries.Count > 0
-            ? modeEntries[selectedEntryIndex]
-            : null;
+        var selectionData = BuildSelectionData(world, focusPolity, focusContext, request);
 
         return new ChronicleViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             focusPolity?.Name ?? "Unknown polity",
             isSimulationRunning,
-            viewState.CurrentChronicleMode,
-            urgentItems,
-            modeEntries,
-            selectedUrgent,
-            selectedEntry,
-            selectedArea,
+            request.Mode,
+            selectionData.UrgentItems,
+            selectionData.ModeEntries,
+            selectionData.SelectedUrgent,
+            selectionData.SelectedEntry,
+            selectionData.SelectedArea,
             BuildConditionSummary(focusPolity, focusContext),
-            BuildModeNotes(viewState.CurrentChronicleMode, visibleEntries.Count, milestoneEntries.Length));
+            BuildModeNotes(request.Mode, selectionData.ArchiveEntryCount, selectionData.MilestoneEntryCount));
+    }
+
+    public static ChronicleSelectionInfo GetSelectionInfo(World world, string focalPolityId, ChronicleViewRequest request)
+    {
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
+        var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
+        var selectionData = BuildSelectionData(world, focusPolity, focusContext, request);
+
+        return new ChronicleSelectionInfo(
+            selectionData.UrgentItems.Count,
+            selectionData.ModeEntries.Count,
+            selectionData.SelectedUrgent);
     }
 
     private static IReadOnlyList<ChronicleUrgentItem> BuildUrgentItems(Polity? polity, PolityContext? context)
@@ -258,13 +246,62 @@ public static class ChronicleViewModelFactory
         };
     }
 
-    private static int GetEntryIndex(PlayerViewState viewState)
+    private static (
+        IReadOnlyList<ChronicleUrgentItem> UrgentItems,
+        IReadOnlyList<ChronicleListItem> ModeEntries,
+        ChronicleSelectionArea SelectedArea,
+        ChronicleUrgentItem? SelectedUrgent,
+        ChronicleListItem? SelectedEntry,
+        int ArchiveEntryCount,
+        int MilestoneEntryCount) BuildSelectionData(
+        World world,
+        Polity? focusPolity,
+        PolityContext? focusContext,
+        ChronicleViewRequest request)
     {
-        return viewState.CurrentChronicleMode switch
+        var urgentItems = BuildUrgentItems(focusPolity, focusContext);
+        var visibleEntries = GetVisibleEntries(world, focusPolity, focusContext);
+        var liveEntries = BuildLiveEntries(visibleEntries);
+        var archiveEntries = visibleEntries.Select(BuildListItem).ToArray();
+        var milestoneEntries = visibleEntries
+            .Where(IsMilestone)
+            .Select(BuildListItem)
+            .ToArray();
+
+        var modeEntries = request.Mode switch
         {
-            ChronicleMode.Live => viewState.CurrentChronicleLiveIndex,
-            ChronicleMode.Archive => viewState.CurrentChronicleArchiveIndex,
-            _ => viewState.CurrentChronicleMilestoneIndex
+            ChronicleMode.Live => liveEntries,
+            ChronicleMode.Archive => archiveEntries,
+            _ => milestoneEntries
+        };
+
+        var selectedArea = ResolveSelectionArea(request.SelectedArea, urgentItems.Count, modeEntries.Count);
+        var selectedUrgentIndex = ClampIndex(request.SelectedUrgentIndex, urgentItems.Count);
+        var selectedEntryIndex = ClampIndex(GetEntryIndex(request), modeEntries.Count);
+        var selectedUrgent = selectedArea == ChronicleSelectionArea.Urgent && urgentItems.Count > 0
+            ? urgentItems[selectedUrgentIndex]
+            : null;
+        var selectedEntry = selectedArea == ChronicleSelectionArea.Entries && modeEntries.Count > 0
+            ? modeEntries[selectedEntryIndex]
+            : null;
+
+        return (
+            urgentItems,
+            modeEntries,
+            selectedArea,
+            selectedUrgent,
+            selectedEntry,
+            archiveEntries.Length,
+            milestoneEntries.Length);
+    }
+
+    private static int GetEntryIndex(ChronicleViewRequest request)
+    {
+        return request.Mode switch
+        {
+            ChronicleMode.Live => request.SelectedLiveEntryIndex,
+            ChronicleMode.Archive => request.SelectedArchiveEntryIndex,
+            _ => request.SelectedMilestoneEntryIndex
         };
     }
 

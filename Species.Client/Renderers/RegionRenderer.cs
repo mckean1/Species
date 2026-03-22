@@ -1,4 +1,3 @@
-using System.Text;
 using Species.Client.Models;
 using Species.Client.Presentation;
 using Species.Client.ViewModels;
@@ -29,14 +28,14 @@ public static class RegionRenderer
 
         var lines = new List<string>();
         lines.AddRange(PlayerScreenShell.BuildHeader("Regions", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
-        lines.Add(BorderLine($"{PaneTitle}Known Regions{Reset}", innerWidth));
+        lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PaneTitle}Known Regions{Reset}", innerWidth), innerWidth));
 
         var listLines = BuildRegionList(data, innerWidth, topListHeight);
-        lines.AddRange(listLines.Select(line => BorderLine(line, innerWidth)));
-        lines.Add(HorizontalBorder(innerWidth));
+        lines.AddRange(listLines.Select(line => PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth)));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
         var lowerRows = BuildLowerRows(data.SelectedRegion, leftWidth, rightWidth, lowerHeight);
-        lines.AddRange(lowerRows.Select(line => BorderLine(line, innerWidth)));
+        lines.AddRange(lowerRows.Select(line => PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
         lines.Add(PlayerScreenShell.BuildFooter(
             innerWidth,
@@ -53,11 +52,11 @@ public static class RegionRenderer
         var rows = new List<string>(listHeight);
         var columnWidths = new[] { 24, 12, 13, 11, 10 };
         rows.Add(
-            FitVisible("Name", columnWidths[0]) + " | " +
-            FitVisible("Biome", columnWidths[1]) + " | " +
-            FitVisible("Knowledge", columnWidths[2]) + " | " +
-            FitVisible("Presence", columnWidths[3]) + " | " +
-            FitVisible("Threat", columnWidths[4]));
+            PlayerScreenShell.FitVisible("Name", columnWidths[0]) + " | " +
+            PlayerScreenShell.FitVisible("Biome", columnWidths[1]) + " | " +
+            PlayerScreenShell.FitVisible("Knowledge", columnWidths[2]) + " | " +
+            PlayerScreenShell.FitVisible("Presence", columnWidths[3]) + " | " +
+            PlayerScreenShell.FitVisible("Threat", columnWidths[4]));
 
         if (data.Regions.Count == 0)
         {
@@ -74,11 +73,11 @@ public static class RegionRenderer
                 var region = data.Regions[index];
                 var familiarity = region.Familiarity;
                 var presence = region.PresenceText;
-                var row = FitVisible(region.Name, columnWidths[0]) + " | " +
-                          FitVisible(region.Biome, columnWidths[1]) + " | " +
-                          FitVisible(familiarity, columnWidths[2]) + " | " +
-                          FitVisible(presence, columnWidths[3]) + " | " +
-                          FitVisible(ColorThreat($"{region.ThreatText} {region.ThreatScore:00}", region.ThreatScore), columnWidths[4]);
+                var row = PlayerScreenShell.FitVisible(region.Name, columnWidths[0]) + " | " +
+                          PlayerScreenShell.FitVisible(region.Biome, columnWidths[1]) + " | " +
+                          PlayerScreenShell.FitVisible(familiarity, columnWidths[2]) + " | " +
+                          PlayerScreenShell.FitVisible(presence, columnWidths[3]) + " | " +
+                          PlayerScreenShell.FitVisible(ColorThreat($"{region.ThreatText} {region.ThreatScore:00}", region.ThreatScore), columnWidths[4]);
 
                 if (index == data.SelectedIndex)
                 {
@@ -89,7 +88,7 @@ public static class RegionRenderer
                     row = $"  {row}";
                 }
 
-                rows.Add(FitVisible(row, innerWidth));
+                rows.Add(PlayerScreenShell.FitVisible(row, innerWidth));
             }
         }
 
@@ -111,7 +110,7 @@ public static class RegionRenderer
         {
             var left = index < leftLines.Count ? leftLines[index] : string.Empty;
             var right = index < rightLines.Count ? rightLines[index] : string.Empty;
-            rows.Add($"{FitVisible(left, leftWidth)} | {FitVisible(right, rightWidth)}");
+            rows.Add($"{PlayerScreenShell.FitVisible(left, leftWidth)} | {PlayerScreenShell.FitVisible(right, rightWidth)}");
         }
 
         return rows;
@@ -187,35 +186,7 @@ public static class RegionRenderer
 
     private static IReadOnlyList<string> BuildBulletLines(IEnumerable<string> items, int width, string color)
     {
-        var lines = new List<string>();
-
-        foreach (var item in items)
-        {
-            var words = item.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var current = "*";
-
-            foreach (var word in words)
-            {
-                var candidate = $"{current} {word}";
-                if (candidate.Length <= width)
-                {
-                    current = candidate;
-                    continue;
-                }
-
-                lines.Add(FitVisible($"{color}{current}{Reset}", width));
-                current = $"  {word}";
-            }
-
-            lines.Add(FitVisible($"{color}{current}{Reset}", width));
-        }
-
-        if (lines.Count == 0)
-        {
-            lines.Add(FitVisible($"{Dim}None{Reset}", width));
-        }
-
-        return lines;
+        return RendererTextWrap.BuildBulletLines(items, width, color, Reset, $"{Dim}None{Reset}");
     }
 
     private static string ColorWater(string waterAvailability)
@@ -241,84 +212,4 @@ public static class RegionRenderer
         return $"{color}{threatText}{Reset}";
     }
 
-    private static string FitVisible(string text, int width)
-    {
-        if (width <= 0)
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder();
-        var visibleLength = 0;
-        var index = 0;
-
-        while (index < text.Length && visibleLength < width)
-        {
-            if (text[index] == '\u001b')
-            {
-                var start = index;
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                if (index < text.Length)
-                {
-                    index++;
-                }
-
-                builder.Append(text[start..index]);
-                continue;
-            }
-
-            builder.Append(text[index]);
-            index++;
-            visibleLength++;
-        }
-
-        if (visibleLength < width)
-        {
-            builder.Append(' ', width - visibleLength);
-        }
-
-        return builder.ToString();
-    }
-
-    private static int VisibleLength(string text)
-    {
-        var length = 0;
-
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] == '\u001b')
-            {
-                while (index < text.Length && text[index] != 'm')
-                {
-                    index++;
-                }
-
-                continue;
-            }
-
-            length++;
-        }
-
-        return length;
-    }
-
-    private static string PadBetween(string left, string right, int width)
-    {
-        var spaces = Math.Max(1, width - VisibleLength(left) - VisibleLength(right));
-        return left + new string(' ', spaces) + right;
-    }
-
-    private static string HorizontalBorder(int innerWidth)
-    {
-        return "+" + new string('-', innerWidth + 2) + "+";
-    }
-
-    private static string BorderLine(string content, int innerWidth)
-    {
-        return $"| {FitVisible(content, innerWidth)} |";
-    }
 }

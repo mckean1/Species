@@ -10,6 +10,40 @@ namespace Species.Client.ViewModelFactories;
 
 public static class KnownSpeciesViewModelFactory
 {
+    public static int GetKnownSpeciesCount(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId)
+    {
+        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
+        if (focusGroup is null)
+        {
+            return 0;
+        }
+
+        var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, focusGroup.PolityId, StringComparison.Ordinal));
+        if (focusPolity is null)
+        {
+            return 1;
+        }
+
+        var visibleRegionIds = focusGroup.KnownRegionIds
+            .Append(focusGroup.CurrentRegionId)
+            .Concat(world.PopulationGroups
+                .Where(group => string.Equals(group.PolityId, focusPolity.Id, StringComparison.Ordinal))
+                .Select(group => group.CurrentRegionId))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var faunaCount = focusPolity.SpeciesAwareness
+            .Where(state => state.SpeciesClass == SpeciesClass.Fauna && state.CurrentLevel >= KnowledgeLevel.Encounter)
+            .Select(state => state.SpeciesId)
+            .Distinct(StringComparer.Ordinal)
+            .Count(speciesId =>
+                faunaCatalog.GetById(speciesId) is not null &&
+                world.Regions.Any(region =>
+                    visibleRegionIds.Contains(region.Id) &&
+                    region.Ecosystem.FaunaPopulations.GetValueOrDefault(speciesId) > 0));
+
+        return 1 + faunaCount;
+    }
+
     public static KnownSpeciesViewModel Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);

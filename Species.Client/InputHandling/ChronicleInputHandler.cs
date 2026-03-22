@@ -7,12 +7,14 @@ public static class ChronicleInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
+        var request = context.ViewState.CreateChronicleViewRequest();
+
         switch (key.Key)
         {
             case ConsoleKey.Backspace:
                 {
-                    var chronicleData = ChronicleViewModelFactory.Build(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState);
-                    context.ViewState.ReturnChronicleToLive(chronicleData.UrgentItems.Count);
+                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    context.ViewState.ReturnChronicleToLive(selectionInfo.UrgentCount);
                     return PlayerInputResult.Render;
                 }
             case ConsoleKey.LeftArrow:
@@ -23,26 +25,26 @@ public static class ChronicleInputHandler
                 return PlayerInputResult.Render;
             case ConsoleKey.UpArrow:
                 {
-                    var chronicleData = ChronicleViewModelFactory.Build(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState);
-                    context.ViewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, -1);
+                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    context.ViewState.MoveChronicleSelection(selectionInfo.UrgentCount, selectionInfo.EntryCount, -1);
                     return PlayerInputResult.Render;
                 }
             case ConsoleKey.DownArrow:
                 {
-                    var chronicleData = ChronicleViewModelFactory.Build(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState);
-                    context.ViewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, 1);
+                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    context.ViewState.MoveChronicleSelection(selectionInfo.UrgentCount, selectionInfo.EntryCount, 1);
                     return PlayerInputResult.Render;
                 }
             case ConsoleKey.Enter:
                 {
-                    var chronicleData = ChronicleViewModelFactory.Build(context.CurrentWorld, context.ViewState.FocalPolityId, context.ViewState);
-                    if (chronicleData.SelectedUrgent is null)
+                    var selectionInfo = ChronicleViewModelFactory.GetSelectionInfo(context.CurrentWorld, context.ViewState.FocalPolityId, request);
+                    if (selectionInfo.SelectedUrgent is null)
                     {
                         return PlayerInputResult.None;
                     }
 
-                    context.ViewState.SetScreen(chronicleData.SelectedUrgent.TargetScreen);
-                    if (chronicleData.SelectedUrgent.TargetScreen == PlayerScreen.Laws)
+                    context.ViewState.SetScreen(selectionInfo.SelectedUrgent.TargetScreen);
+                    if (selectionInfo.SelectedUrgent.TargetScreen == PlayerScreen.Laws)
                     {
                         context.ViewState.SetLawSelection(0);
                     }

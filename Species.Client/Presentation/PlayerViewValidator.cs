@@ -58,43 +58,46 @@ public static class PlayerViewValidator
         }
 
         var focalPolityId = focalPolity?.Id ?? string.Empty;
-        var regionCount = RegionsViewModelFactory.Build(world, focalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count;
+        var regionCount = RegionsViewModelFactory.GetKnownRegionCount(world, focalPolityId);
         if (viewState.CurrentRegionIndex < 0 || (regionCount > 0 && viewState.CurrentRegionIndex >= regionCount))
         {
             errors.Add("Regions points at an invalid region.");
         }
 
-        var polityCount = KnownPolitiesViewModelFactory.Build(world, focalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
+        var polityCount = KnownPolitiesViewModelFactory.GetKnownPolityCount(world, focalPolityId);
         if (viewState.CurrentKnownPolityIndex < 0 ||
             (polityCount > 0 && viewState.CurrentKnownPolityIndex >= polityCount))
         {
             errors.Add("Known Polities points at an invalid polity.");
         }
 
-        var advancementCount = AdvancementViewModelFactory.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
+        var advancementCount = AdvancementViewModelFactory.GetAdvancementCount(advancementCatalog);
         if (viewState.CurrentAdvancementIndex < 0 ||
             (advancementCount > 0 && viewState.CurrentAdvancementIndex >= advancementCount))
         {
             errors.Add("Advancements points at an invalid advancement.");
         }
 
-        var lawCount = LawsViewModelFactory.Build(world, focalPolityId, viewState.CurrentLawIndex).Laws.Count;
+        var lawSelection = LawsViewModelFactory.GetSelectionInfo(world, focalPolityId, viewState.CurrentLawIndex);
+        var lawCount = lawSelection.LawCount;
         if (viewState.CurrentLawIndex < 0 ||
             (lawCount > 0 && viewState.CurrentLawIndex >= lawCount))
         {
             errors.Add("Laws points at an invalid law.");
         }
 
-        var knownSpeciesCount = KnownSpeciesViewModelFactory.Build(world, faunaCatalog, focalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
+        var knownSpeciesCount = KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, faunaCatalog, focalPolityId);
         if (viewState.CurrentKnownSpeciesIndex < 0 ||
             (knownSpeciesCount > 0 && viewState.CurrentKnownSpeciesIndex >= knownSpeciesCount))
         {
             errors.Add("Known Species points at an invalid species.");
         }
 
-        var chronicleData = ChronicleViewModelFactory.Build(world, focalPolityId, viewState);
+        var chronicleRequest = viewState.CreateChronicleViewRequest();
+        var chronicleSelection = ChronicleViewModelFactory.GetSelectionInfo(world, focalPolityId, chronicleRequest);
+        var chronicleData = ChronicleViewModelFactory.Build(world, focalPolityId, chronicleRequest);
         if (viewState.CurrentChronicleUrgentIndex < 0 ||
-            (chronicleData.UrgentItems.Count > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleData.UrgentItems.Count))
+            (chronicleSelection.UrgentCount > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleSelection.UrgentCount))
         {
             errors.Add("Chronicle urgent selection points at an invalid item.");
         }
@@ -106,7 +109,7 @@ public static class PlayerViewValidator
             _ => viewState.CurrentChronicleMilestoneIndex
         };
         if (chronicleEntryIndex < 0 ||
-            (chronicleData.Entries.Count > 0 && chronicleEntryIndex >= chronicleData.Entries.Count))
+            (chronicleSelection.EntryCount > 0 && chronicleEntryIndex >= chronicleSelection.EntryCount))
         {
             errors.Add("Chronicle entry selection points at an invalid item.");
         }

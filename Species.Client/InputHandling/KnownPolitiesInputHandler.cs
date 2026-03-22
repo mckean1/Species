@@ -6,12 +6,7 @@ public static class KnownPolitiesInputHandler
 {
     public static PlayerInputResult HandleKey(ConsoleKeyInfo key, PlayerInputContext context)
     {
-        var polityCount = KnownPolitiesViewModelFactory.Build(
-            context.CurrentWorld,
-            context.ViewState.FocalPolityId,
-            context.ViewState.CurrentKnownPolityIndex,
-            context.DiscoveryCatalog,
-            context.AdvancementCatalog).Polities.Count;
+        var polityCount = KnownPolitiesViewModelFactory.GetKnownPolityCount(context.CurrentWorld, context.ViewState.FocalPolityId);
 
         if (polityCount == 0)
         {
