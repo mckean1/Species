@@ -16,8 +16,10 @@ public static class AdvancementViewModelFactory
         string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
-        int selectedIndex)
+        int selectedIndex,
+        bool isSimulationRunning = false)
     {
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
@@ -32,7 +34,9 @@ public static class AdvancementViewModelFactory
             : Math.Clamp(selectedIndex, 0, items.Length - 1);
 
         return new AdvancementsViewModel(
+            focusPolity?.Name ?? "Unknown polity",
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             items,
             items.Length == 0 ? null : items[clampedIndex],
             clampedIndex,

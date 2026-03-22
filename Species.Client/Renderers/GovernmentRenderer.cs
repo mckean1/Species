@@ -1,6 +1,4 @@
-using Species.Domain.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -16,13 +14,8 @@ public static class GovernmentRenderer
     private const string Orange = "\u001b[38;5;215m";
     private const string Red = "\u001b[38;5;210m";
 
-    public static string Render(
-        World world,
-        string focalPolityId,
-        bool isSimulationRunning,
-        TerminalViewport viewport)
+    public static string Render(GovernmentViewModel data, TerminalViewport viewport)
     {
-        var data = GovernmentViewModelFactory.Build(world, focalPolityId);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var bodyHeight = Math.Max(16, viewport.Height - 7);
         var bodyLines = BuildBodyLines(data, innerWidth);
@@ -39,7 +32,7 @@ public static class GovernmentRenderer
         }
 
         var lines = new List<string>(bodyHeight + 8);
-        lines.AddRange(PlayerScreenShell.BuildHeader("Government", data.PolityName, data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Government", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
         lines.AddRange(bodyLines.Select(line => PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible(line, innerWidth), innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
         lines.Add(PlayerScreenShell.BuildFooter(

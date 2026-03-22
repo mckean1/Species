@@ -1,9 +1,6 @@
 using System.Text;
-using Species.Domain.Catalogs;
-using Species.Domain.Models;
 using Species.Client.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -21,25 +18,18 @@ public static class KnownSpeciesRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    public static string Render(
-        World world,
-        string focalPolityId,
-        FaunaSpeciesCatalog faunaCatalog,
-        int selectedIndex,
-        bool isSimulationRunning,
-        TerminalViewport viewport)
+    public static string Render(KnownSpeciesViewModel data, TerminalViewport viewport)
     {
-        var data = KnownSpeciesViewModelFactory.Build(world, faunaCatalog, focalPolityId, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
         var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var listLines = BuildSpeciesList(data, listWidth, bodyHeight);
-        var detailLines = BuildDetailPanel(data.SelectedSpecies, detailWidth, bodyHeight, isSimulationRunning);
+        var detailLines = BuildDetailPanel(data.SelectedSpecies, detailWidth, bodyHeight, data.IsSimulationRunning);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Known Species", PlayerScreenShell.ResolvePolityName(world, focalPolityId), data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Known Species", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {

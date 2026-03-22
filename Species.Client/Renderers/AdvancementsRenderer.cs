@@ -1,10 +1,7 @@
 using System.Text;
-using Species.Domain.Catalogs;
-using Species.Domain.Models;
 using Species.Client.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -22,26 +19,18 @@ public static class AdvancementsRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    public static string Render(
-        World world,
-        string focalPolityId,
-        DiscoveryCatalog discoveryCatalog,
-        AdvancementCatalog advancementCatalog,
-        int selectedIndex,
-        bool isSimulationRunning,
-        TerminalViewport viewport)
+    public static string Render(AdvancementsViewModel data, TerminalViewport viewport)
     {
-        var data = AdvancementViewModelFactory.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, selectedIndex);
         var innerWidth = Math.Max(80, viewport.Width - 4);
         var listWidth = Math.Max(36, ((innerWidth - 3) * 10) / 21);
         var detailWidth = Math.Max(28, innerWidth - listWidth - 3);
         var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var listLines = BuildAdvancementList(data, listWidth, bodyHeight);
-        var detailLines = BuildDetailPanel(data.SelectedItem, detailWidth, bodyHeight, isSimulationRunning);
+        var detailLines = BuildDetailPanel(data.SelectedItem, detailWidth, bodyHeight, data.IsSimulationRunning);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Advancements", PlayerScreenShell.ResolvePolityName(world, focalPolityId), data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Advancements", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
 
         for (var row = 0; row < bodyHeight; row++)
         {

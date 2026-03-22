@@ -8,6 +8,7 @@ public sealed class ChronicleViewModel
     public ChronicleViewModel(
         string currentDate,
         string polityName,
+        bool isSimulationRunning,
         ChronicleMode mode,
         IReadOnlyList<ChronicleUrgentItem> urgentItems,
         IReadOnlyList<ChronicleListItem> entries,
@@ -19,6 +20,7 @@ public sealed class ChronicleViewModel
     {
         CurrentDate = currentDate;
         PolityName = polityName;
+        IsSimulationRunning = isSimulationRunning;
         Mode = mode;
         UrgentItems = urgentItems;
         Entries = entries;
@@ -32,6 +34,8 @@ public sealed class ChronicleViewModel
     public string CurrentDate { get; }
 
     public string PolityName { get; }
+
+    public bool IsSimulationRunning { get; }
 
     public ChronicleMode Mode { get; }
 

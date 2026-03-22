@@ -10,14 +10,17 @@ namespace Species.Client.ViewModelFactories;
 
 public static class KnownSpeciesViewModelFactory
 {
-    public static KnownSpeciesViewModel Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex)
+    public static KnownSpeciesViewModel Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex, bool isSimulationRunning = false)
     {
+        var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var items = BuildSpecies(world, focusGroup, faunaCatalog);
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
 
         return new KnownSpeciesViewModel(
+            focusPolity?.Name ?? "Unknown polity",
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             items,
             items.Count == 0 ? null : items[clampedIndex],
             clampedIndex);

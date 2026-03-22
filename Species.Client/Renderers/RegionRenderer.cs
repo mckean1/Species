@@ -1,9 +1,6 @@
 using System.Text;
-using Species.Domain.Catalogs;
-using Species.Domain.Models;
 using Species.Client.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -22,27 +19,16 @@ public static class RegionRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    public static string Render(
-        World world,
-        string focalPolityId,
-        int regionIndex,
-        FloraSpeciesCatalog floraCatalog,
-        FaunaSpeciesCatalog faunaCatalog,
-        DiscoveryCatalog discoveryCatalog,
-        AdvancementCatalog advancementCatalog,
-        bool isSimulationRunning,
-        TerminalViewport viewport)
+    public static string Render(RegionsViewModel data, TerminalViewport viewport)
     {
-        var data = RegionsViewModelFactory.Build(world, focalPolityId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var topListHeight = Math.Max(8, Math.Min(12, viewport.Height / 3));
         var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 9);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var rightWidth = Math.Max(24, innerWidth - leftWidth - 3);
-        var polityName = PlayerScreenShell.ResolvePolityName(world, focalPolityId);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Regions", polityName, data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Regions", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
         lines.Add(BorderLine($"{PaneTitle}Known Regions{Reset}", innerWidth));
 
         var listLines = BuildRegionList(data, innerWidth, topListHeight);

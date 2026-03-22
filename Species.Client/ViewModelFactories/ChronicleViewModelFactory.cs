@@ -11,7 +11,7 @@ namespace Species.Client.ViewModelFactories;
 
 public static class ChronicleViewModelFactory
 {
-    public static ChronicleViewModel Build(World world, string focalPolityId, PlayerViewState viewState)
+    public static ChronicleViewModel Build(World world, string focalPolityId, PlayerViewState viewState, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -30,24 +30,27 @@ public static class ChronicleViewModelFactory
             _ => milestoneEntries
         };
 
-        viewState.ClampChronicleSelection(urgentItems.Count, modeEntries.Count);
+        var selectedArea = ResolveSelectionArea(viewState.CurrentChronicleSelectionArea, urgentItems.Count, modeEntries.Count);
+        var selectedUrgentIndex = ClampIndex(viewState.CurrentChronicleUrgentIndex, urgentItems.Count);
+        var selectedEntryIndex = ClampIndex(GetEntryIndex(viewState), modeEntries.Count);
 
-        var selectedUrgent = viewState.CurrentChronicleSelectionArea == ChronicleSelectionArea.Urgent && urgentItems.Count > 0
-            ? urgentItems[viewState.CurrentChronicleUrgentIndex]
+        var selectedUrgent = selectedArea == ChronicleSelectionArea.Urgent && urgentItems.Count > 0
+            ? urgentItems[selectedUrgentIndex]
             : null;
-        var selectedEntry = viewState.CurrentChronicleSelectionArea == ChronicleSelectionArea.Entries && modeEntries.Count > 0
-            ? modeEntries[GetEntryIndex(viewState)]
+        var selectedEntry = selectedArea == ChronicleSelectionArea.Entries && modeEntries.Count > 0
+            ? modeEntries[selectedEntryIndex]
             : null;
 
         return new ChronicleViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             focusPolity?.Name ?? "Unknown polity",
+            isSimulationRunning,
             viewState.CurrentChronicleMode,
             urgentItems,
             modeEntries,
             selectedUrgent,
             selectedEntry,
-            viewState.CurrentChronicleSelectionArea,
+            selectedArea,
             BuildConditionSummary(focusPolity, focusContext),
             BuildModeNotes(viewState.CurrentChronicleMode, visibleEntries.Count, milestoneEntries.Length));
     }
@@ -263,6 +266,43 @@ public static class ChronicleViewModelFactory
             ChronicleMode.Archive => viewState.CurrentChronicleArchiveIndex,
             _ => viewState.CurrentChronicleMilestoneIndex
         };
+    }
+
+    private static ChronicleSelectionArea ResolveSelectionArea(ChronicleSelectionArea selectionArea, int urgentCount, int entryCount)
+    {
+        if (urgentCount <= 0 && entryCount <= 0)
+        {
+            return ChronicleSelectionArea.Entries;
+        }
+
+        if (selectionArea == ChronicleSelectionArea.Urgent && urgentCount <= 0)
+        {
+            return ChronicleSelectionArea.Entries;
+        }
+
+        if (selectionArea == ChronicleSelectionArea.Entries && entryCount <= 0)
+        {
+            return urgentCount > 0
+                ? ChronicleSelectionArea.Urgent
+                : ChronicleSelectionArea.Entries;
+        }
+
+        return selectionArea;
+    }
+
+    private static int ClampIndex(int index, int count)
+    {
+        if (count <= 0)
+        {
+            return 0;
+        }
+
+        if (index < 0)
+        {
+            return 0;
+        }
+
+        return index >= count ? count - 1 : index;
     }
 
     private static string SummarizeDirection(PolityContext context)

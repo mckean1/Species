@@ -17,7 +17,8 @@ public static class RegionsViewModelFactory
         int selectedRegionIndex,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
-        DiscoveryCatalog discoveryCatalog)
+        DiscoveryCatalog discoveryCatalog,
+        bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -35,7 +36,9 @@ public static class RegionsViewModelFactory
             .ToArray();
 
         return new RegionsViewModel(
+            focusPolity?.Name ?? "Unknown polity",
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             summaries,
             summaries.Length == 0 ? null : summaries[selectedIndex],
             selectedIndex);

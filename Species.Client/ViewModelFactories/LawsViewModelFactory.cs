@@ -7,7 +7,13 @@ namespace Species.Client.ViewModelFactories;
 
 public static class LawsViewModelFactory
 {
-    public static LawsViewModel Build(World world, string focalPolityId, int selectedIndex)
+    public static LawsViewModel Build(
+        World world,
+        string focalPolityId,
+        int selectedIndex,
+        bool isSimulationRunning = false,
+        bool isActionMenuOpen = false,
+        int selectedActionIndex = 0)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var polityName = focusPolity?.Name ?? "Unknown polity";
@@ -20,6 +26,7 @@ public static class LawsViewModelFactory
         return new LawsViewModel(
             polityName,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             items,
             pendingDecisions,
             recentDecisions,
@@ -27,6 +34,8 @@ public static class LawsViewModelFactory
             clampedIndex,
             focusPolity is not null && focusPolity.ActiveLawProposal is not null,
             selected?.Status == Species.Domain.Enums.LawProposalStatus.Active,
+            isActionMenuOpen,
+            selectedActionIndex,
             BuildGovernanceSummary(focusPolity),
             BuildEnactedLaws(focusPolity),
             [

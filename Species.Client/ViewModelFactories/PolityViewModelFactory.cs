@@ -18,7 +18,7 @@ public static class PolityViewModelFactory
         Critical
     }
 
-    public static PolityViewModel Build(World world, string focalPolityId)
+    public static PolityViewModel Build(World world, string focalPolityId, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var context = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -27,6 +27,7 @@ public static class PolityViewModelFactory
             return new PolityViewModel(
                 "Unknown polity",
                 FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+                isSimulationRunning,
                 "Unknown",
                 "0",
                 "0",
@@ -45,6 +46,7 @@ public static class PolityViewModelFactory
         return new PolityViewModel(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm),
             context.TotalPopulation.ToString("N0"),
             activeSettlementCount.ToString("N0"),

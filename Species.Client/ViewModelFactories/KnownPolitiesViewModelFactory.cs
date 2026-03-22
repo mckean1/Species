@@ -16,7 +16,8 @@ public static class KnownPolitiesViewModelFactory
         string focalPolityId,
         int selectedPolityIndex,
         DiscoveryCatalog discoveryCatalog,
-        AdvancementCatalog advancementCatalog)
+        AdvancementCatalog advancementCatalog,
+        bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -27,7 +28,9 @@ public static class KnownPolitiesViewModelFactory
             : Math.Clamp(selectedPolityIndex, 0, knownPolities.Count - 1);
 
         return new KnownPolitiesViewModel(
+            focusPolity?.Name ?? "Unknown polity",
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             knownPolities,
             knownPolities.Count == 0 ? null : knownPolities[clampedIndex],
             clampedIndex);

@@ -7,6 +7,7 @@ public sealed class PolityViewModel
     public PolityViewModel(
         string polityName,
         string currentDate,
+        bool isSimulationRunning,
         string governmentForm,
         string population,
         string settlementCount,
@@ -18,6 +19,7 @@ public sealed class PolityViewModel
     {
         PolityName = polityName;
         CurrentDate = currentDate;
+        IsSimulationRunning = isSimulationRunning;
         GovernmentForm = governmentForm;
         Population = population;
         SettlementCount = settlementCount;
@@ -31,6 +33,8 @@ public sealed class PolityViewModel
     public string PolityName { get; }
 
     public string CurrentDate { get; }
+
+    public bool IsSimulationRunning { get; }
 
     public string GovernmentForm { get; }
 

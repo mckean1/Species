@@ -7,6 +7,7 @@ public sealed class LawsViewModel
     public LawsViewModel(
         string polityName,
         string currentDate,
+        bool isSimulationRunning,
         IReadOnlyList<LawScreenItem> laws,
         IReadOnlyList<LawScreenItem> pendingDecisions,
         IReadOnlyList<LawScreenItem> recentDecisions,
@@ -14,6 +15,8 @@ public sealed class LawsViewModel
         int selectedIndex,
         bool hasActiveProposal,
         bool hasSelectedPendingDecision,
+        bool isActionMenuOpen,
+        int selectedActionIndex,
         IReadOnlyList<string> governanceSummary,
         IReadOnlyList<EnactedLawScreenItem> enactedLaws,
         IReadOnlyList<string> notes,
@@ -21,6 +24,7 @@ public sealed class LawsViewModel
     {
         PolityName = polityName;
         CurrentDate = currentDate;
+        IsSimulationRunning = isSimulationRunning;
         Laws = laws;
         PendingDecisions = pendingDecisions;
         RecentDecisions = recentDecisions;
@@ -28,6 +32,8 @@ public sealed class LawsViewModel
         SelectedIndex = selectedIndex;
         HasActiveProposal = hasActiveProposal;
         HasSelectedPendingDecision = hasSelectedPendingDecision;
+        IsActionMenuOpen = isActionMenuOpen;
+        SelectedActionIndex = selectedActionIndex;
         GovernanceSummary = governanceSummary;
         EnactedLaws = enactedLaws;
         Notes = notes;
@@ -37,6 +43,8 @@ public sealed class LawsViewModel
     public string PolityName { get; }
 
     public string CurrentDate { get; }
+
+    public bool IsSimulationRunning { get; }
 
     public IReadOnlyList<LawScreenItem> Laws { get; }
 
@@ -51,6 +59,10 @@ public sealed class LawsViewModel
     public bool HasActiveProposal { get; }
 
     public bool HasSelectedPendingDecision { get; }
+
+    public bool IsActionMenuOpen { get; }
+
+    public int SelectedActionIndex { get; }
 
     public IReadOnlyList<string> GovernanceSummary { get; }
 

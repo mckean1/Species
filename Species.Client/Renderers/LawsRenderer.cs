@@ -1,9 +1,7 @@
 using System.Text;
 using Species.Domain.Enums;
-using Species.Domain.Models;
 using Species.Client.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -21,25 +19,17 @@ public static class LawsRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    public static string Render(
-        World world,
-        string focalPolityId,
-        int selectedIndex,
-        bool isSimulationRunning,
-        bool isLawActionMenuOpen,
-        int selectedActionIndex,
-        TerminalViewport viewport)
+    public static string Render(LawsViewModel data, TerminalViewport viewport)
     {
-        var data = LawsViewModelFactory.Build(world, focalPolityId, selectedIndex);
         var innerWidth = Math.Max(82, viewport.Width - 4);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var rightWidth = Math.Max(30, innerWidth - leftWidth - 3);
         var bodyHeight = Math.Max(18, viewport.Height - 7);
 
         var listLines = BuildLawList(data, leftWidth);
-        var detailLines = BuildLawDetail(data, rightWidth, isSimulationRunning, isLawActionMenuOpen, selectedActionIndex);
+        var detailLines = BuildLawDetail(data, rightWidth);
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Laws", data.PolityName, data.CurrentDate, isSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Laws", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
 
         var topRows = Math.Max(listLines.Count, detailLines.Count);
         for (var row = 0; row < topRows; row++)
@@ -66,8 +56,8 @@ public static class LawsRenderer
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
         lines.Add(PlayerScreenShell.BuildFooter(
             innerWidth,
-            BuildFullFooter(isSimulationRunning, data.HasSelectedPendingDecision, isLawActionMenuOpen),
-            BuildMediumFooter(isSimulationRunning, data.HasSelectedPendingDecision, isLawActionMenuOpen),
+            BuildFullFooter(data.IsSimulationRunning, data.HasSelectedPendingDecision, data.IsActionMenuOpen),
+            BuildMediumFooter(data.IsSimulationRunning, data.HasSelectedPendingDecision, data.IsActionMenuOpen),
             ["Tab: Screens", "Up/Down: Navigate", "Enter: Select"]));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
 
@@ -141,10 +131,7 @@ public static class LawsRenderer
 
     private static IReadOnlyList<string> BuildLawDetail(
         LawsViewModel data,
-        int width,
-        bool isSimulationRunning,
-        bool isLawActionMenuOpen,
-        int selectedActionIndex)
+        int width)
     {
         if (data.SelectedLaw is null)
         {
@@ -186,18 +173,18 @@ public static class LawsRenderer
         {
             lines.Add($"{Dim}{new string('-', width)}{Reset}");
             lines.Add($"{PaneTitle}Decision Actions{Reset}");
-            if (isSimulationRunning)
+            if (data.IsSimulationRunning)
             {
                 lines.AddRange(WrapText("Pause the simulation to Pass or Veto this proposal.", width));
             }
-            else if (!isLawActionMenuOpen)
+            else if (!data.IsActionMenuOpen)
             {
                 lines.AddRange(WrapText("Press Enter to open the Pass / Veto decision.", width));
             }
             else
             {
-                lines.Add(RenderActionRow("Pass", selectedActionIndex == 0, width));
-                lines.Add(RenderActionRow("Veto", selectedActionIndex == 1, width));
+                lines.Add(RenderActionRow("Pass", data.SelectedActionIndex == 0, width));
+                lines.Add(RenderActionRow("Veto", data.SelectedActionIndex == 1, width));
                 lines.AddRange(WrapText("Enter confirms the highlighted action.", width));
             }
         }

@@ -5,7 +5,9 @@ namespace Species.Client.ViewModels;
 public sealed class AdvancementsViewModel
 {
     public AdvancementsViewModel(
+        string polityName,
         string currentDate,
+        bool isSimulationRunning,
         IReadOnlyList<AdvancementScreenItem> items,
         AdvancementScreenItem? selectedItem,
         int selectedIndex,
@@ -13,7 +15,9 @@ public sealed class AdvancementsViewModel
         int availableCount,
         int lockedCount)
     {
+        PolityName = polityName;
         CurrentDate = currentDate;
+        IsSimulationRunning = isSimulationRunning;
         Items = items;
         SelectedItem = selectedItem;
         SelectedIndex = selectedIndex;
@@ -22,7 +26,11 @@ public sealed class AdvancementsViewModel
         LockedCount = lockedCount;
     }
 
+    public string PolityName { get; }
+
     public string CurrentDate { get; }
+
+    public bool IsSimulationRunning { get; }
 
     public IReadOnlyList<AdvancementScreenItem> Items { get; }
 

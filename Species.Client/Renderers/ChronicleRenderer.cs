@@ -1,9 +1,7 @@
 using System.Text;
-using Species.Domain.Models;
 using Species.Client.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
-using Species.Client.ViewModelFactories;
 using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
@@ -22,9 +20,8 @@ public static class ChronicleRenderer
     private const string Red = "\u001b[38;5;210m";
     private const string HighlightBackground = "\u001b[48;5;236m";
 
-    public static string Render(World world, PlayerViewState viewState, TerminalViewport viewport)
+    public static string Render(ChronicleViewModel data, TerminalViewport viewport)
     {
-        var data = ChronicleViewModelFactory.Build(world, viewState.FocalPolityId, viewState);
         var innerWidth = Math.Max(84, viewport.Width - 4);
         var headerTitle = $"Chronicle [{DescribeMode(data.Mode)}]";
         var urgentHeight = Math.Clamp(4 + Math.Max(1, data.UrgentItems.Count), 5, 7);
@@ -33,7 +30,7 @@ public static class ChronicleRenderer
         var rightWidth = Math.Max(28, innerWidth - leftWidth - 3);
 
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader(headerTitle, data.PolityName, data.CurrentDate, viewState.IsSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader(headerTitle, data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
         lines.Add(BorderLine($"{PaneTitle}Urgent{Reset}", innerWidth));
         lines.AddRange(BuildUrgentSection(data, innerWidth, urgentHeight).Select(line => BorderLine(line, innerWidth)));
         lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));

@@ -10,7 +10,7 @@ public static class GovernmentViewModelFactory
 {
     private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
-    public static GovernmentViewModel Build(World world, string focalPolityId)
+    public static GovernmentViewModel Build(World world, string focalPolityId, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var context = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -19,6 +19,7 @@ public static class GovernmentViewModelFactory
             return new GovernmentViewModel(
                 "Unknown polity",
                 FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+                isSimulationRunning,
                 "Unknown",
                 "Not Established",
                 "Not Recorded");
@@ -30,6 +31,7 @@ public static class GovernmentViewModelFactory
         return new GovernmentViewModel(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
+            isSimulationRunning,
             PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm),
             ResolveCapital(focusPolity, context, regionsById),
             ResolveFounded(focusPolity));
