@@ -6,6 +6,18 @@ using Species.Domain.Models;
 
 namespace Species.Domain.Generation;
 
+/// <summary>
+/// TRANSITIONAL: This seeder is deprecated in favor of PrimitiveLifeSeeder for world generation.
+/// 
+/// RegionEcosystemSeeder was the pre-WG-3 approach that seeded all species from catalogs
+/// into regions, creating mature multi-species ecosystems at world start.
+/// 
+/// WG-3 replaces this with PrimitiveLifeSeeder, which seeds only primitive species
+/// to establish a minimal organic foothold rather than fabricating mature ecosystems.
+/// 
+/// This class remains temporarily for reference and potential future use in
+/// non-world-generation contexts (e.g., testing, scenario setup).
+/// </summary>
 public static class RegionEcosystemSeeder
 {
     public static RegionEcosystem Seed(

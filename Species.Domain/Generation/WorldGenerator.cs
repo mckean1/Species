@@ -77,7 +77,9 @@ public static class WorldGenerator
                 neighbors,
                 temperatureBand: temperatureBand,
                 terrainRuggedness: terrainRuggedness);
-            var ecosystem = RegionEcosystemSeeder.Seed(provisionalRegion, floraCatalog, faunaCatalog, random);
+
+            // WG-3: Seed primitive life only - not mature ecosystems
+            var ecosystem = PrimitiveLifeSeeder.Seed(provisionalRegion, floraCatalog, faunaCatalog, random);
             var seededRegion = new Region(
                 regionId,
                 regionName,
@@ -102,21 +104,12 @@ public static class WorldGenerator
                 terrainRuggedness));
         }
 
-        var provisionalWorld = new World(worldSeed, 1, 1, regions);
-        var spawnResult = PopulationGroupSpawner.Spawn(
-            provisionalWorld,
-            PopulationGroupSpawningConstants.DefaultGroupCount,
-            random);
-        var groupsByPolityId = spawnResult.Groups
-            .GroupBy(group => group.PolityId, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Sum(item => item.Population), StringComparer.Ordinal);
-        var focalPolityId = spawnResult.Polities
-            .OrderByDescending(polity => groupsByPolityId.GetValueOrDefault(polity.Id))
-            .ThenBy(polity => polity.Name, StringComparer.Ordinal)
-            .Select(polity => polity.Id)
-            .FirstOrDefault() ?? string.Empty;
+        // WG-3: World starts with primitive life but no sapients
+        // Sapient emergence belongs to a later roadmap phase (WG-4/WG-5)
+        // and should occur through historical simulation, not fabrication during world generation
+        var world = new World(worldSeed, 1, 1, regions);
 
-        return new World(worldSeed, 1, 1, regions, spawnResult.Groups, provisionalWorld.Chronicle, spawnResult.Polities, focalPolityId);
+        return world;
     }
 
     private static Dictionary<int, HashSet<int>> BuildNeighborMap(int regionCount, Random random)

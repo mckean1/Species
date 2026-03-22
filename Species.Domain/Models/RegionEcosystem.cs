@@ -9,9 +9,11 @@ public sealed class RegionEcosystem
         IReadOnlyDictionary<string, RegionalBiologicalProfile>? floraProfiles = null,
         IReadOnlyDictionary<string, RegionalBiologicalProfile>? faunaProfiles = null,
         IReadOnlyList<FossilRecord>? fossilRecords = null,
-        IReadOnlyList<BiologicalHistoryRecord>? biologicalHistoryRecords = null)
+        IReadOnlyList<BiologicalHistoryRecord>? biologicalHistoryRecords = null,
+        PrimitiveLifeSubstrate? primitiveLifeSubstrate = null)
     {
         ProtoLifeSubstrate = protoLifeSubstrate?.Clone() ?? new ProtoLifeSubstrate();
+        PrimitiveLifeSubstrate = primitiveLifeSubstrate?.Clone() ?? new PrimitiveLifeSubstrate();
         FloraPopulations = floraPopulations ?? new Dictionary<string, int>(StringComparer.Ordinal);
         FaunaPopulations = faunaPopulations ?? new Dictionary<string, int>(StringComparer.Ordinal);
         FloraProfiles = floraProfiles ?? new Dictionary<string, RegionalBiologicalProfile>(StringComparer.Ordinal);
@@ -20,7 +22,11 @@ public sealed class RegionEcosystem
         BiologicalHistoryRecords = biologicalHistoryRecords ?? Array.Empty<BiologicalHistoryRecord>();
     }
 
+    // Legacy substrate - still used by simulation systems during transition
     public ProtoLifeSubstrate ProtoLifeSubstrate { get; }
+
+    // Canonical primitive life substrate - represents the foundational organic state
+    public PrimitiveLifeSubstrate PrimitiveLifeSubstrate { get; }
 
     public IReadOnlyDictionary<string, int> FloraPopulations { get; }
 
