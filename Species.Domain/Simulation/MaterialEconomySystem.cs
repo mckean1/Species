@@ -1,4 +1,5 @@
 using Species.Domain.Catalogs;
+using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
@@ -230,7 +231,9 @@ public sealed class MaterialEconomySystem
         };
         var continuityFactor = 0.8 + Math.Clamp(presence.TotalMonthsPresent / 24.0, 0.0, 0.45);
         var knowledgeFactor = knownDiscoveryIds.Count > 0 ? 1.05 : 0.95;
-        var advancementFactor = learnedAdvancementIds.Contains(AdvancementCatalog.LocalResourceUseId) ? 1.20 : 1.00;
+        var advancementFactor = learnedAdvancementIds.Contains(AdvancementCatalog.StoneToolmakingId)
+            ? AdvancementConstants.StoneToolmakingMaterialExtractionMultiplier
+            : 1.00f;
         var lawFactor = 1.0;
         if (activeLawIds.Contains(GovernanceLawCatalog.ExtractionObligationId))
         {
@@ -390,9 +393,14 @@ public sealed class MaterialEconomySystem
             storageSupport = Math.Clamp((int)Math.Round(storageSupport * 1.10, MidpointRounding.AwayFromZero), 0, 100);
         }
 
-        if (learnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId))
+        if (learnedAdvancementIds.Contains(AdvancementCatalog.HideWorkingId))
         {
-            shelterSupport = Math.Clamp(shelterSupport + 10, 0, 100);
+            textileSupport = Math.Clamp((int)Math.Round(textileSupport + AdvancementConstants.HideWorkingTextileSupportBonus, MidpointRounding.AwayFromZero), 0, 100);
+        }
+
+        if (learnedAdvancementIds.Contains(AdvancementCatalog.FiberWorkingId))
+        {
+            textileSupport = Math.Clamp((int)Math.Round(textileSupport + AdvancementConstants.FiberWorkingTextileSupportBonus, MidpointRounding.AwayFromZero), 0, 100);
         }
 
         if (activeLawIds.Contains(GovernanceLawCatalog.CentralizeStoresId))

@@ -12,4 +12,5 @@ public static class ChronicleConstants
     public const int StablePressureDisplayThreshold = 45;
     public const int PressureTransitionDisplayThreshold = 60;
     public const int MeaningfulPressureDisplayDelta = 10;
+    public const int ActiveAlertVisibilityMonths = 2;
 }

@@ -1,16 +1,16 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
+using Species.Domain.Discovery;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
-namespace Species.Domain.Knowledge;
+namespace Species.Domain.Discovery;
 
-public sealed class GroupKnowledgeContext
+public sealed class GroupDiscoveryContext
 {
     private const float UnknownBaselineMultiplier = 0.65f;
     private const float EncounterBaselineMultiplier = 0.90f;
 
-    private readonly World world;
     private readonly PopulationGroup group;
     private readonly DiscoveryCatalog discoveryCatalog;
     private readonly FloraSpeciesCatalog floraCatalog;
@@ -22,14 +22,13 @@ public sealed class GroupKnowledgeContext
     private readonly float baselineWaterSupport;
     private readonly float baselineThreatPressure;
 
-    private GroupKnowledgeContext(
+    private GroupDiscoveryContext(
         World world,
         PopulationGroup group,
         DiscoveryCatalog discoveryCatalog,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog)
     {
-        this.world = world;
         this.group = group;
         this.discoveryCatalog = discoveryCatalog;
         this.floraCatalog = floraCatalog;
@@ -60,31 +59,31 @@ public sealed class GroupKnowledgeContext
         baselineThreatPressure = (float)knownRegions.Average(region => SubsistenceSupportModel.NormalizeThreatPressure(SubsistenceSupportModel.CalculateCarnivoreThreat(region, faunaCatalog)));
     }
 
-    public static GroupKnowledgeContext Create(
+    public static GroupDiscoveryContext Create(
         World world,
         PopulationGroup group,
         DiscoveryCatalog discoveryCatalog,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog)
     {
-        return new GroupKnowledgeContext(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
+        return new GroupDiscoveryContext(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
     }
 
-    public RegionKnowledgeSnapshot ObserveRegion(string regionId, string? fromRegionId = null)
+    public RegionDiscoverySnapshot ObserveRegion(string regionId, string? fromRegionId = null)
     {
         return regionsById.TryGetValue(regionId, out var region)
             ? ObserveRegion(region, fromRegionId)
-            : new RegionKnowledgeSnapshot(
+            : new RegionDiscoverySnapshot(
                 regionId,
                 "Unknown",
                 false,
                 false,
-                KnowledgeLevel.Unknown,
-                KnowledgeLevel.Unknown,
-                KnowledgeLevel.Unknown,
-                KnowledgeLevel.Unknown,
-                KnowledgeLevel.Unknown,
-                KnowledgeLevel.Unknown,
+                DiscoveryStage.Unknown,
+                DiscoveryStage.Unknown,
+                DiscoveryStage.Unknown,
+                DiscoveryStage.Unknown,
+                DiscoveryStage.Unknown,
+                DiscoveryStage.Unknown,
                 baselineGatheringPotentialFood * UnknownBaselineMultiplier,
                 baselineHuntingPotentialFood * UnknownBaselineMultiplier,
                 baselineWaterSupport * UnknownBaselineMultiplier,
@@ -95,7 +94,7 @@ public sealed class GroupKnowledgeContext
                 0);
     }
 
-    public RegionKnowledgeSnapshot ObserveRegion(Region region, string? fromRegionId = null)
+    public RegionDiscoverySnapshot ObserveRegion(Region region, string? fromRegionId = null)
     {
         var isCurrentRegion = string.Equals(region.Id, group.CurrentRegionId, StringComparison.Ordinal);
         var isKnownRegion = isCurrentRegion || group.KnownRegionIds.Contains(region.Id);
@@ -105,11 +104,11 @@ public sealed class GroupKnowledgeContext
         var waterEvidence = group.DiscoveryEvidence.WaterExposureMonthsByRegionId.GetValueOrDefault(region.Id);
         var hasObservation = isKnownRegion || monthsSpent > 0 || gatheringEvidence > 0 || huntingEvidence > 0 || waterEvidence > 0;
 
-        var routeKnowledge = ResolveRouteKnowledge(region.Id, fromRegionId, isCurrentRegion, isKnownRegion);
-        var floraKnowledge = ResolveFieldKnowledge(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFloraDiscoveryId(region.Id)), hasObservation, gatheringEvidence, isCurrentRegion);
-        var faunaKnowledge = ResolveFieldKnowledge(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id)), hasObservation, huntingEvidence, isCurrentRegion);
-        var waterKnowledge = ResolveFieldKnowledge(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id)), hasObservation, waterEvidence, isCurrentRegion);
-        var conditionsKnowledge = ResolveFieldKnowledge(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalRegionConditionsDiscoveryId(region.Id)), hasObservation, monthsSpent, isCurrentRegion);
+        var routeStage = ResolveRouteStage(region.Id, fromRegionId, isCurrentRegion, isKnownRegion);
+        var floraStage = ResolveFieldStage(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFloraDiscoveryId(region.Id)), hasObservation);
+        var faunaStage = ResolveFieldStage(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id)), hasObservation);
+        var waterStage = ResolveFieldStage(group.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id)), hasObservation);
+        var regionStage = ResolveFieldStage(discoveryCatalog.IsLocalRegionDiscoveryKnown(group.KnownDiscoveryIds, region.Id), hasObservation);
 
         var actualGatheringPotential = SubsistenceSupportModel.CalculateGatheringPotentialFood(region, group, floraCatalog);
         var actualHuntingPotential = SubsistenceSupportModel.CalculateHuntingPotentialFood(region, group, faunaCatalog);
@@ -117,27 +116,25 @@ public sealed class GroupKnowledgeContext
         var actualThreatPressure = SubsistenceSupportModel.NormalizeThreatPressure(SubsistenceSupportModel.CalculateCarnivoreThreat(region, faunaCatalog));
         var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
 
-        var snapshot = new RegionKnowledgeSnapshot(
+        return new RegionDiscoverySnapshot(
             region.Id,
             region.Name,
             isKnownRegion,
             isCurrentRegion,
-            ResolveOverallKnowledge(floraKnowledge, faunaKnowledge, waterKnowledge, conditionsKnowledge, routeKnowledge),
-            floraKnowledge,
-            faunaKnowledge,
-            waterKnowledge,
-            conditionsKnowledge,
-            routeKnowledge,
-            EstimatePotential(floraKnowledge, actualGatheringPotential, baselineGatheringPotentialFood, monthlyFoodNeed),
-            EstimatePotential(faunaKnowledge, actualHuntingPotential, baselineHuntingPotentialFood, monthlyFoodNeed),
-            EstimateWaterSupport(waterKnowledge, actualWaterSupport, baselineWaterSupport, isCurrentRegion),
-            EstimateScalar(conditionsKnowledge == KnowledgeLevel.Unknown ? faunaKnowledge : conditionsKnowledge, actualThreatPressure, baselineThreatPressure),
+            ResolveOverallStage(floraStage, faunaStage, waterStage, regionStage, routeStage),
+            floraStage,
+            faunaStage,
+            waterStage,
+            regionStage,
+            routeStage,
+            EstimatePotential(floraStage, actualGatheringPotential, baselineGatheringPotentialFood, monthlyFoodNeed, isCurrentRegion),
+            EstimatePotential(faunaStage, actualHuntingPotential, baselineHuntingPotentialFood, monthlyFoodNeed, isCurrentRegion),
+            EstimateWaterSupport(waterStage, actualWaterSupport, baselineWaterSupport, isCurrentRegion),
+            EstimateScalar(regionStage == DiscoveryStage.Unknown ? faunaStage : regionStage, actualThreatPressure, baselineThreatPressure, isCurrentRegion),
             monthsSpent,
             gatheringEvidence,
             huntingEvidence,
             waterEvidence);
-
-        return snapshot;
     }
 
     public bool CanIntentionallyForage(Region region, string floraSpeciesId)
@@ -150,14 +147,14 @@ public sealed class GroupKnowledgeContext
         return ResolveFaunaUseMultiplier(region, faunaSpeciesId) > 0.0f;
     }
 
-    public KnowledgeLevel GetFloraKnowledgeLevel(Region region, string floraSpeciesId)
+    public DiscoveryStage GetFloraDiscoveryStage(Region region, string floraSpeciesId)
     {
-        return ResolveSpeciesKnowledge(region, floraSpeciesId, SpeciesClass.Flora);
+        return ResolveSpeciesDiscoveryStage(region, floraSpeciesId, SpeciesClass.Flora);
     }
 
-    public KnowledgeLevel GetFaunaKnowledgeLevel(Region region, string faunaSpeciesId)
+    public DiscoveryStage GetFaunaDiscoveryStage(Region region, string faunaSpeciesId)
     {
-        return ResolveSpeciesKnowledge(region, faunaSpeciesId, SpeciesClass.Fauna);
+        return ResolveSpeciesDiscoveryStage(region, faunaSpeciesId, SpeciesClass.Fauna);
     }
 
     public float ResolveFloraUseMultiplier(Region region, string floraSpeciesId)
@@ -170,160 +167,123 @@ public sealed class GroupKnowledgeContext
         return ResolveSpeciesUseMultiplier(region, faunaSpeciesId, SpeciesClass.Fauna);
     }
 
-    private KnowledgeLevel ResolveRouteKnowledge(string targetRegionId, string? fromRegionId, bool isCurrentRegion, bool isKnownRegion)
+    private DiscoveryStage ResolveRouteStage(string targetRegionId, string? fromRegionId, bool isCurrentRegion, bool isKnownRegion)
     {
         if (isCurrentRegion)
         {
-            return KnowledgeLevel.Knowledge;
+            return DiscoveryStage.Discovered;
         }
 
         if (string.IsNullOrWhiteSpace(fromRegionId))
         {
-            return isKnownRegion ? KnowledgeLevel.Encounter : KnowledgeLevel.Unknown;
+            return isKnownRegion ? DiscoveryStage.Encountered : DiscoveryStage.Unknown;
         }
 
         if (group.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(fromRegionId, targetRegionId)))
         {
-            return KnowledgeLevel.Discovery;
+            return DiscoveryStage.Discovered;
         }
 
-        return KnowledgeLevel.Encounter;
+        return DiscoveryStage.Encountered;
     }
 
-    private static KnowledgeLevel ResolveFieldKnowledge(bool explicitlyKnown, bool hasObservation, int evidenceMonths, bool isCurrentRegion)
+    private static DiscoveryStage ResolveFieldStage(bool explicitlyDiscovered, bool hasObservation)
     {
-        if (explicitlyKnown)
+        if (explicitlyDiscovered)
         {
-            return isCurrentRegion ? KnowledgeLevel.Knowledge : KnowledgeLevel.Discovery;
+            return DiscoveryStage.Discovered;
         }
 
-        if (evidenceMonths > 0 || hasObservation)
-        {
-            return KnowledgeLevel.Encounter;
-        }
-
-        return KnowledgeLevel.Unknown;
+        return hasObservation ? DiscoveryStage.Encountered : DiscoveryStage.Unknown;
     }
 
-    private static KnowledgeLevel ResolveOverallKnowledge(params KnowledgeLevel[] values)
+    private static DiscoveryStage ResolveOverallStage(params DiscoveryStage[] values)
     {
-        if (values.All(value => value >= KnowledgeLevel.Discovery))
+        if (values.All(value => value == DiscoveryStage.Discovered))
         {
-            return values.Any(value => value == KnowledgeLevel.Knowledge)
-                ? KnowledgeLevel.Knowledge
-                : KnowledgeLevel.Discovery;
+            return DiscoveryStage.Discovered;
         }
 
-        if (values.Any(value => value == KnowledgeLevel.Discovery))
+        if (values.Any(value => value == DiscoveryStage.Discovered))
         {
-            return KnowledgeLevel.Discovery;
+            return DiscoveryStage.Discovered;
         }
 
-        if (values.Any(value => value == KnowledgeLevel.Encounter))
+        if (values.Any(value => value == DiscoveryStage.Encountered))
         {
-            return KnowledgeLevel.Encounter;
+            return DiscoveryStage.Encountered;
         }
 
-        return KnowledgeLevel.Unknown;
+        return DiscoveryStage.Unknown;
     }
 
-    private static float EstimatePotential(KnowledgeLevel level, float actual, float baseline, int monthlyFoodNeed)
+    private static float EstimatePotential(DiscoveryStage stage, float actual, float baseline, int monthlyFoodNeed, bool isCurrentRegion)
     {
-        return level switch
-        {
-            KnowledgeLevel.Knowledge => actual,
-            KnowledgeLevel.Discovery => BucketPotential(actual, monthlyFoodNeed),
-            KnowledgeLevel.Encounter => baseline * EncounterBaselineMultiplier,
-            _ => baseline * UnknownBaselineMultiplier
-        };
-    }
-
-    private static float BucketPotential(float actual, int monthlyFoodNeed)
-    {
-        if (monthlyFoodNeed <= 0)
+        if (isCurrentRegion || stage == DiscoveryStage.Discovered)
         {
             return actual;
         }
 
-        var ratio = actual / monthlyFoodNeed;
-        return ratio switch
+        return stage switch
         {
-            < 0.35f => monthlyFoodNeed * 0.25f,
-            < 0.85f => monthlyFoodNeed * 0.70f,
-            < 1.35f => monthlyFoodNeed * 1.10f,
-            _ => monthlyFoodNeed * 1.60f
-        };
-    }
-
-    private static float EstimateScalar(KnowledgeLevel level, float actual, float baseline)
-    {
-        return level switch
-        {
-            KnowledgeLevel.Knowledge => actual,
-            KnowledgeLevel.Discovery => BucketScalar(actual),
-            KnowledgeLevel.Encounter => baseline * EncounterBaselineMultiplier,
+            DiscoveryStage.Encountered => baseline * EncounterBaselineMultiplier,
             _ => baseline * UnknownBaselineMultiplier
         };
     }
 
-    private static float EstimateWaterSupport(KnowledgeLevel level, float actual, float baseline, bool isCurrentRegion)
+    private static float EstimateScalar(DiscoveryStage stage, float actual, float baseline, bool isCurrentRegion)
     {
-        if (isCurrentRegion)
+        if (isCurrentRegion || stage == DiscoveryStage.Discovered)
         {
             return actual;
         }
 
-        return level switch
+        return stage switch
         {
-            KnowledgeLevel.Knowledge => actual,
-            KnowledgeLevel.Discovery => Math.Clamp(actual - 4.0f, 0.0f, 100.0f),
-            KnowledgeLevel.Encounter => Math.Clamp(Math.Max(actual - 12.0f, baseline * 0.88f), 0.0f, 100.0f),
+            DiscoveryStage.Encountered => baseline * EncounterBaselineMultiplier,
+            _ => baseline * UnknownBaselineMultiplier
+        };
+    }
+
+    private static float EstimateWaterSupport(DiscoveryStage stage, float actual, float baseline, bool isCurrentRegion)
+    {
+        if (isCurrentRegion || stage == DiscoveryStage.Discovered)
+        {
+            return actual;
+        }
+
+        return stage switch
+        {
+            DiscoveryStage.Encountered => Math.Clamp(Math.Max(actual - 12.0f, baseline * 0.88f), 0.0f, 100.0f),
             _ => Math.Clamp(baseline * UnknownBaselineMultiplier, 0.0f, 100.0f)
         };
     }
 
-    private static float BucketScalar(float actual)
+    private DiscoveryStage ResolveSpeciesDiscoveryStage(Region region, string speciesId, SpeciesClass speciesClass)
     {
-        return actual switch
+        var fieldStage = speciesClass == SpeciesClass.Flora
+            ? ObserveRegion(region, group.CurrentRegionId).FloraStage
+            : ObserveRegion(region, group.CurrentRegionId).FaunaStage;
+        if (fieldStage == DiscoveryStage.Unknown)
         {
-            < 30.0f => 25.0f,
-            < 65.0f => 55.0f,
-            _ => 85.0f
-        };
-    }
-
-    private KnowledgeLevel ResolveSpeciesKnowledge(Region region, string speciesId, SpeciesClass speciesClass)
-    {
-        // Sapient intentional use needs both:
-        // 1. enough regional field familiarity to meaningfully recognize the local ecology, and
-        // 2. polity species-awareness that has reached Knowledge for this specific species.
-        var fieldKnowledge = speciesClass == SpeciesClass.Flora
-            ? ObserveRegion(region, group.CurrentRegionId).FloraKnowledge
-            : ObserveRegion(region, group.CurrentRegionId).FaunaKnowledge;
-        if (fieldKnowledge == KnowledgeLevel.Unknown)
-        {
-            return KnowledgeLevel.Unknown;
+            return DiscoveryStage.Unknown;
         }
 
         return speciesAwarenessByKey.TryGetValue(BuildSpeciesKey(speciesClass, speciesId), out var state)
-            ? state.CurrentLevel
-            : KnowledgeLevel.Unknown;
+            ? state.CurrentStage
+            : DiscoveryStage.Unknown;
     }
 
-    private static float ResolveSpeciesUseMultiplier(KnowledgeLevel level)
+    private static float ResolveSpeciesUseMultiplier(DiscoveryStage stage)
     {
-        return level switch
-        {
-            // Species may exist in the world and still be unusable to this actor.
-            // Intentional exploitation requires Knowledge, not merely Discovery.
-            KnowledgeLevel.Knowledge => SpeciesAwarenessConstants.KnowledgeUsabilityMultiplier,
-            _ => 0.0f
-        };
+        return stage == DiscoveryStage.Discovered
+            ? SpeciesAwarenessConstants.DiscoveryUsabilityMultiplier
+            : 0.0f;
     }
 
     private float ResolveSpeciesUseMultiplier(Region region, string speciesId, SpeciesClass speciesClass)
     {
-        return ResolveSpeciesUseMultiplier(ResolveSpeciesKnowledge(region, speciesId, speciesClass));
+        return ResolveSpeciesUseMultiplier(ResolveSpeciesDiscoveryStage(region, speciesId, speciesClass));
     }
 
     private static string BuildSpeciesKey(SpeciesClass speciesClass, string speciesId)

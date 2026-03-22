@@ -1,7 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
+using Species.Domain.Discovery;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -35,7 +35,7 @@ public sealed class DiscoverySystem
 
         // Boundary:
         // - The main group loop below owns broader non-species discoveries such as routes, methods, and materials.
-        // - Species-specific flora/fauna knowing and use progression is handled separately in UpdateSpeciesAwareness.
+        // - Species-specific flora/fauna encounter/discovery progression is handled separately in UpdateSpeciesAwareness.
         foreach (var group in world.PopulationGroups.OrderBy(group => group.Id, StringComparer.Ordinal))
         {
             var updatedGroup = CloneGroup(group);
@@ -197,14 +197,14 @@ public sealed class DiscoverySystem
             EvaluateRegionDiscovery(
                 updatedGroup,
                 discoveryCatalog,
-                discoveryCatalog.GetLocalRegionConditionsDiscoveryId(livedRegionId),
+                discoveryCatalog.GetLocalRegionDiscoveryId(livedRegionId),
                 evidence.MonthsSpentByRegionId.GetValueOrDefault(livedRegionId),
                 DiscoveryConstants.LocalRegionResidenceMonthsRequired,
                 unlockedThisMonth,
                 checks,
                 ref discoveryBudget,
                 extraGate: evidence.RecurringFoodPressureMonths > 0 || evidence.SettlementContinuityMonths > 0,
-                waitingReason: "needs residence under practical conditions");
+                waitingReason: "needs residence under practical use");
 
             EvaluateRegionDiscovery(
                 updatedGroup,
@@ -238,6 +238,21 @@ public sealed class DiscoverySystem
             EvaluateRegionDiscovery(
                 updatedGroup,
                 discoveryCatalog,
+                DiscoveryCatalog.ToolStoneId,
+                evidence.MaterialExposureMonthsByResourceId.GetValueOrDefault(MaterialResource.Stone.ToString()) +
+                evidence.MaterialUseMonthsByResourceId.GetValueOrDefault(MaterialResource.Stone.ToString()),
+                DiscoveryConstants.ToolStoneExposureMonthsRequired,
+                unlockedThisMonth,
+                checks,
+                ref discoveryBudget,
+                extraGate:
+                    evidence.RecurringMaterialShortageMonths > 0 ||
+                    evidence.MaterialUseMonthsByResourceId.GetValueOrDefault(MaterialResource.Stone.ToString()) > 0,
+                waitingReason: "needs repeated stone exposure under practical processing need");
+
+            EvaluateRegionDiscovery(
+                updatedGroup,
+                discoveryCatalog,
                 DiscoveryCatalog.ClayShapingId,
                 evidence.MaterialExposureMonthsByResourceId.GetValueOrDefault(MaterialResource.Clay.ToString()) +
                 evidence.MaterialUseMonthsByResourceId.GetValueOrDefault(MaterialResource.Clay.ToString()),
@@ -264,7 +279,7 @@ public sealed class DiscoverySystem
                 updatedGroup,
                 discoveryCatalog,
                 DiscoveryCatalog.PreservationCluesId,
-                evidence.RecurringFoodPressureMonths + group.AdvancementEvidence.SurplusStoredFoodMonths,
+                evidence.RecurringFoodPressureMonths + group.AdvancementEvidence.SurplusOpportunityMonths,
                 DiscoveryConstants.PreservationCluesMonthsRequired,
                 unlockedThisMonth,
                 checks,
@@ -305,9 +320,14 @@ public sealed class DiscoverySystem
                 DecisionEffectSummary = unlockedThisMonth.Count == 0
                     ? "No new discovery effect this month."
                     : string.Join(" ", unlockedThisMonth.Select(definition => definition.DecisionEffectSummary)),
-                ChronicleLinesSummary = unlockedThisMonth.Count == 0
-                    ? "none"
-                    : string.Join(";;", unlockedThisMonth.Select(definition => BuildChronicleLine(updatedGroup.Name, definition)))
+                UnlockedEntries = unlockedThisMonth
+                    .Select(definition => new DiscoveryUnlock
+                    {
+                        Name = definition.Name,
+                        IsEncounter = false,
+                        IsScoutSourced = false
+                    })
+                    .ToArray()
             });
         }
 
@@ -327,7 +347,7 @@ public sealed class DiscoverySystem
         FaunaSpeciesCatalog faunaCatalog)
     {
         // Species awareness is intentionally separate from broader discovery progression.
-        // It owns only the Encounter -> Discovery -> Knowledge ladder for actual flora/fauna species.
+        // It owns only the Unknown -> Encountered -> Discovered ladder for actual flora/fauna species.
         var groupsByPolityId = updatedGroups
             .GroupBy(group => group.PolityId, StringComparer.Ordinal)
             .ToDictionary(grouping => grouping.Key, grouping => grouping.ToArray(), StringComparer.Ordinal);
@@ -370,10 +390,9 @@ public sealed class DiscoverySystem
 
             polity.SpeciesAwareness.Clear();
             polity.SpeciesAwareness.AddRange(awarenessByKey.Values
-                .Where(state => state.CurrentLevel != KnowledgeLevel.Unknown ||
+                .Where(state => state.CurrentStage != DiscoveryStage.Unknown ||
                                 state.EncounterProgress > 0.0f ||
-                                state.DiscoveryProgress > 0.0f ||
-                                state.KnowledgeProgress > 0.0f)
+                                state.DiscoveryProgress > 0.0f)
                 .OrderBy(state => state.SpeciesClass)
                 .ThenBy(state => state.SpeciesId, StringComparer.Ordinal));
         }
@@ -552,9 +571,9 @@ public sealed class DiscoverySystem
         var successfulInteractions = exposure?.SuccessfulInteractions ?? 0;
         var successfulUseIntensity = exposure?.SuccessfulUseIntensity ?? 0.0f;
 
-        switch (state.CurrentLevel)
+        switch (state.CurrentStage)
         {
-            case KnowledgeLevel.Unknown:
+            case DiscoveryStage.Unknown:
                 if (contactScore < SpeciesAwarenessConstants.MinimumContactScoreForEncounter)
                 {
                     state.EncounterProgress = Math.Max(0.0f, state.EncounterProgress - SpeciesAwarenessConstants.EncounterMonthlyDecay);
@@ -568,7 +587,7 @@ public sealed class DiscoverySystem
                         0.6f + contactScore * 5.2f + overlapScore * 1.4f + behaviorAlignment * 1.0f));
                 return;
 
-            case KnowledgeLevel.Encounter:
+            case DiscoveryStage.Encountered:
                 if (contactScore < SpeciesAwarenessConstants.MinimumContactScoreForEncounter ||
                     presenceContacts < SpeciesAwarenessConstants.MinimumPresenceContactsForDiscovery)
                 {
@@ -583,22 +602,7 @@ public sealed class DiscoverySystem
                         0.5f + contactScore * 3.2f + overlapScore * 1.2f + behaviorAlignment * 1.6f + successfulInteractions * 1.4f + successfulUseIntensity * 1.2f));
                 return;
 
-            case KnowledgeLevel.Discovery:
-                if ((contactScore < SpeciesAwarenessConstants.MinimumContactScoreForEncounter && successfulInteractions <= 0) ||
-                    successfulInteractions < SpeciesAwarenessConstants.MinimumSuccessfulInteractionsForKnowledge)
-                {
-                    state.KnowledgeProgress = Math.Max(0.0f, state.KnowledgeProgress - SpeciesAwarenessConstants.KnowledgeMonthlyDecay);
-                    return;
-                }
-
-                state.KnowledgeProgress = Math.Min(
-                    SpeciesAwarenessConstants.StageThreshold,
-                    state.KnowledgeProgress + Math.Min(
-                        SpeciesAwarenessConstants.KnowledgeMonthlyGainCap,
-                        0.4f + contactScore * 1.6f + behaviorAlignment * 1.4f + successfulInteractions * 2.0f + successfulUseIntensity * 2.8f));
-                return;
-
-            case KnowledgeLevel.Knowledge:
+            case DiscoveryStage.Discovered:
                 return;
         }
     }
@@ -710,7 +714,7 @@ public sealed class DiscoverySystem
             {
                 group.KnownDiscoveryIds.Add(spreadEvidence.Key);
                 unlockedThisMonth.Add(definition);
-                checks.Add($"{definition.Name}: learned through continued contact and continuity.");
+                checks.Add($"{definition.Name}: discovered through continued contact and continuity.");
                 continue;
             }
 
@@ -835,19 +839,18 @@ public sealed class DiscoverySystem
             ", ",
             group.KnownDiscoveryIds
                 .OrderBy(id => id, StringComparer.Ordinal)
-                .Select(id => discoveryCatalog.GetById(id)?.Name ?? id));
-    }
+                .Select(id =>
+                {
+                    var definition = discoveryCatalog.GetById(id);
+                    if (definition is not null)
+                    {
+                        return definition.Name;
+                    }
 
-    private static string BuildChronicleLine(string groupName, DiscoveryDefinition definition)
-    {
-        return definition.Id switch
-        {
-            var id when id == DiscoveryCatalog.ClayShapingId => $"{groupName} learned clay shaping from repeated local use.",
-            var id when id == DiscoveryCatalog.SeasonalTrackingId => $"{groupName} learned seasonal tracking from repeated return and pursuit.",
-            var id when id == DiscoveryCatalog.PreservationCluesId => $"{groupName} learned preservation clues after repeated storage strain.",
-            var id when id == DiscoveryCatalog.ShelterMethodsId => $"{groupName} learned shelter methods through material strain and contact.",
-            _ => $"{groupName} discovered {definition.Name.ToLowerInvariant()}."
-        };
+                    return discoveryCatalog.TryNormalizeDiscoveryId(id, out var normalizedId)
+                        ? normalizedId
+                        : id;
+                }));
     }
 
     private static string BuildEvidenceSummary(DiscoveryEvidenceState evidence)

@@ -1,5 +1,6 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
+using Species.Domain.Enums;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -10,6 +11,8 @@ public sealed class AdvancementSystem
         World world,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
         IReadOnlyList<MigrationChange> migrationChanges)
     {
@@ -19,6 +22,8 @@ public sealed class AdvancementSystem
             .Select(polity => PolityData.BuildContext(world, polity))
             .Where(context => context is not null)
             .ToDictionary(context => context!.Polity.Id, context => context!, StringComparer.Ordinal);
+        var politiesById = world.Polities.ToDictionary(polity => polity.Id, StringComparer.Ordinal);
+        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var updatedGroups = new List<PopulationGroup>(world.PopulationGroups.Count);
         var changes = new List<AdvancementChange>(world.PopulationGroups.Count);
 
@@ -29,185 +34,35 @@ public sealed class AdvancementSystem
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
             migrationByGroupId.TryGetValue(group.Id, out var migrationChange);
             polityContextById.TryGetValue(group.PolityId, out var polityContext);
+            politiesById.TryGetValue(group.PolityId, out var polity);
+            var region = regionsById.GetValueOrDefault(survivalChange?.CurrentRegionId ?? updatedGroup.CurrentRegionId);
 
-            var livedRegionId = survivalChange?.CurrentRegionId ?? updatedGroup.CurrentRegionId;
-            var localFloraDiscoveryId = discoveryCatalog.GetLocalFloraDiscoveryId(livedRegionId);
-            var localFaunaDiscoveryId = discoveryCatalog.GetLocalFaunaDiscoveryId(livedRegionId);
-            var localRegionDiscoveryId = discoveryCatalog.GetLocalRegionConditionsDiscoveryId(livedRegionId);
-
-            if (((survivalChange?.PrimaryAction == "Gather" && survivalChange.PrimaryFoodGained > 0) ||
-                 (survivalChange?.FallbackAction == "Gather" && survivalChange.FallbackFoodGained > 0)) &&
-                updatedGroup.KnownDiscoveryIds.Contains(localFloraDiscoveryId))
-            {
-                evidence.SuccessfulGatheringWithKnowledgeMonths++;
-            }
-
-            if (((survivalChange?.PrimaryAction == "Hunt" && survivalChange.PrimaryFoodGained > 0) ||
-                 (survivalChange?.FallbackAction == "Hunt" && survivalChange.FallbackFoodGained > 0)) &&
-                updatedGroup.KnownDiscoveryIds.Contains(localFaunaDiscoveryId))
-            {
-                evidence.SuccessfulHuntingWithKnowledgeMonths++;
-            }
-
-            if (updatedGroup.StoredFood > 0 && polityContext is not null && polityContext.MaterialProduction.StorageSupport >= 20)
-            {
-                evidence.SurplusStoredFoodMonths++;
-            }
-
-            if (migrationChange is { Moved: true } &&
-                updatedGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetRouteDiscoveryId(migrationChange.CurrentRegionId, migrationChange.NewRegionId)))
-            {
-                evidence.KnownRouteTravelMonths++;
-            }
-
-            if (survivalChange is { Outcome: "Survived", Shortage: 0 } &&
-                updatedGroup.KnownDiscoveryIds.Contains(localRegionDiscoveryId))
-            {
-                evidence.SuccessfulResidenceWithRegionKnowledgeMonths++;
-            }
-
-            if (polityContext is not null &&
-                polityContext.MaterialProduction.ToolSupport >= 20 &&
-                polityContext.MaterialProduction.SurplusScore >= 20)
-            {
-                evidence.MaterialPracticeMonths++;
-            }
-
-            if (updatedGroup.StoredFood > 0 &&
-                (survivalChange?.Shortage > 0 || (polityContext is not null && polityContext.MaterialProduction.StorageSupport < 35)))
-            {
-                evidence.StoragePressureMonths++;
-            }
-
-            if (polityContext is not null &&
-                polityContext.PrimarySettlement is not null &&
-                polityContext.MaterialProduction.ShelterSupport >= 25 &&
-                (updatedGroup.Pressures.Threat.EffectiveValue >= 45 || polityContext.MaterialShortageMonths > 0))
-            {
-                evidence.ShelterReadinessMonths++;
-            }
-
-            if (polityContext is not null &&
-                polityContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile &&
-                polityContext.Pressures.Migration.EffectiveValue < 60 &&
-                polityContext.MaterialProduction.DeficitScore < 60)
-            {
-                evidence.StabilityMonths++;
-            }
-
-            if (updatedGroup.DiscoveryEvidence.SharedExposureMonthsByDiscoveryId.Count > 0)
-            {
-                evidence.ContactLearningMonths++;
-            }
+            UpdateMonthlyEvidence(updatedGroup, polity, polityContext, region, survivalChange, migrationChange, floraCatalog, faunaCatalog);
 
             var unlockedThisMonth = new List<AdvancementDefinition>();
             var checks = new List<string>();
             var advancementBudget = ProgressionPacingConstants.AdvancementMonthlyBudget;
             var adoptionBudget = ProgressionPacingConstants.AdoptionMonthlyBudget;
 
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.ImprovedGatheringId,
-                updatedGroup.KnownDiscoveryIds.Contains(localFloraDiscoveryId) &&
-                updatedGroup.DiscoveryEvidence.RecurringFoodPressureMonths > 0,
-                evidence.SuccessfulGatheringWithKnowledgeMonths,
-                AdvancementConstants.ImprovedGatheringMonthsRequired + 1,
-                "flora knowledge plus sustained need",
-                1.00f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
-
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.ImprovedHuntingId,
-                updatedGroup.KnownDiscoveryIds.Contains(localFaunaDiscoveryId) &&
-                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId) &&
-                (updatedGroup.DiscoveryEvidence.RecurringFoodPressureMonths > 0 || updatedGroup.DiscoveryEvidence.RecurringThreatPressureMonths > 0),
-                evidence.SuccessfulHuntingWithKnowledgeMonths,
-                AdvancementConstants.ImprovedHuntingMonthsRequired + 1,
-                "fauna knowledge, tracking, and sustained need",
-                1.05f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
-
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.FoodStorageId,
-                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId) &&
-                (updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.ClayShapingId) || (polityContext?.MaterialProduction.StorageSupport ?? 0) >= 20) &&
-                polityContext is not null &&
-                polityContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile,
-                Math.Min(evidence.SurplusStoredFoodMonths, evidence.StoragePressureMonths),
-                AdvancementConstants.FoodStorageSurplusMonthsRequired,
-                "preservation knowledge plus durable storage conditions",
-                0.95f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
-
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.OrganizedTravelId,
-                evidence.KnownRouteTravelMonths > 0 &&
-                evidence.StabilityMonths > 0,
-                evidence.KnownRouteTravelMonths,
-                AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired,
-                "known route use plus continuity",
-                0.85f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
-
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.LocalResourceUseId,
-                updatedGroup.KnownDiscoveryIds.Contains(localRegionDiscoveryId) &&
-                polityContext is not null &&
-                polityContext.MaterialProduction.ToolSupport >= 20 &&
-                evidence.StabilityMonths > 0,
-                Math.Min(evidence.MaterialPracticeMonths, evidence.SuccessfulResidenceWithRegionKnowledgeMonths),
-                AdvancementConstants.LocalResourceUseMonthsRequired,
-                "local region knowledge plus material practice",
-                0.90f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
-
-            EvaluateAdvancement(
-                updatedGroup,
-                advancementCatalog,
-                AdvancementCatalog.StrongerShelterId,
-                updatedGroup.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId) &&
-                polityContext is not null &&
-                polityContext.PrimarySettlement is not null &&
-                polityContext.MaterialProduction.ShelterSupport >= 25,
-                evidence.ShelterReadinessMonths,
-                AdvancementConstants.StrongerShelterMonthsRequired,
-                "shelter-method knowledge plus settled material readiness",
-                0.90f,
-                ref advancementBudget,
-                ref adoptionBudget,
-                unlockedThisMonth,
-                checks);
+            foreach (var definition in advancementCatalog.Definitions.OrderBy(item => item.Id, StringComparer.Ordinal))
+            {
+                var eligibility = FirstWaveAdvancementEvaluator.Evaluate(definition, updatedGroup, polity, polityContext, region, floraCatalog, faunaCatalog);
+                EvaluateAdvancement(
+                    updatedGroup,
+                    definition,
+                    eligibility,
+                    ref advancementBudget,
+                    ref adoptionBudget,
+                    unlockedThisMonth,
+                    checks);
+            }
 
             updatedGroups.Add(updatedGroup);
             changes.Add(new AdvancementChange
             {
                 GroupId = updatedGroup.Id,
                 GroupName = updatedGroup.Name,
-                RelevantDiscoveriesSummary = BuildRelevantDiscoveriesSummary(updatedGroup, discoveryCatalog, livedRegionId),
+                RelevantDiscoveriesSummary = BuildRelevantDiscoveriesSummary(updatedGroup, advancementCatalog),
                 LearnedAdvancementsSummary = BuildLearnedAdvancementsSummary(updatedGroup, advancementCatalog),
                 EvidenceSummary = BuildEvidenceSummary(updatedGroup.AdvancementEvidence),
                 CheckSummary = checks.Count == 0 ? "none" : string.Join(" | ", checks),
@@ -217,9 +72,9 @@ public sealed class AdvancementSystem
                 PracticalEffectSummary = unlockedThisMonth.Count == 0
                     ? "No new advancement effect this month."
                     : string.Join(" ", unlockedThisMonth.Select(definition => definition.PracticalEffectSummary)),
-                ChronicleLinesSummary = unlockedThisMonth.Count == 0
-                    ? "none"
-                    : string.Join(";;", unlockedThisMonth.Select(definition => BuildChronicleLine(updatedGroup.Name, definition)))
+                UnlockedAdvancementNames = unlockedThisMonth
+                    .Select(definition => definition.Name)
+                    .ToArray()
             });
         }
 
@@ -228,74 +83,166 @@ public sealed class AdvancementSystem
             changes);
     }
 
+    private static void UpdateMonthlyEvidence(
+        PopulationGroup group,
+        Polity? polity,
+        PolityContext? polityContext,
+        Region? region,
+        GroupSurvivalChange? survivalChange,
+        MigrationChange? migrationChange,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
+    {
+        if (region is null)
+        {
+            return;
+        }
+
+        if (HasDiscoveredFloraTag(polity, region, floraCatalog, FloraTag.Edible))
+        {
+            group.AdvancementEvidence.ForagingOpportunityMonths++;
+        }
+
+        if (HasDiscoveredFaunaTag(polity, region, faunaCatalog, FaunaTag.SmallPrey))
+        {
+            group.AdvancementEvidence.SmallPreyOpportunityMonths++;
+        }
+
+        if (HasDiscoveredFaunaTag(polity, region, faunaCatalog, FaunaTag.LargePrey))
+        {
+            group.AdvancementEvidence.LargePreyOpportunityMonths++;
+        }
+
+        if (region.WaterAvailability is WaterAvailability.Medium or WaterAvailability.High &&
+            HasDiscoveredFaunaTag(polity, region, faunaCatalog, FaunaTag.AquaticFood))
+        {
+            group.AdvancementEvidence.AquaticOpportunityMonths++;
+        }
+
+        if (group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ToolStoneId) &&
+            region.MaterialProfile.Opportunities.Stone > 0)
+        {
+            group.AdvancementEvidence.StoneAccessMonths++;
+        }
+
+        if (HasDiscoveredFaunaTag(polity, region, faunaCatalog, FaunaTag.HideSource))
+        {
+            group.AdvancementEvidence.HideAccessMonths++;
+        }
+
+        if (HasDiscoveredFloraTag(polity, region, floraCatalog, FloraTag.FiberSource))
+        {
+            group.AdvancementEvidence.FiberAccessMonths++;
+        }
+
+        if (survivalChange is not null &&
+            (survivalChange.TotalFoodAcquired > survivalChange.MonthlyFoodNeed ||
+             survivalChange.StoredFoodAfter > survivalChange.StoredFoodBefore))
+        {
+            group.AdvancementEvidence.SurplusOpportunityMonths++;
+        }
+
+        if (survivalChange is not null &&
+            ((survivalChange.StoredFoodAfter > 0 && survivalChange.Shortage > 0) ||
+             survivalChange.StoredFoodBefore > 0 ||
+             group.ShortageMonths > 0))
+        {
+            group.AdvancementEvidence.SpoilagePressureMonths++;
+        }
+
+        if (survivalChange is not null &&
+            (survivalChange.Shortage > 0 ||
+             survivalChange.FoodStressState is nameof(FoodStressState.HungerPressure) or nameof(FoodStressState.SevereShortage) or nameof(FoodStressState.Starvation)))
+        {
+            group.AdvancementEvidence.FoodPressureMonths++;
+        }
+
+        if ((polityContext?.MaterialProduction.DeficitScore ?? 0) >= 45 ||
+            (polity?.MaterialShortageMonths ?? 0) > 0 ||
+            group.Pressures.Threat.EffectiveValue >= 45)
+        {
+            group.AdvancementEvidence.MaterialNeedMonths++;
+        }
+
+        if (polityContext is not null &&
+            polityContext.AnchoringKind is not PolityAnchoringKind.Mobile &&
+            group.Pressures.Migration.EffectiveValue < 60 &&
+            (migrationChange is null || !migrationChange.Moved))
+        {
+            group.AdvancementEvidence.StabilityMonths++;
+        }
+
+        if (polityContext is not null &&
+            polityContext.AnchoringKind is PolityAnchoringKind.SemiRooted or PolityAnchoringKind.Anchored)
+        {
+            group.AdvancementEvidence.AnchoredContinuityMonths++;
+        }
+
+        if (group.Population >= 35 ||
+            polityContext?.PrimarySettlement is not null ||
+            polityContext?.AnchoringKind is PolityAnchoringKind.SemiRooted or PolityAnchoringKind.Anchored)
+        {
+            group.AdvancementEvidence.OrganizationalReadinessMonths++;
+        }
+    }
+
     private static void EvaluateAdvancement(
         PopulationGroup group,
-        AdvancementCatalog advancementCatalog,
-        string advancementId,
-        bool prerequisiteMet,
-        int evidenceCount,
-        int requiredCount,
-        string prerequisiteLabel,
-        float needFactor,
+        AdvancementDefinition definition,
+        FirstWaveAdvancementEvaluator.AdvancementEligibility eligibility,
         ref float advancementBudget,
         ref float adoptionBudget,
         ICollection<AdvancementDefinition> unlockedThisMonth,
         ICollection<string> checks)
     {
-        var definition = advancementCatalog.GetById(advancementId);
-        if (definition is null)
-        {
-            return;
-        }
-
-        if (group.LearnedAdvancementIds.Contains(advancementId))
+        if (group.LearnedAdvancementIds.Contains(definition.Id))
         {
             checks.Add($"{definition.Name}: already learned.");
             return;
         }
 
-        var capabilityProgress = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
-        var adoptionProgress = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
+        var capabilityProgress = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(definition.Id);
+        var adoptionProgress = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(definition.Id);
 
-        if (!prerequisiteMet)
+        if (!eligibility.PrerequisitesMet)
         {
-            capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, advancementId, capabilityProgress, 0.0f, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
-            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
-            checks.Add($"{definition.Name}: waiting on {prerequisiteLabel}.");
+            capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, definition.Id, capabilityProgress, 0.0f, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
+            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, definition.Id, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
+            checks.Add($"{definition.Name}: {eligibility.StatusSummary}");
             return;
         }
 
-        var evidenceRatio = requiredCount <= 0
+        var evidenceRatio = eligibility.RequiredOpportunityCount <= 0
             ? 0.0f
-            : Math.Clamp(evidenceCount / (float)requiredCount, 0.0f, 2.0f);
+            : Math.Clamp(eligibility.OpportunityCount / (float)eligibility.RequiredOpportunityCount, 0.0f, 2.0f);
         var capabilityGain = Math.Min(
             ProgressionPacingConstants.AdvancementMonthlyGainCap,
-            1.25f + evidenceRatio * 5.5f + needFactor * 2.0f);
-        capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, advancementId, capabilityProgress, capabilityGain, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
+            1.00f + evidenceRatio * 5.0f + eligibility.NeedFactor * 2.2f);
+        capabilityProgress = ApplyProgress(group.AdvancementEvidence.AdvancementProgressById, definition.Id, capabilityProgress, capabilityGain, ref advancementBudget, ProgressionPacingConstants.AdvancementMonthlyDecay);
 
         if (capabilityProgress < ProgressionPacingConstants.StageThreshold)
         {
-            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
-            checks.Add($"{definition.Name}: capability progress {capabilityProgress:0}/{ProgressionPacingConstants.StageThreshold:0} from {evidenceCount}/{requiredCount} after {prerequisiteLabel}.");
+            adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, definition.Id, adoptionProgress, 0.0f, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
+            checks.Add($"{definition.Name}: capability progress {capabilityProgress:0}/100 from {eligibility.OpportunityCount}/{eligibility.RequiredOpportunityCount} causal opportunity.");
             return;
         }
 
         var adoptionGain = Math.Min(
             ProgressionPacingConstants.AdoptionMonthlyGainCap,
-            0.75f + evidenceRatio * 3.5f + needFactor * 1.5f);
-        adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, advancementId, adoptionProgress, adoptionGain, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
+            0.75f + evidenceRatio * 3.0f + eligibility.NeedFactor * 1.8f);
+        adoptionProgress = ApplyProgress(group.AdvancementEvidence.AdoptionProgressById, definition.Id, adoptionProgress, adoptionGain, ref adoptionBudget, ProgressionPacingConstants.AdoptionMonthlyDecay);
 
         if (adoptionProgress >= ProgressionPacingConstants.StageThreshold)
         {
-            group.LearnedAdvancementIds.Add(advancementId);
-            group.AdvancementEvidence.AdvancementProgressById.Remove(advancementId);
-            group.AdvancementEvidence.AdoptionProgressById.Remove(advancementId);
+            group.LearnedAdvancementIds.Add(definition.Id);
+            group.AdvancementEvidence.AdvancementProgressById.Remove(definition.Id);
+            group.AdvancementEvidence.AdoptionProgressById.Remove(definition.Id);
             unlockedThisMonth.Add(definition);
-            checks.Add($"{definition.Name}: adopted after paced capability and adoption progress.");
+            checks.Add($"{definition.Name}: learned from repeated causal opportunity.");
             return;
         }
 
-        checks.Add($"{definition.Name}: capability {capabilityProgress:0}/100, adoption {adoptionProgress:0}/100 from {evidenceCount}/{requiredCount} after {prerequisiteLabel}.");
+        checks.Add($"{definition.Name}: capability {capabilityProgress:0}/100, adoption {adoptionProgress:0}/100 from {eligibility.OpportunityCount}/{eligibility.RequiredOpportunityCount} opportunity.");
     }
 
     private static float ApplyProgress(
@@ -326,26 +273,16 @@ public sealed class AdvancementSystem
         return progress;
     }
 
-    private static string BuildRelevantDiscoveriesSummary(PopulationGroup group, DiscoveryCatalog discoveryCatalog, string regionId)
+    private static string BuildRelevantDiscoveriesSummary(PopulationGroup group, AdvancementCatalog advancementCatalog)
     {
-        var relevantIds = new[]
-        {
-            discoveryCatalog.GetLocalFloraDiscoveryId(regionId),
-            discoveryCatalog.GetLocalFaunaDiscoveryId(regionId),
-            discoveryCatalog.GetLocalWaterSourcesDiscoveryId(regionId),
-            discoveryCatalog.GetLocalRegionConditionsDiscoveryId(regionId),
-            DiscoveryCatalog.ClayShapingId,
-            DiscoveryCatalog.SeasonalTrackingId,
-            DiscoveryCatalog.PreservationCluesId,
-            DiscoveryCatalog.ShelterMethodsId
-        };
-
-        var names = relevantIds
+        var relevantIds = advancementCatalog.Definitions
+            .SelectMany(definition => definition.RequiredDiscoveryIds)
+            .Distinct(StringComparer.Ordinal)
             .Where(group.KnownDiscoveryIds.Contains)
-            .Select(id => discoveryCatalog.GetById(id)?.Name ?? id)
+            .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
 
-        return names.Length == 0 ? "none" : string.Join(", ", names);
+        return relevantIds.Length == 0 ? "none" : string.Join(", ", relevantIds);
     }
 
     private static string BuildLearnedAdvancementsSummary(PopulationGroup group, AdvancementCatalog advancementCatalog)
@@ -362,21 +299,9 @@ public sealed class AdvancementSystem
                 .Select(id => advancementCatalog.GetById(id)?.Name ?? id));
     }
 
-    private static string BuildChronicleLine(string groupName, AdvancementDefinition definition)
-    {
-        return definition.Id switch
-        {
-            var id when id == AdvancementCatalog.FoodStorageId => $"{groupName} adopted improved storage after repeated spoilage pressure.",
-            var id when id == AdvancementCatalog.StrongerShelterId => $"{groupName} adopted stronger shelter from settled material practice.",
-            var id when id == AdvancementCatalog.ImprovedHuntingId => $"{groupName} improved hunting practice through repeated tracking.",
-            var id when id == AdvancementCatalog.ImprovedGatheringId => $"{groupName} improved gathering practice through repeated local use.",
-            _ => $"{groupName} learned {definition.Name.ToLowerInvariant()}."
-        };
-    }
-
     private static string BuildEvidenceSummary(AdvancementEvidenceState evidence)
     {
-        return $"GatherUse={evidence.SuccessfulGatheringWithKnowledgeMonths} | HuntUse={evidence.SuccessfulHuntingWithKnowledgeMonths} | StorageUse={evidence.SurplusStoredFoodMonths}/{evidence.StoragePressureMonths} | RouteUse={evidence.KnownRouteTravelMonths} | LocalUse={evidence.SuccessfulResidenceWithRegionKnowledgeMonths}/{evidence.MaterialPracticeMonths} | Shelter={evidence.ShelterReadinessMonths} | Stability={evidence.StabilityMonths} | CapabilityProgress=[{SummarizeProgress(evidence.AdvancementProgressById)}] | AdoptionProgress=[{SummarizeProgress(evidence.AdoptionProgressById)}]";
+        return $"Forage={evidence.ForagingOpportunityMonths} | SmallPrey={evidence.SmallPreyOpportunityMonths} | LargePrey={evidence.LargePreyOpportunityMonths} | Aquatic={evidence.AquaticOpportunityMonths} | Surplus={evidence.SurplusOpportunityMonths} | Spoilage={evidence.SpoilagePressureMonths} | Stone={evidence.StoneAccessMonths} | Hide={evidence.HideAccessMonths} | Fiber={evidence.FiberAccessMonths} | FoodNeed={evidence.FoodPressureMonths} | MaterialNeed={evidence.MaterialNeedMonths} | Stability={evidence.StabilityMonths} | Anchor={evidence.AnchoredContinuityMonths} | Organization={evidence.OrganizationalReadinessMonths} | CapabilityProgress=[{SummarizeProgress(evidence.AdvancementProgressById)}] | AdoptionProgress=[{SummarizeProgress(evidence.AdoptionProgressById)}]";
     }
 
     private static string SummarizeProgress(IReadOnlyDictionary<string, float> progressById)
@@ -396,6 +321,7 @@ public sealed class AdvancementSystem
             Id = group.Id,
             Name = group.Name,
             SpeciesId = group.SpeciesId,
+            SpeciesClass = group.SpeciesClass,
             PolityId = group.PolityId,
             CurrentRegionId = group.CurrentRegionId,
             OriginRegionId = group.OriginRegionId,
@@ -416,5 +342,37 @@ public sealed class AdvancementSystem
             LearnedAdvancementIds = new HashSet<string>(group.LearnedAdvancementIds, StringComparer.Ordinal),
             AdvancementEvidence = group.AdvancementEvidence.Clone()
         };
+    }
+
+    private static bool HasDiscoveredFloraTag(Polity? polity, Region region, FloraSpeciesCatalog floraCatalog, FloraTag tag)
+    {
+        return region.Ecosystem.FloraPopulations
+            .Where(entry => entry.Value > 0)
+            .Any(entry =>
+            {
+                var flora = floraCatalog.GetById(entry.Key);
+                return flora is not null &&
+                       flora.Tags.Contains(tag) &&
+                       polity?.SpeciesAwareness.Any(state =>
+                           state.SpeciesClass == SpeciesClass.Flora &&
+                           string.Equals(state.SpeciesId, entry.Key, StringComparison.Ordinal) &&
+                           state.CurrentStage == Discovery.DiscoveryStage.Discovered) == true;
+            });
+    }
+
+    private static bool HasDiscoveredFaunaTag(Polity? polity, Region region, FaunaSpeciesCatalog faunaCatalog, FaunaTag tag)
+    {
+        return region.Ecosystem.FaunaPopulations
+            .Where(entry => entry.Value > 0)
+            .Any(entry =>
+            {
+                var fauna = faunaCatalog.GetById(entry.Key);
+                return fauna is not null &&
+                       fauna.Tags.Contains(tag) &&
+                       polity?.SpeciesAwareness.Any(state =>
+                           state.SpeciesClass == SpeciesClass.Fauna &&
+                           string.Equals(state.SpeciesId, entry.Key, StringComparison.Ordinal) &&
+                           state.CurrentStage == Discovery.DiscoveryStage.Discovered) == true;
+            });
     }
 }

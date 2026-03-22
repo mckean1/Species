@@ -32,7 +32,7 @@ public static class PlayerViewStateCoordinator
             viewState.CloseLawActionMenu();
         }
 
-        viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, faunaCatalog, viewState.FocalPolityId));
+        viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, floraCatalog, faunaCatalog, viewState.FocalPolityId));
 
         var chronicleSelection = ChronicleViewModelFactory.QuerySelectionInfo(world, viewState.FocalPolityId, viewState.CreateChronicleViewRequest());
         viewState.ClampChronicleSelection(chronicleSelection.UrgentCount, chronicleSelection.EntryCount);

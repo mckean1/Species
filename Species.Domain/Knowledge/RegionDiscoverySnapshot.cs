@@ -1,16 +1,16 @@
-namespace Species.Domain.Knowledge;
+namespace Species.Domain.Discovery;
 
-public sealed record RegionKnowledgeSnapshot(
+public sealed record RegionDiscoverySnapshot(
     string RegionId,
     string RegionName,
     bool IsKnownRegion,
     bool IsCurrentRegion,
-    KnowledgeLevel OverallKnowledge,
-    KnowledgeLevel FloraKnowledge,
-    KnowledgeLevel FaunaKnowledge,
-    KnowledgeLevel WaterKnowledge,
-    KnowledgeLevel ConditionsKnowledge,
-    KnowledgeLevel RouteKnowledge,
+    DiscoveryStage OverallStage,
+    DiscoveryStage FloraStage,
+    DiscoveryStage FaunaStage,
+    DiscoveryStage WaterStage,
+    DiscoveryStage RegionStage,
+    DiscoveryStage RouteStage,
     float GatheringPotentialFood,
     float HuntingPotentialFood,
     float WaterSupport,

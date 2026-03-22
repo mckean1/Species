@@ -59,7 +59,7 @@ public static class PlayerScreenNavigation
             var text =
                 $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Overview {dim}[3]{reset} Government {dim}[4]{reset} Regions  |  " +
                 $"Civic: {dim}[5]{reset} Laws {dim}[6]{reset} Advancements  |  " +
-                $"Knowledge: {dim}[7]{reset} Known Polities {dim}[8]{reset} Known Species  " +
+                $"Discovery: {dim}[7]{reset} Known Polities {dim}[8]{reset} Known Species  " +
                 $"{dim}[TAB]{reset} Next {dim}[SPACE]{reset} Run/Pause {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -72,7 +72,7 @@ public static class PlayerScreenNavigation
             var text =
                 $"Main: {dim}[1]{reset} Chronicle {dim}[2]{reset} Overview {dim}[3]{reset} Gov {dim}[4]{reset} Regions  |  " +
                 $"Civic: {dim}[5]{reset} Laws {dim}[6]{reset} Adv  |  " +
-                $"Know: {dim}[7]{reset} Polities {dim}[8]{reset} Species  " +
+                $"Disc: {dim}[7]{reset} Polities {dim}[8]{reset} Species  " +
                 $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -83,7 +83,7 @@ public static class PlayerScreenNavigation
         if (width >= 78)
         {
             var text =
-                $"Main {dim}[1]{reset}{dim}[2]{reset}{dim}[3]{reset}{dim}[4]{reset} | Civ {dim}[5]{reset}{dim}[6]{reset} | Know {dim}[7]{reset}{dim}[8]{reset}  " +
+                $"Main {dim}[1]{reset}{dim}[2]{reset}{dim}[3]{reset}{dim}[4]{reset} | Civ {dim}[5]{reset}{dim}[6]{reset} | Disc {dim}[7]{reset}{dim}[8]{reset}  " +
                 $"{dim}[TAB]{reset} Next  {dim}[SPACE]{reset} Run/Pause  {dim}[ENTER]{reset} Step";
 
             return selectionLabel is null
@@ -92,7 +92,7 @@ public static class PlayerScreenNavigation
         }
 
         return selectionLabel is null
-            ? $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}K{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}"
-            : $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}K{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}  {dim}[< >]{reset}";
+            ? $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}D{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}"
+            : $"{dim}M{reset}[1234] {dim}C{reset}[56] {dim}D{reset}[78]  {dim}[TAB]{reset}  {dim}[SPACE]{reset}  {dim}[ENTER]{reset}  {dim}[< >]{reset}";
     }
 }

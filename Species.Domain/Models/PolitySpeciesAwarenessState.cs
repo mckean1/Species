@@ -1,5 +1,5 @@
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 
 namespace Species.Domain.Models;
 
@@ -13,13 +13,10 @@ public sealed class PolitySpeciesAwarenessState
 
     public float DiscoveryProgress { get; set; }
 
-    public float KnowledgeProgress { get; set; }
-
-    public KnowledgeLevel CurrentLevel =>
-        KnowledgeProgress >= 100.0f ? KnowledgeLevel.Knowledge :
-        DiscoveryProgress >= 100.0f ? KnowledgeLevel.Discovery :
-        EncounterProgress >= 100.0f ? KnowledgeLevel.Encounter :
-        KnowledgeLevel.Unknown;
+    public DiscoveryStage CurrentStage =>
+        DiscoveryProgress >= 100.0f ? DiscoveryStage.Discovered :
+        EncounterProgress >= 100.0f ? DiscoveryStage.Encountered :
+        DiscoveryStage.Unknown;
 
     public PolitySpeciesAwarenessState Clone()
     {
@@ -28,8 +25,7 @@ public sealed class PolitySpeciesAwarenessState
             SpeciesId = SpeciesId,
             SpeciesClass = SpeciesClass,
             EncounterProgress = EncounterProgress,
-            DiscoveryProgress = DiscoveryProgress,
-            KnowledgeProgress = KnowledgeProgress
+            DiscoveryProgress = DiscoveryProgress
         };
     }
 }

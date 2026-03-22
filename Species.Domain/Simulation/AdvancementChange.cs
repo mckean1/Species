@@ -18,5 +18,5 @@ public sealed class AdvancementChange
 
     public required string PracticalEffectSummary { get; init; }
 
-    public required string ChronicleLinesSummary { get; init; }
+    public IReadOnlyList<string> UnlockedAdvancementNames { get; init; } = Array.Empty<string>();
 }

@@ -1,5 +1,5 @@
 using Species.Domain.Catalogs;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Diagnostics;
@@ -23,8 +23,8 @@ public static class FaunaVisibilityDiagnosticsFormatter
             return $"Fauna visibility diagnostic unavailable for polity={polityId}, region={regionId}.";
         }
 
-        var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
-        var snapshot = knowledgeContext.ObserveRegion(region, group.CurrentRegionId);
+        var discoveryContext = GroupDiscoveryContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
+        var snapshot = discoveryContext.ObserveRegion(region, group.CurrentRegionId);
         var visibility = RegionFaunaVisibilityResolver.Resolve(region, snapshot, faunaCatalog);
         var localFaunaDiscoveryId = discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id);
         var simulatedFauna = region.Ecosystem.FaunaPopulations.Count == 0
@@ -35,7 +35,7 @@ public static class FaunaVisibilityDiagnosticsFormatter
                 .ThenBy(entry => entry.Key, StringComparer.Ordinal)
                 .Select(entry => $"{faunaCatalog.GetById(entry.Key)?.Name ?? entry.Key}:{entry.Value}"));
 
-        var knowledgeReason = group.KnownDiscoveryIds.Contains(localFaunaDiscoveryId)
+        var discoveryReason = group.KnownDiscoveryIds.Contains(localFaunaDiscoveryId)
             ? "Local fauna discovery is known."
             : snapshot.IsCurrentRegion
                 ? "Current regional presence grants encounter-level fauna awareness."
@@ -51,8 +51,8 @@ public static class FaunaVisibilityDiagnosticsFormatter
         {
             $"Region={region.Id} ({region.Name})",
             $"SimulatedFauna=[{simulatedFauna}]",
-            $"FaunaKnowledge={snapshot.FaunaKnowledge}",
-            $"KnowledgeReason={knowledgeReason}",
+            $"FaunaStage={snapshot.FaunaStage}",
+            $"DiscoveryReason={discoveryReason}",
             $"EncounterDisplay=[{string.Join(", ", visibility.EncounterEligibleEntries.DefaultIfEmpty("none"))}]",
             $"DiscoveryDisplay=[{string.Join(", ", visibility.DiscoveryEligibleEntries.DefaultIfEmpty("none"))}]",
             $"ActiveDisplayLabel={visibility.DisplayLabel}",

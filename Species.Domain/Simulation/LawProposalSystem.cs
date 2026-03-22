@@ -418,32 +418,9 @@ public sealed class LawProposalSystem
                 GroupId = polity.Id,
                 GroupName = polity.Name,
                 ProposalTitle = proposal.Title,
-                ChronicleLine = BuildLawChronicleLine(polity.Name, proposal, status),
                 Status = status
             }
         ];
-    }
-
-    private static string BuildLawChronicleLine(string polityName, LawProposal proposal, LawProposalStatus status)
-    {
-        if (status == LawProposalStatus.Vetoed)
-        {
-            return $"{polityName} rejected {proposal.Title.ToLowerInvariant()}.";
-        }
-
-        return proposal.DefinitionId switch
-        {
-            GovernanceLawCatalog.CentralizeStoresId => $"{polityName} centralized its stores under emergency law.",
-            GovernanceLawCatalog.LocalStoreAutonomyId => $"{polityName} left store control with local settlements.",
-            GovernanceLawCatalog.ExtractionObligationId => $"{polityName} imposed stricter extraction obligations.",
-            GovernanceLawCatalog.EaseExtractionBurdenId => $"{polityName} eased extraction burdens on local sites.",
-            GovernanceLawCatalog.CrisisMovementRestrictionId => $"{polityName} restricted movement during instability.",
-            GovernanceLawCatalog.OpenMovementId => $"{polityName} kept routes open despite instability.",
-            GovernanceLawCatalog.StrengthenCentralAuthorityId => $"{polityName} concentrated authority around the core order.",
-            GovernanceLawCatalog.SharedGovernanceId => $"{polityName} widened shared governance across the polity.",
-            GovernanceLawCatalog.FrontierIntegrationId => $"{polityName} tied frontier settlements more closely to the core.",
-            _ => $"{polityName} passed {proposal.Title}."
-        };
     }
 
     private static int ScoreWhen(bool eligible, int score)

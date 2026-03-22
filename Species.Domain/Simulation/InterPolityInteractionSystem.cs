@@ -341,6 +341,7 @@ public sealed class InterPolityInteractionSystem
                 OtherPolityId = defender.Id,
                 OtherPolityName = defender.Name,
                 Kind = likelyOpenConflict ? "open-conflict" : "raid",
+                EventType = likelyOpenConflict ? "war" : "raid",
                 Message = message
             }
         };
@@ -429,7 +430,16 @@ public sealed class InterPolityInteractionSystem
             _ => string.Empty
         };
 
-        if (string.IsNullOrWhiteSpace(message))
+        var eventType = current switch
+        {
+            InterPolityStance.Cooperative => "alliance",
+            InterPolityStance.Rival => "hostility",
+            InterPolityStance.Hostile => "hostility",
+            InterPolityStance.UneasyPeace => "peace",
+            _ => string.Empty
+        };
+
+        if (string.IsNullOrWhiteSpace(message) || string.IsNullOrWhiteSpace(eventType))
         {
             return;
         }
@@ -441,6 +451,7 @@ public sealed class InterPolityInteractionSystem
             OtherPolityId = other.Id,
             OtherPolityName = other.Name,
             Kind = "stance-shift",
+            EventType = eventType,
             Message = message
         });
     }

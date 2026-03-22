@@ -14,6 +14,8 @@ public sealed class PressureState
 
     public PressureValue Migration { get; set; } = new();
 
+    public PressureValue Curiosity { get; set; } = new();
+
     public int FoodPressure => Food.DisplayValue;
 
     public int WaterPressure => Water.DisplayValue;
@@ -24,6 +26,8 @@ public sealed class PressureState
 
     public int MigrationPressure => Migration.DisplayValue;
 
+    public int CuriosityPressure => Curiosity.DisplayValue;
+
     public PressureValue Get(PressureCategory category)
     {
         return category switch
@@ -33,6 +37,7 @@ public sealed class PressureState
             PressureCategory.Threat => Threat,
             PressureCategory.Overcrowding => Overcrowding,
             PressureCategory.Migration => Migration,
+            PressureCategory.Curiosity => Curiosity,
             _ => throw new ArgumentOutOfRangeException(nameof(category), category, null)
         };
     }
@@ -56,6 +61,9 @@ public sealed class PressureState
             case PressureCategory.Migration:
                 Migration = value;
                 break;
+            case PressureCategory.Curiosity:
+                Curiosity = value;
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(category), category, null);
         }
@@ -69,7 +77,8 @@ public sealed class PressureState
             Water = Water.Clone(),
             Threat = Threat.Clone(),
             Overcrowding = Overcrowding.Clone(),
-            Migration = Migration.Clone()
+            Migration = Migration.Clone(),
+            Curiosity = Curiosity.Clone()
         };
     }
 }

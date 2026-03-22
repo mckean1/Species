@@ -1,3 +1,5 @@
+using Species.Domain.Enums;
+
 namespace Species.Client.Models;
 
 public sealed class KnownSpeciesSummary
@@ -5,44 +7,44 @@ public sealed class KnownSpeciesSummary
     public KnownSpeciesSummary(
         string id,
         string name,
-        string kind,
+        SpeciesClass speciesClass,
         bool isPlayerSpecies,
-        string presence,
-        string status,
+        string stateLabel,
+        IReadOnlyList<string> cells,
         string overview,
-        IReadOnlyList<string> facts,
+        IReadOnlyList<string> details,
         IReadOnlyList<string> traits,
-        IReadOnlyList<string> relevance)
+        IReadOnlyList<string> context)
     {
         Id = id;
         Name = name;
-        Kind = kind;
+        SpeciesClass = speciesClass;
         IsPlayerSpecies = isPlayerSpecies;
-        Presence = presence;
-        Status = status;
+        StateLabel = stateLabel;
+        Cells = cells;
         Overview = overview;
-        Facts = facts;
+        Details = details;
         Traits = traits;
-        Relevance = relevance;
+        Context = context;
     }
 
     public string Id { get; }
 
     public string Name { get; }
 
-    public string Kind { get; }
+    public SpeciesClass SpeciesClass { get; }
 
     public bool IsPlayerSpecies { get; }
 
-    public string Presence { get; }
+    public string StateLabel { get; }
 
-    public string Status { get; }
+    public IReadOnlyList<string> Cells { get; }
 
     public string Overview { get; }
 
-    public IReadOnlyList<string> Facts { get; }
+    public IReadOnlyList<string> Details { get; }
 
     public IReadOnlyList<string> Traits { get; }
 
-    public IReadOnlyList<string> Relevance { get; }
+    public IReadOnlyList<string> Context { get; }
 }

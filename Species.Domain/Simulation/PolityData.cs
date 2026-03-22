@@ -1,6 +1,6 @@
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -132,7 +132,8 @@ public static class PolityData
                 Water = WeightedPressure(memberGroups, group => group.Pressures.Water, PressureDefinitions.Water),
                 Threat = WeightedPressure(memberGroups, group => group.Pressures.Threat, PressureDefinitions.Threat),
                 Overcrowding = WeightedPressure(memberGroups, group => group.Pressures.Overcrowding, PressureDefinitions.Overcrowding),
-                Migration = WeightedPressure(memberGroups, group => group.Pressures.Migration, PressureDefinitions.Migration)
+                Migration = WeightedPressure(memberGroups, group => group.Pressures.Migration, PressureDefinitions.Migration),
+                Curiosity = PressureMath.CreateValue(PressureDefinitions.Curiosity, polity.Curiosity.StoredRawPressure)
             },
             knownRegionIds,
             knownDiscoveryIds,

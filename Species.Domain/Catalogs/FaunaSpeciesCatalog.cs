@@ -63,6 +63,7 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.76f,
                 Conspicuousness = 0.56f,
                 FoodYield = 0.35f,
+                Tags = [FaunaTag.SmallPrey, FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 44,
@@ -100,6 +101,7 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.48f,
                 Conspicuousness = 0.70f,
                 FoodYield = 0.85f,
+                Tags = [FaunaTag.LargePrey, FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 48,
@@ -138,6 +140,7 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.54f,
                 Conspicuousness = 0.44f,
                 FoodYield = 0.25f,
+                Tags = [FaunaTag.SmallPrey, FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 42,
@@ -175,6 +178,7 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.42f,
                 Conspicuousness = 0.52f,
                 FoodYield = 0.30f,
+                Tags = [FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 46,
@@ -213,6 +217,7 @@ public sealed class FaunaSpeciesCatalog
                 RegionalAbundance = 0.30f,
                 Conspicuousness = 0.66f,
                 FoodYield = 0.55f,
+                Tags = [FaunaTag.HideSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 54,

@@ -11,6 +11,8 @@ namespace Species.Client.ViewModelFactories;
 
 public static class ChronicleViewModelFactory
 {
+    private const int ActiveAlertVisibilityMonths = 2;
+
     public static ChronicleViewModel Build(World world, string focalPolityId, ChronicleViewRequest request, bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
@@ -35,7 +37,7 @@ public static class ChronicleViewModelFactory
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
-        var urgentItems = BuildUrgentItems(focusPolity, focusContext);
+        var urgentItems = BuildUrgentItems(world, focusPolity, focusContext);
         var visibleEntries = GetVisibleEntries(world, focusPolity, focusContext);
         var entryCount = request.Mode switch
         {
@@ -54,7 +56,7 @@ public static class ChronicleViewModelFactory
             selectedUrgent);
     }
 
-    private static IReadOnlyList<ChronicleUrgentItem> BuildUrgentItems(Polity? polity, PolityContext? context)
+    private static IReadOnlyList<ChronicleUrgentItem> BuildUrgentItems(World world, Polity? polity, PolityContext? context)
     {
         var items = new List<ChronicleUrgentItem>();
         if (polity is null || context is null)
@@ -73,56 +75,23 @@ public static class ChronicleViewModelFactory
                 polity.ActiveLawProposal.Id));
         }
 
-        if (context.Pressures.Food.DisplayValue >= ChronicleConstants.HardshipWarningDisplayThreshold ||
-            context.Pressures.Water.DisplayValue >= ChronicleConstants.HardshipWarningDisplayThreshold ||
-            context.MaterialShortageMonths >= 3)
-        {
-            items.Add(new ChronicleUrgentItem(
-                "stores-crisis",
-                "Stores are under severe strain and shortfalls are spreading.",
-                context.Pressures.Food.DisplayValue >= context.Pressures.Water.DisplayValue
-                    ? $"Food pressure is {context.Pressures.Food.SeverityLabel.ToLowerInvariant()} and running ahead of current reserves."
-                    : $"Water pressure is {context.Pressures.Water.SeverityLabel.ToLowerInvariant()} and now threatening stability.",
-                "A prolonged shortage can trigger settlement loss, legitimacy damage, and migration.",
-                PlayerScreen.Polity,
-                null));
-        }
-
-        if (context.ExternalPressure.RaidPressure >= 55 || context.ExternalPressure.Threat >= 70)
-        {
-            items.Add(new ChronicleUrgentItem(
-                "external-threat",
-                "Frontier danger is escalating under outside pressure.",
-                context.ExternalPressure.Summary,
-                "Further raids or conflict can damage settlements, stores, and cohesion.",
-                PlayerScreen.KnownPolities,
-                null));
-        }
-
-        if (context.ScaleState.FragmentationRisk >= 68 || context.Governance.PeripheralStrain >= 72)
-        {
-            items.Add(new ChronicleUrgentItem(
-                "fragmentation-risk",
-                "Breakaway risk is rising on the periphery.",
-                context.ScaleState.Summary,
-                "If integration strain keeps climbing, the realm may lose outlying regions or attached polities.",
-                PlayerScreen.Government,
-                null));
-        }
-
-        if (context.Governance.Governability <= 28 || context.Governance.Legitimacy <= 25 || context.Governance.Cohesion <= 25)
-        {
-            items.Add(new ChronicleUrgentItem(
-                "governance-crisis",
-                "Governance is faltering as legitimacy and cohesion weaken.",
-                $"Legitimacy {context.Governance.Legitimacy}, cohesion {context.Governance.Cohesion}, authority {context.Governance.Authority}.",
-                "Weak governability makes laws, enforcement, and coordinated recovery less reliable.",
-                PlayerScreen.Government,
-                null));
-        }
+        items.AddRange(BuildChronicleAlerts(world, polity));
 
         return items
+            .GroupBy(item => item.Id, StringComparer.Ordinal)
+            .Select(group => group.First())
             .Take(3)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<ChronicleUrgentItem> BuildChronicleAlerts(World world, Polity polity)
+    {
+        return world.Chronicle
+            .GetCurrentAlerts(world.CurrentYear, world.CurrentMonth, ActiveAlertVisibilityMonths)
+            .Where(alert => string.Equals(alert.PolityId, polity.Id, StringComparison.Ordinal))
+            .OrderByDescending(alert => alert.Severity)
+            .ThenByDescending(alert => alert.Sequence)
+            .Select(BuildAlertItem)
             .ToArray();
     }
 
@@ -179,6 +148,7 @@ public static class ChronicleViewModelFactory
             entry.EventMonth,
             FormatMonthYear(entry.EventMonth, entry.EventYear),
             entry.Message,
+            entry.Tokens,
             DescribeCategory(entry.Category),
             BuildEntryImpact(entry),
             IsMilestone(entry));
@@ -270,7 +240,7 @@ public static class ChronicleViewModelFactory
         PolityContext? focusContext,
         ChronicleViewRequest request)
     {
-        var urgentItems = BuildUrgentItems(focusPolity, focusContext);
+        var urgentItems = BuildUrgentItems(world, focusPolity, focusContext);
         var visibleEntries = GetVisibleEntries(world, focusPolity, focusContext);
         var liveEntries = BuildLiveEntries(visibleEntries);
         var archiveEntries = visibleEntries.Select(BuildListItem).ToArray();
@@ -375,6 +345,11 @@ public static class ChronicleViewModelFactory
             return "Movement pressure is pushing the polity to reposition.";
         }
 
+        if (context.Pressures.Curiosity.DisplayValue >= ChronicleConstants.PressureConcernDisplayThreshold)
+        {
+            return "Curiosity pressure is pushing the polity toward nearby unknown ground.";
+        }
+
         return "No single direction dominates the current month.";
     }
 
@@ -386,7 +361,8 @@ public static class ChronicleViewModelFactory
             ("Water", context.Pressures.Water.DisplayValue, context.Pressures.Water.SeverityLabel),
             ("Threat", context.Pressures.Threat.DisplayValue, context.Pressures.Threat.SeverityLabel),
             ("Crowding", context.Pressures.Overcrowding.DisplayValue, context.Pressures.Overcrowding.SeverityLabel),
-            ("Migration", context.Pressures.Migration.DisplayValue, context.Pressures.Migration.SeverityLabel)
+            ("Migration", context.Pressures.Migration.DisplayValue, context.Pressures.Migration.SeverityLabel),
+            ("Curiosity", context.Pressures.Curiosity.DisplayValue, context.Pressures.Curiosity.SeverityLabel)
         };
 
         var strongest = pressures
@@ -459,5 +435,40 @@ public static class ChronicleViewModelFactory
         };
 
         return $"{monthText} {year:D3}";
+    }
+
+    private static ChronicleUrgentItem BuildAlertItem(ChronicleAlert alert)
+    {
+        var targetScreen = alert.Category switch
+        {
+            ChronicleCandidateCategory.Conflict => PlayerScreen.KnownPolities,
+            ChronicleCandidateCategory.Settlement => PlayerScreen.Regions,
+            ChronicleCandidateCategory.Territory => PlayerScreen.Regions,
+            _ => PlayerScreen.Polity
+        };
+        var cause = alert.Category switch
+        {
+            ChronicleCandidateCategory.Survival => "Current living conditions remain under strain.",
+            ChronicleCandidateCategory.Conflict => "Outside pressure remains active.",
+            ChronicleCandidateCategory.Territory => "Movement pressure is still unresolved.",
+            ChronicleCandidateCategory.Settlement => "Settlement support is weak right now.",
+            _ => "This condition is still active."
+        };
+        var impact = alert.Category switch
+        {
+            ChronicleCandidateCategory.Survival => "If it persists, losses, migration, or instability can follow.",
+            ChronicleCandidateCategory.Conflict => "Further raids or conflict can damage cohesion and stores.",
+            ChronicleCandidateCategory.Territory => "Continued pressure can push movement or territorial loss.",
+            ChronicleCandidateCategory.Settlement => "A vulnerable settlement is easier to lose or abandon.",
+            _ => "Continued strain can worsen the polity's position."
+        };
+
+        return new ChronicleUrgentItem(
+            $"{alert.PolityId}:{alert.DedupeKey}",
+            alert.Message,
+            cause,
+            impact,
+            targetScreen,
+            null);
     }
 }

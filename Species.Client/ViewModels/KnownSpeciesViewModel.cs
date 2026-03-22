@@ -8,14 +8,16 @@ public sealed class KnownSpeciesViewModel
         string polityName,
         string currentDate,
         bool isSimulationRunning,
-        IReadOnlyList<KnownSpeciesSummary> species,
+        IReadOnlyList<KnownSpeciesSectionSummary> sections,
+        IReadOnlyList<KnownSpeciesSummary> selectableSpecies,
         KnownSpeciesSummary? selectedSpecies,
         int selectedIndex)
     {
         PolityName = polityName;
         CurrentDate = currentDate;
         IsSimulationRunning = isSimulationRunning;
-        Species = species;
+        Sections = sections;
+        SelectableSpecies = selectableSpecies;
         SelectedSpecies = selectedSpecies;
         SelectedIndex = selectedIndex;
     }
@@ -26,7 +28,9 @@ public sealed class KnownSpeciesViewModel
 
     public bool IsSimulationRunning { get; }
 
-    public IReadOnlyList<KnownSpeciesSummary> Species { get; }
+    public IReadOnlyList<KnownSpeciesSectionSummary> Sections { get; }
+
+    public IReadOnlyList<KnownSpeciesSummary> SelectableSpecies { get; }
 
     public KnownSpeciesSummary? SelectedSpecies { get; }
 

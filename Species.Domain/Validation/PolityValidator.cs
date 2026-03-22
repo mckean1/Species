@@ -265,6 +265,11 @@ public static class PolityValidator
                 errors.Add($"Polity {polity.Id} has negative material economy counters.");
             }
 
+            if (polity.Curiosity.MonthsSinceLastNovelty < 0 || polity.Curiosity.StoredRawPressure < 0)
+            {
+                errors.Add($"Polity {polity.Id} has invalid curiosity state.");
+            }
+
             if (polity.ExternalPressure.Threat is < 0 or > 100 ||
                 polity.ExternalPressure.Cooperation is < 0 or > 100 ||
                 polity.ExternalPressure.FrontierFriction is < 0 or > 100 ||

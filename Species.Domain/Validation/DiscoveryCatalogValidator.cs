@@ -24,6 +24,10 @@ public static class DiscoveryCatalogValidator
             {
                 errors.Add($"Discovery definition {definition.Id} is missing a name.");
             }
+            else if (definition.Name.Contains("conditions", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"Discovery definition {definition.Id} still uses forbidden discovery wording in its name.");
+            }
 
             if (string.IsNullOrWhiteSpace(definition.CausalSummary))
             {

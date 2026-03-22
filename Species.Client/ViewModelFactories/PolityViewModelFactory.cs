@@ -65,7 +65,8 @@ public static class PolityViewModelFactory
             new PolityPressureItem("Water", pressures.Water.DisplayValue, pressures.Water.SeverityLabel),
             new PolityPressureItem("Threat", pressures.Threat.DisplayValue, pressures.Threat.SeverityLabel),
             new PolityPressureItem("Crowding", pressures.Overcrowding.DisplayValue, pressures.Overcrowding.SeverityLabel),
-            new PolityPressureItem("Migration", pressures.Migration.DisplayValue, pressures.Migration.SeverityLabel)
+            new PolityPressureItem("Migration", pressures.Migration.DisplayValue, pressures.Migration.SeverityLabel),
+            new PolityPressureItem("Curiosity", pressures.Curiosity.DisplayValue, pressures.Curiosity.SeverityLabel)
         }
         .OrderByDescending(item => item.Value)
         .ThenBy(item => item.Label, StringComparer.Ordinal)
@@ -185,6 +186,11 @@ public static class PolityViewModelFactory
             return activeSettlementCount >= 2
                 ? "Migration pressure is rising across frontier settlements."
                 : "Migration pressure is rising around the polity's current base.";
+        }
+
+        if (context.Pressures.Curiosity.DisplayValue >= 10)
+        {
+            return "Curiosity pressure is rising as novelty dries up beyond the current frontier.";
         }
 
         if (context.Pressures.Water.DisplayValue >= 10)

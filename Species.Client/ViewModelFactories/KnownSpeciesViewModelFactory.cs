@@ -1,309 +1,559 @@
-using Species.Domain.Catalogs;
-using Species.Domain.Enums;
-using Species.Domain.Knowledge;
-using Species.Domain.Models;
 using Species.Client.Models;
 using Species.Client.Presentation;
 using Species.Client.ViewModels;
+using Species.Domain.Catalogs;
+using Species.Domain.Discovery;
+using Species.Domain.Enums;
+using Species.Domain.Models;
 
 namespace Species.Client.ViewModelFactories;
 
 public static class KnownSpeciesViewModelFactory
 {
-    public static int GetKnownSpeciesCount(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId)
+    private static readonly string[] FloraColumns = ["Name", "Food Role", "Known Uses", "Outputs", "Habitat", "Seasonality"];
+    private static readonly string[] FaunaColumns = ["Name", "Role", "Food Role", "Outputs", "Danger", "Habitat"];
+    private static readonly string[] SapientColumns = ["Name", "Threat", "Location", "Known Traits"];
+
+    public static int GetKnownSpeciesCount(
+        World world,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        string focalPolityId)
     {
-        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
-        if (focusGroup is null)
-        {
-            return 0;
-        }
-
-        var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, focusGroup.PolityId, StringComparison.Ordinal));
-        if (focusPolity is null)
-        {
-            return 1;
-        }
-
-        var visibleRegionIds = focusGroup.KnownRegionIds
-            .Append(focusGroup.CurrentRegionId)
-            .Concat(world.PopulationGroups
-                .Where(group => string.Equals(group.PolityId, focusPolity.Id, StringComparison.Ordinal))
-                .Select(group => group.CurrentRegionId))
-            .ToHashSet(StringComparer.Ordinal);
-
-        var faunaCount = focusPolity.SpeciesAwareness
-            .Where(state => state.SpeciesClass == SpeciesClass.Fauna && state.CurrentLevel >= KnowledgeLevel.Encounter)
-            .Select(state => state.SpeciesId)
-            .Distinct(StringComparer.Ordinal)
-            .Count(speciesId =>
-                faunaCatalog.GetById(speciesId) is not null &&
-                world.Regions.Any(region =>
-                    visibleRegionIds.Contains(region.Id) &&
-                    region.Ecosystem.FaunaPopulations.GetValueOrDefault(speciesId) > 0));
-
-        return 1 + faunaCount;
+        return BuildSelectableSpecies(world, floraCatalog, faunaCatalog, focalPolityId).Count;
     }
 
-    public static KnownSpeciesViewModel Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex, bool isSimulationRunning = false)
+    public static KnownSpeciesViewModel Build(
+        World world,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        string focalPolityId,
+        int selectedIndex,
+        bool isSimulationRunning = false)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
-        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
-        var items = BuildSpecies(world, focusGroup, faunaCatalog);
-        var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
+        var selectableSpecies = BuildSelectableSpecies(world, floraCatalog, faunaCatalog, focalPolityId);
+        var sections = BuildSections(selectableSpecies);
+        var clampedIndex = selectableSpecies.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, selectableSpecies.Count - 1);
 
         return new KnownSpeciesViewModel(
             focusPolity?.Name ?? "Unknown polity",
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             isSimulationRunning,
-            items,
-            items.Count == 0 ? null : items[clampedIndex],
+            sections,
+            selectableSpecies,
+            selectableSpecies.Count == 0 ? null : selectableSpecies[clampedIndex],
             clampedIndex);
     }
 
-    private static IReadOnlyList<KnownSpeciesSummary> BuildSpecies(World world, PopulationGroup? focusGroup, FaunaSpeciesCatalog faunaCatalog)
+    private static IReadOnlyList<KnownSpeciesSectionSummary> BuildSections(IReadOnlyList<KnownSpeciesSummary> species)
     {
+        var flora = species.Where(item => item.SpeciesClass == SpeciesClass.Flora).ToArray();
+        var fauna = species.Where(item => item.SpeciesClass == SpeciesClass.Fauna).ToArray();
+        var sapients = species.Where(item => item.SpeciesClass == SpeciesClass.Sapient).ToArray();
+
+        return
+        [
+            new KnownSpeciesSectionSummary("Flora", "No known flora", FloraColumns, flora),
+            new KnownSpeciesSectionSummary("Fauna", "No known fauna", FaunaColumns, fauna),
+            new KnownSpeciesSectionSummary("Sapients", "No known sapients", SapientColumns, sapients)
+        ];
+    }
+
+    private static IReadOnlyList<KnownSpeciesSummary> BuildSelectableSpecies(
+        World world,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
+        string focalPolityId)
+    {
+        var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         if (focusGroup is null)
         {
             return [];
         }
 
-        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
         var focusPolity = world.Polities.FirstOrDefault(polity => string.Equals(polity.Id, focusGroup.PolityId, StringComparison.Ordinal));
-        var summaries = new List<KnownSpeciesSummary>
-        {
-            BuildOwnSpeciesSummary(world, focusGroup, regionsById)
-        };
+        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+        var visibleRegionIds = ResolveVisibleRegionIds(world, focusGroup, focusPolity);
+        var visibleRegions = visibleRegionIds
+            .Select(regionId => regionsById.GetValueOrDefault(regionId))
+            .Where(region => region is not null)
+            .Cast<Region>()
+            .ToArray();
+        var summaries = new List<KnownSpeciesSummary>();
 
-        if (focusPolity is null)
-        {
-            return summaries;
-        }
+        summaries.AddRange(BuildFloraSummaries(visibleRegions, floraCatalog, focusPolity));
+        summaries.AddRange(BuildFaunaSummaries(visibleRegions, faunaCatalog, focusPolity));
+        summaries.AddRange(BuildSapientSummaries(world, focusGroup, focusPolity, regionsById, visibleRegionIds));
 
-        var visibleRegionIds = focusGroup.KnownRegionIds
+        return summaries
+            .OrderBy(summary => summary.SpeciesClass)
+            .ThenBy(summary => summary.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static HashSet<string> ResolveVisibleRegionIds(World world, PopulationGroup focusGroup, Polity? focusPolity)
+    {
+        return focusGroup.KnownRegionIds
             .Append(focusGroup.CurrentRegionId)
             .Concat(world.PopulationGroups
-                .Where(group => string.Equals(group.PolityId, focusPolity.Id, StringComparison.Ordinal))
+                .Where(group => focusPolity is not null && string.Equals(group.PolityId, focusPolity.Id, StringComparison.Ordinal))
                 .Select(group => group.CurrentRegionId))
             .ToHashSet(StringComparer.Ordinal);
-        var knownFaunaById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
+    }
 
+    private static IReadOnlyList<KnownSpeciesSummary> BuildFloraSummaries(
+        IReadOnlyList<Region> visibleRegions,
+        FloraSpeciesCatalog floraCatalog,
+        Polity? focusPolity)
+    {
+        if (focusPolity is null)
+        {
+            return [];
+        }
+
+        var floraById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
         foreach (var awareness in focusPolity.SpeciesAwareness
-                     .Where(state => state.SpeciesClass == SpeciesClass.Fauna && state.CurrentLevel >= KnowledgeLevel.Encounter)
+                     .Where(state => state.SpeciesClass == SpeciesClass.Flora && state.CurrentStage == DiscoveryStage.Discovered)
                      .OrderBy(state => state.SpeciesId, StringComparer.Ordinal))
         {
-            foreach (var region in world.Regions
-                         .Where(region => visibleRegionIds.Contains(region.Id))
-                         .Where(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(awareness.SpeciesId) > 0))
+            foreach (var region in visibleRegions.Where(region => region.Ecosystem.FloraPopulations.GetValueOrDefault(awareness.SpeciesId) > 0))
             {
-                if (!knownFaunaById.TryGetValue(awareness.SpeciesId, out var regions))
+                if (!floraById.TryGetValue(awareness.SpeciesId, out var regions))
                 {
                     regions = [];
-                    knownFaunaById.Add(awareness.SpeciesId, regions);
+                    floraById.Add(awareness.SpeciesId, regions);
                 }
 
                 regions.Add(region);
             }
         }
 
-        foreach (var faunaEntry in knownFaunaById.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        return floraById
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => floraCatalog.GetById(entry.Key) is { } flora ? BuildFloraSummary(flora, entry.Value) : null)
+            .Where(summary => summary is not null)
+            .Cast<KnownSpeciesSummary>()
+            .ToArray();
+    }
+
+    private static IReadOnlyList<KnownSpeciesSummary> BuildFaunaSummaries(
+        IReadOnlyList<Region> visibleRegions,
+        FaunaSpeciesCatalog faunaCatalog,
+        Polity? focusPolity)
+    {
+        if (focusPolity is null)
         {
-            var fauna = faunaCatalog.GetById(faunaEntry.Key);
-            if (fauna is null)
+            return [];
+        }
+
+        var faunaById = new Dictionary<string, List<Region>>(StringComparer.Ordinal);
+        foreach (var awareness in focusPolity.SpeciesAwareness
+                     .Where(state => state.SpeciesClass == SpeciesClass.Fauna && state.CurrentStage == DiscoveryStage.Discovered)
+                     .OrderBy(state => state.SpeciesId, StringComparer.Ordinal))
+        {
+            foreach (var region in visibleRegions.Where(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(awareness.SpeciesId) > 0))
+            {
+                if (!faunaById.TryGetValue(awareness.SpeciesId, out var regions))
+                {
+                    regions = [];
+                    faunaById.Add(awareness.SpeciesId, regions);
+                }
+
+                regions.Add(region);
+            }
+        }
+
+        return faunaById
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => faunaCatalog.GetById(entry.Key) is { } fauna ? BuildFaunaSummary(fauna, entry.Value) : null)
+            .Where(summary => summary is not null)
+            .Cast<KnownSpeciesSummary>()
+            .ToArray();
+    }
+
+    private static IReadOnlyList<KnownSpeciesSummary> BuildSapientSummaries(
+        World world,
+        PopulationGroup focusGroup,
+        Polity? focusPolity,
+        IReadOnlyDictionary<string, Region> regionsById,
+        IReadOnlySet<string> visibleRegionIds)
+    {
+        var encounterRegionIds = new HashSet<string>(visibleRegionIds, StringComparer.Ordinal);
+        foreach (var regionId in visibleRegionIds)
+        {
+            if (!regionsById.TryGetValue(regionId, out var region))
             {
                 continue;
             }
 
-            var awareness = focusPolity.SpeciesAwareness.First(state =>
-                state.SpeciesClass == SpeciesClass.Fauna &&
-                string.Equals(state.SpeciesId, faunaEntry.Key, StringComparison.Ordinal));
-            summaries.Add(BuildFaunaSummary(fauna, faunaEntry.Value, awareness.CurrentLevel));
+            foreach (var neighborId in region.NeighborIds)
+            {
+                encounterRegionIds.Add(neighborId);
+            }
+        }
+
+        var sapientGroups = world.PopulationGroups
+            .Where(group => group.SpeciesClass == SpeciesClass.Sapient)
+            .Where(group =>
+                string.Equals(group.PolityId, focusGroup.PolityId, StringComparison.Ordinal) ||
+                encounterRegionIds.Contains(group.CurrentRegionId) ||
+                focusPolity?.InterPolityRelations.Any(relation =>
+                    string.Equals(relation.OtherPolityId, group.PolityId, StringComparison.Ordinal) &&
+                    relation.ContactIntensity > 0) == true)
+            .GroupBy(group => group.SpeciesId, StringComparer.Ordinal)
+            .OrderBy(grouping => grouping.Key, StringComparer.Ordinal);
+
+        var summaries = new List<KnownSpeciesSummary>();
+        foreach (var speciesGroup in sapientGroups)
+        {
+            summaries.Add(BuildSapientSummary(speciesGroup.Key, speciesGroup.ToArray(), focusGroup, focusPolity, regionsById));
         }
 
         return summaries;
     }
 
-    private static KnownSpeciesSummary BuildOwnSpeciesSummary(
-        World world,
-        PopulationGroup focusGroup,
-        IReadOnlyDictionary<string, Region> regionsById)
+    private static KnownSpeciesSummary BuildFloraSummary(FloraSpeciesDefinition flora, IReadOnlyList<Region> regions)
     {
-        var speciesGroups = world.PopulationGroups
-            .Where(group => string.Equals(group.SpeciesId, focusGroup.SpeciesId, StringComparison.Ordinal))
-            .Where(group =>
-                string.Equals(group.Id, focusGroup.Id, StringComparison.Ordinal) ||
-                focusGroup.KnownRegionIds.Contains(group.CurrentRegionId) ||
-                focusGroup.KnownRegionIds.Contains(group.OriginRegionId))
-            .ToArray();
-        var regions = speciesGroups
-            .Select(group => regionsById.GetValueOrDefault(group.CurrentRegionId))
-            .Where(region => region is not null)
-            .Cast<Region>()
-            .DistinctBy(region => region.Id)
-            .ToArray();
-        var avgPressure = speciesGroups.Length == 0
-            ? 0
-            : (int)Math.Round(speciesGroups.Average(group => Math.Max(group.Pressures.Food.DisplayValue, group.Pressures.Water.DisplayValue)), MidpointRounding.AwayFromZero);
+        var distinctRegions = regions.DistinctBy(region => region.Id).ToArray();
+        var habitat = BuildHabitat(distinctRegions);
+        var foodRole = flora.UsableBiomass >= 0.65f
+            ? "major forage"
+            : flora.UsableBiomass >= 0.35f
+                ? "supplemental forage"
+                : "marginal forage";
+        var uses = BuildFloraUses(flora);
+        var outputs = BuildFloraOutputs(flora);
+        var seasonality = BuildFloraSeasonality(flora);
 
         return new KnownSpeciesSummary(
-            focusGroup.SpeciesId,
-            BuildPlayerSpeciesName(focusGroup.SpeciesId),
-            "Sapient species",
-            true,
-            $"{speciesGroups.Sum(group => group.Population):N0}",
-            avgPressure >= 50 ? "familiar, pressured" : "familiar, common nearby",
-            "The sapient species your polity belongs to.",
+            flora.Id,
+            flora.Name,
+            SpeciesClass.Flora,
+            false,
+            "Discovered",
+            [flora.Name, foodRole, uses, outputs, habitat, seasonality],
+            $"A discovered plant species known from {BuildRegionNames(distinctRegions)}.",
             [
-                $"Known population: {speciesGroups.Sum(group => group.Population):N0}",
-                $"Known range: {regions.Length} region{(regions.Length == 1 ? string.Empty : "s")}",
-                $"Dominant way of living: {FormatSubsistence(speciesGroups.GroupBy(group => group.SubsistenceMode).OrderByDescending(group => group.Count()).First().Key)}"
+                $"Known habitat: {habitat}",
+                $"Water range: {BuildWaterSummary(flora.SupportedWaterAvailabilities)}",
+                $"Observed range: {BuildRegionNames(distinctRegions)}"
             ],
-            BuildOwnTraits(speciesGroups, regions),
-            BuildOwnContext(focusGroup, regions));
+            [
+                $"Food role: {foodRole}",
+                $"Known uses: {uses}",
+                $"Outputs: {outputs}"
+            ],
+            [
+                "Appears on the Known Species screen only after full discovery.",
+                $"Seasonality is currently inferred as {seasonality} from growth and recovery."
+            ]);
     }
 
-    private static KnownSpeciesSummary BuildFaunaSummary(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions, KnowledgeLevel knowledgeLevel)
+    private static KnownSpeciesSummary BuildFaunaSummary(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions)
     {
-        var totalPopulation = regions.Sum(region => region.Ecosystem.FaunaPopulations.GetValueOrDefault(fauna.Id));
-        var isDangerous = fauna.DietCategory == DietCategory.Carnivore;
-        var prevalence = totalPopulation switch
+        var distinctRegions = regions.DistinctBy(region => region.Id).ToArray();
+        var habitat = BuildHabitat(distinctRegions);
+        var role = fauna.DietCategory switch
         {
-            >= 900 => "common nearby",
-            >= 350 => "present nearby",
-            >= 1 => "rare",
-            _ => "sparsely confirmed"
+            DietCategory.Carnivore => "predator",
+            DietCategory.Herbivore => "grazer",
+            _ => "omnivore"
         };
-        var knowledgeStatus = knowledgeLevel switch
+        var foodRole = fauna.DietCategory switch
         {
-            KnowledgeLevel.Knowledge => "reliably understood",
-            KnowledgeLevel.Discovery => "recognized resource",
-            _ => "encountered"
+            DietCategory.Carnivore => fauna.FoodYield >= 0.45f ? "risky meat" : "dangerous prey",
+            DietCategory.Herbivore => fauna.FoodYield >= 0.55f ? "major prey" : "common prey",
+            _ => "opportunistic prey"
         };
-        var status = isDangerous ? $"{prevalence}, {knowledgeStatus}, dangerous" : $"{prevalence}, {knowledgeStatus}";
-        var habitat = string.Join(", ", regions.Select(region => region.Name).Distinct(StringComparer.Ordinal).Take(3));
-
-        var overview = isDangerous
-            ? $"A known predator species encountered in {habitat}."
-            : fauna.DietCategory == DietCategory.Herbivore
-                ? $"A known prey and grazing species encountered in {habitat}."
-                : $"A known omnivorous species encountered in {habitat}.";
-
-        var observedBiomes = regions
-            .Select(region => FormatBiome(region.Biome))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var observedWater = regions
-            .Select(region => FormatWater(region.WaterAvailability))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var outputs = BuildFaunaOutputs(fauna);
+        var danger = BuildFaunaDanger(fauna);
 
         return new KnownSpeciesSummary(
             fauna.Id,
             fauna.Name,
-            "Known fauna",
+            SpeciesClass.Fauna,
             false,
-            ApproximatePopulation(totalPopulation),
-            status,
-            overview,
+            "Discovered",
+            [fauna.Name, role, foodRole, outputs, danger, habitat],
+            $"A discovered animal species known from {BuildRegionNames(distinctRegions)}.",
             [
-                $"Observed habitat: {string.Join(", ", observedBiomes)}",
-                $"Observed water conditions: {string.Join(", ", observedWater)}",
-                $"Known range: {habitat}"
+                $"Known habitat: {habitat}",
+                $"Water range: {BuildWaterSummary(fauna.SupportedWaterAvailabilities)}",
+                $"Observed range: {BuildRegionNames(distinctRegions)}"
             ],
-            BuildFaunaTraits(fauna),
-            BuildFaunaContext(fauna, regions, totalPopulation));
+            [
+                $"Role: {role}",
+                $"Food role: {foodRole}",
+                $"Outputs: {outputs}"
+            ],
+            [
+                "Appears on the Known Species screen only after full discovery.",
+                $"{danger} danger is inferred from diet, mobility, and size."
+            ]);
     }
 
-    private static IReadOnlyList<string> BuildOwnTraits(IReadOnlyList<PopulationGroup> groups, IReadOnlyList<Region> regions)
+    private static KnownSpeciesSummary BuildSapientSummary(
+        string speciesId,
+        IReadOnlyList<PopulationGroup> groups,
+        PopulationGroup focusGroup,
+        Polity? focusPolity,
+        IReadOnlyDictionary<string, Region> regionsById)
     {
-        var traits = new List<string>
-        {
-            "Omnivorous subsistence inferred from mixed foraging and hunting systems."
-        };
+        var isPlayerSpecies = string.Equals(speciesId, focusGroup.SpeciesId, StringComparison.Ordinal);
+        var locations = groups
+            .Select(group => regionsById.GetValueOrDefault(group.CurrentRegionId)?.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .Cast<string>()
+            .Take(3)
+            .ToArray();
+        var locationText = locations.Length == 0 ? "uncertain" : string.Join(", ", locations);
+        var threat = isPlayerSpecies
+            ? "ourselves"
+            : BuildSapientThreat(groups, focusPolity);
+        var knownTraits = BuildSapientKnownTraits(groups, isPlayerSpecies);
+        var displayName = BuildPlayerSpeciesName(speciesId);
 
-        if (groups.Average(group => group.Pressures.Migration.DisplayValue) >= 45)
-        {
-            traits.Add("Mobility is moderate to high when pressures rise.");
-        }
-
-        if (regions.Any(region => region.WaterAvailability == WaterAvailability.High))
-        {
-            traits.Add("Performs best in well-watered known regions.");
-        }
-
-        if (groups.Any(group => group.LearnedAdvancementIds.Count > 0))
-        {
-            traits.Add("Cultural learning is visible through active advancements.");
-        }
-
-        return traits;
+        return new KnownSpeciesSummary(
+            speciesId,
+            displayName,
+            SpeciesClass.Sapient,
+            isPlayerSpecies,
+            isPlayerSpecies ? "Known" : "Encountered",
+            [displayName, threat, locationText, knownTraits],
+            isPlayerSpecies
+                ? "Your polity's own sapient species."
+                : $"An encountered sapient species known from {locationText}.",
+            [
+                $"Known location: {locationText}",
+                $"Observed groups: {groups.Count}",
+                $"Known population: {groups.Sum(group => group.Population):N0}"
+            ],
+            BuildSapientTraitLines(groups, isPlayerSpecies),
+            [
+                isPlayerSpecies
+                    ? "Always present because it is your own species."
+                    : "Sapients appear here after encounter or live contact, even before deeper social understanding.",
+                focusPolity is null || isPlayerSpecies
+                    ? "Diplomacy depth is intentionally deferred on this screen."
+                    : BuildSapientContactContext(groups, focusPolity)
+            ]);
     }
 
-    private static IReadOnlyList<string> BuildOwnContext(PopulationGroup focusGroup, IReadOnlyList<Region> regions)
+    private static string BuildFloraUses(FloraSpeciesDefinition flora)
     {
-        var context = new List<string>
+        var uses = new List<string>();
+        if (flora.UsableBiomass >= 0.25f)
         {
-            "This is your own sapient species.",
-            focusGroup.Pressures.Water.DisplayValue >= 40
-                ? $"Water access is currently the main species-level concern for your polity ({focusGroup.Pressures.Water.SeverityLabel.ToLowerInvariant()})."
-                : "No single species-level pressure dominates your polity right now."
-        };
-
-        if (regions.Count > 1)
-        {
-            context.Add("Known neighboring regions give this species room to adapt.");
+            uses.Add("forage");
         }
 
-        return context;
+        if (flora.SpreadTendency >= 0.60f || flora.ConsumptionResilience >= 0.55f)
+        {
+            uses.Add("fodder");
+        }
+
+        if (flora.BaselineTraits.BodySize >= 44 || flora.BaselineTraits.Defense >= 36)
+        {
+            uses.Add("cover");
+        }
+
+        return uses.Count == 0 ? "limited use" : string.Join(", ", uses.Take(2));
     }
 
-    private static IReadOnlyList<string> BuildFaunaTraits(FaunaSpeciesDefinition fauna)
+    private static string BuildFloraOutputs(FloraSpeciesDefinition flora)
     {
-        var traits = new List<string>
+        var outputs = new List<string>();
+        if (flora.UsableBiomass >= 0.55f)
         {
-            $"Diet: {fauna.DietCategory}",
-            fauna.Mobility >= 0.65f ? "Mobility: highly mobile" : fauna.Mobility >= 0.45f ? "Mobility: moderately mobile" : "Mobility: relatively settled",
-            $"Yield / usefulness: {(fauna.FoodYield >= 0.60f ? "high" : fauna.FoodYield >= 0.35f ? "moderate" : "limited")}"
-        };
+            outputs.Add("food");
+        }
 
+        if (flora.BaselineTraits.BodySize >= 45)
+        {
+            outputs.Add("fiber");
+        }
+
+        if (flora.RecoveryRate >= 0.60f)
+        {
+            outputs.Add("fresh growth");
+        }
+
+        return outputs.Count == 0 ? "minor biomass" : string.Join(", ", outputs.Take(2));
+    }
+
+    private static string BuildFloraSeasonality(FloraSpeciesDefinition flora)
+    {
+        if (flora.GrowthRate >= 0.65f && flora.RecoveryRate >= 0.65f)
+        {
+            return "steady";
+        }
+
+        if (flora.GrowthRate >= 0.55f)
+        {
+            return "strong season";
+        }
+
+        if (flora.RecoveryRate <= 0.40f)
+        {
+            return "slow renewal";
+        }
+
+        return "moderate";
+    }
+
+    private static string BuildFaunaOutputs(FaunaSpeciesDefinition fauna)
+    {
+        var outputs = new List<string>();
+        if (fauna.FoodYield >= 0.25f)
+        {
+            outputs.Add("meat");
+        }
+
+        if (fauna.BaselineTraits.BodySize >= 40 || fauna.FoodYield >= 0.45f)
+        {
+            outputs.Add("hide");
+        }
+
+        if (fauna.BaselineTraits.Defense >= 50)
+        {
+            outputs.Add("bone");
+        }
+
+        return outputs.Count == 0 ? "minor yield" : string.Join(", ", outputs.Take(2));
+    }
+
+    private static string BuildFaunaDanger(FaunaSpeciesDefinition fauna)
+    {
+        var dangerScore = 0;
         if (fauna.DietCategory == DietCategory.Carnivore)
         {
-            traits.Add("Behavior: threatening where encountered.");
-        }
-        else if (fauna.DietCategory == DietCategory.Herbivore)
-        {
-            traits.Add("Behavior: likely useful as prey.");
-        }
-        else
-        {
-            traits.Add("Behavior: opportunistic omnivore.");
+            dangerScore += 2;
         }
 
-        return traits;
+        if (fauna.Mobility >= 0.60f)
+        {
+            dangerScore++;
+        }
+
+        if (fauna.BaselineTraits.BodySize >= 55)
+        {
+            dangerScore++;
+        }
+
+        return dangerScore switch
+        {
+            >= 3 => "high",
+            2 => "moderate",
+            _ => "low"
+        };
     }
 
-    private static IReadOnlyList<string> BuildFaunaContext(FaunaSpeciesDefinition fauna, IReadOnlyList<Region> regions, int totalPopulation)
+    private static string BuildSapientThreat(IReadOnlyList<PopulationGroup> groups, Polity? focusPolity)
     {
-        var context = new List<string>();
+        var maxThreat = groups.Max(group => group.Pressures.Threat.DisplayValue);
+        var relatedPolityIds = groups.Select(group => group.PolityId).Distinct(StringComparer.Ordinal).ToArray();
+        var hostility = focusPolity?.InterPolityRelations
+            .Where(relation => relatedPolityIds.Contains(relation.OtherPolityId, StringComparer.Ordinal))
+            .Select(relation => relation.Hostility)
+            .DefaultIfEmpty(0)
+            .Max() ?? 0;
+        var score = Math.Max(maxThreat, hostility);
 
-        if (fauna.DietCategory == DietCategory.Carnivore)
+        return score switch
         {
-            context.Add("Matters as a local threat when your polity moves or settles nearby.");
-        }
-        else
+            >= 60 => "high",
+            >= 30 => "moderate",
+            _ => "low"
+        };
+    }
+
+    private static string BuildSapientKnownTraits(IReadOnlyList<PopulationGroup> groups, bool isPlayerSpecies)
+    {
+        if (isPlayerSpecies)
         {
-            context.Add("Matters as a known food or environmental species in nearby regions.");
+            return "our people";
         }
 
-        if (totalPopulation >= 900)
+        var dominantMode = groups
+            .GroupBy(group => group.SubsistenceMode)
+            .OrderByDescending(group => group.Count())
+            .Select(group => group.Key)
+            .FirstOrDefault();
+        var mobility = groups.Average(group => group.MonthsSinceLastMove);
+        var mobilityText = mobility <= 2 ? "mobile" : "settled";
+
+        return $"{FormatSubsistence(dominantMode)}, {mobilityText}";
+    }
+
+    private static IReadOnlyList<string> BuildSapientTraitLines(IReadOnlyList<PopulationGroup> groups, bool isPlayerSpecies)
+    {
+        var dominantMode = groups
+            .GroupBy(group => group.SubsistenceMode)
+            .OrderByDescending(group => group.Count())
+            .Select(group => group.Key)
+            .FirstOrDefault();
+
+        return
+        [
+            $"Subsistence pattern: {FormatSubsistence(dominantMode)}",
+            groups.Average(group => group.MonthsSinceLastMove) <= 2 ? "Mobility: currently mobile" : "Mobility: relatively settled",
+            isPlayerSpecies
+                ? "Known traits reflect direct familiarity with your own species."
+                : "Known traits are still first-pass encounter impressions."
+        ];
+    }
+
+    private static string BuildSapientContactContext(IReadOnlyList<PopulationGroup> groups, Polity focusPolity)
+    {
+        var relatedPolityIds = groups.Select(group => group.PolityId).Distinct(StringComparer.Ordinal).ToArray();
+        var relation = focusPolity.InterPolityRelations
+            .Where(item => relatedPolityIds.Contains(item.OtherPolityId, StringComparer.Ordinal))
+            .OrderByDescending(item => item.ContactIntensity)
+            .FirstOrDefault();
+
+        if (relation is null || relation.ContactIntensity <= 0)
         {
-            context.Add("Appears widespread in the regions your polity knows.");
-        }
-        else if (regions.Count <= 1)
-        {
-            context.Add("Known from only a narrow part of the player polity's world.");
+            return "The encounter is geographic and local rather than deeply socialized.";
         }
 
-        return context;
+        return relation.Hostility >= 45
+            ? "Encounter is reinforced by tense live contact."
+            : relation.Cooperation >= 45
+                ? "Encounter is reinforced by recurring live contact."
+                : "Encounter is reinforced by ongoing contact, but deep diplomacy detail is deferred.";
+    }
+
+    private static string BuildHabitat(IReadOnlyList<Region> regions)
+    {
+        if (regions.Count == 0)
+        {
+            return "unknown";
+        }
+
+        var biome = regions
+            .Select(region => FormatBiome(region.Biome))
+            .Distinct(StringComparer.Ordinal)
+            .Take(2);
+        var water = regions
+            .Select(region => FormatWater(region.WaterAvailability))
+            .Distinct(StringComparer.Ordinal)
+            .Take(2);
+        return $"{string.Join("/", biome)}; {string.Join("/", water)} water";
+    }
+
+    private static string BuildWaterSummary(IReadOnlyList<WaterAvailability> waters)
+    {
+        return waters.Count == 0
+            ? "unknown"
+            : string.Join(", ", waters.Select(FormatWater).Distinct(StringComparer.Ordinal));
+    }
+
+    private static string BuildRegionNames(IReadOnlyList<Region> regions)
+    {
+        var names = regions.Select(region => region.Name).Distinct(StringComparer.Ordinal).Take(3).ToArray();
+        return names.Length == 0 ? "unknown regions" : string.Join(", ", names);
     }
 
     private static string BuildPlayerSpeciesName(string speciesId)
@@ -318,24 +568,13 @@ public static class KnownSpeciesViewModelFactory
         };
     }
 
-    private static string ApproximatePopulation(int value)
-    {
-        return value switch
-        {
-            >= 1000 => "many",
-            >= 400 => "several known groups",
-            >= 1 => "few known sightings",
-            _ => "unknown"
-        };
-    }
-
     private static string FormatSubsistence(SubsistenceMode mode)
     {
         return mode switch
         {
-            SubsistenceMode.Gatherer => "Gathering",
-            SubsistenceMode.Hunter => "Hunting",
-            _ => "Mixed foraging"
+            SubsistenceMode.Gatherer => "gathering",
+            SubsistenceMode.Hunter => "hunting",
+            _ => "mixed foraging"
         };
     }
 
@@ -343,15 +582,15 @@ public static class KnownSpeciesViewModelFactory
     {
         return biome switch
         {
-            Biome.Highlands => "Highlands",
-            Biome.Wetlands => "Wetlands",
-            _ => biome.ToString()
+            Biome.Highlands => "highlands",
+            Biome.Wetlands => "wetlands",
+            _ => biome.ToString().ToLowerInvariant()
         };
     }
 
     private static string FormatWater(WaterAvailability water)
     {
-        return water.ToString();
+        return water.ToString().ToLowerInvariant();
     }
 
     private static string FormatMonthYear(int month, int year)

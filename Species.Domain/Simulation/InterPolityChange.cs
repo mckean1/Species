@@ -12,5 +12,7 @@ public sealed class InterPolityChange
 
     public required string Kind { get; init; }
 
+    public required string EventType { get; init; }
+
     public required string Message { get; init; }
 }

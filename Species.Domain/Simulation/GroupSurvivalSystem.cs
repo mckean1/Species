@@ -1,7 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -61,7 +61,7 @@ public sealed class GroupSurvivalSystem
             var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
             survivalStates[group.Id] = new GroupSurvivalState(
                 group,
-                GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog),
+                GroupDiscoveryContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog),
                 monthlyFoodNeed,
                 ResolvePrimaryAction(group.SubsistenceMode),
                 ResolveFallbackAction(group.SubsistenceMode),
@@ -860,12 +860,18 @@ public sealed class GroupSurvivalSystem
 
     private static float ResolveStoredFoodUsabilityMultiplier(PopulationGroup group)
     {
-        if (!group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId))
+        if (!group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodDryingId))
         {
             return 1.0f;
         }
 
-        return AdvancementConstants.FoodStorageStoredFoodMultiplier;
+        var multiplier = AdvancementConstants.FoodDryingStoredFoodMultiplier;
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId))
+        {
+            multiplier *= AdvancementConstants.FoodStorageStoredFoodMultiplier;
+        }
+
+        return multiplier;
     }
 
     private static float ResolveSettlementReserveUsabilityMultiplier(PopulationGroup group)
@@ -1039,7 +1045,7 @@ public sealed class GroupSurvivalSystem
 
     private sealed class GroupSurvivalState
     {
-        public GroupSurvivalState(PopulationGroup group, GroupKnowledgeContext knowledgeContext, int monthlyFoodNeed, string primaryAction, string fallbackAction, string planKind)
+        public GroupSurvivalState(PopulationGroup group, GroupDiscoveryContext knowledgeContext, int monthlyFoodNeed, string primaryAction, string fallbackAction, string planKind)
         {
             Group = group;
             KnowledgeContext = knowledgeContext;
@@ -1055,7 +1061,7 @@ public sealed class GroupSurvivalSystem
 
         public PopulationGroup Group { get; }
 
-        public GroupKnowledgeContext KnowledgeContext { get; }
+        public GroupDiscoveryContext KnowledgeContext { get; }
 
         public int MonthlyFoodNeed { get; }
 

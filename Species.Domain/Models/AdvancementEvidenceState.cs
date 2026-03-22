@@ -2,25 +2,33 @@ namespace Species.Domain.Models;
 
 public sealed class AdvancementEvidenceState
 {
-    public int SuccessfulGatheringWithKnowledgeMonths { get; set; }
+    public int ForagingOpportunityMonths { get; set; }
 
-    public int SuccessfulHuntingWithKnowledgeMonths { get; set; }
+    public int SmallPreyOpportunityMonths { get; set; }
 
-    public int SurplusStoredFoodMonths { get; set; }
+    public int LargePreyOpportunityMonths { get; set; }
 
-    public int KnownRouteTravelMonths { get; set; }
+    public int AquaticOpportunityMonths { get; set; }
 
-    public int SuccessfulResidenceWithRegionKnowledgeMonths { get; set; }
+    public int SurplusOpportunityMonths { get; set; }
 
-    public int MaterialPracticeMonths { get; set; }
+    public int SpoilagePressureMonths { get; set; }
 
-    public int StoragePressureMonths { get; set; }
+    public int StoneAccessMonths { get; set; }
 
-    public int ShelterReadinessMonths { get; set; }
+    public int HideAccessMonths { get; set; }
+
+    public int FiberAccessMonths { get; set; }
+
+    public int FoodPressureMonths { get; set; }
+
+    public int MaterialNeedMonths { get; set; }
 
     public int StabilityMonths { get; set; }
 
-    public int ContactLearningMonths { get; set; }
+    public int AnchoredContinuityMonths { get; set; }
+
+    public int OrganizationalReadinessMonths { get; set; }
 
     public Dictionary<string, float> AdvancementProgressById { get; init; } = new(StringComparer.Ordinal);
 
@@ -30,16 +38,20 @@ public sealed class AdvancementEvidenceState
     {
         return new AdvancementEvidenceState
         {
-            SuccessfulGatheringWithKnowledgeMonths = SuccessfulGatheringWithKnowledgeMonths,
-            SuccessfulHuntingWithKnowledgeMonths = SuccessfulHuntingWithKnowledgeMonths,
-            SurplusStoredFoodMonths = SurplusStoredFoodMonths,
-            KnownRouteTravelMonths = KnownRouteTravelMonths,
-            SuccessfulResidenceWithRegionKnowledgeMonths = SuccessfulResidenceWithRegionKnowledgeMonths,
-            MaterialPracticeMonths = MaterialPracticeMonths,
-            StoragePressureMonths = StoragePressureMonths,
-            ShelterReadinessMonths = ShelterReadinessMonths,
+            ForagingOpportunityMonths = ForagingOpportunityMonths,
+            SmallPreyOpportunityMonths = SmallPreyOpportunityMonths,
+            LargePreyOpportunityMonths = LargePreyOpportunityMonths,
+            AquaticOpportunityMonths = AquaticOpportunityMonths,
+            SurplusOpportunityMonths = SurplusOpportunityMonths,
+            SpoilagePressureMonths = SpoilagePressureMonths,
+            StoneAccessMonths = StoneAccessMonths,
+            HideAccessMonths = HideAccessMonths,
+            FiberAccessMonths = FiberAccessMonths,
+            FoodPressureMonths = FoodPressureMonths,
+            MaterialNeedMonths = MaterialNeedMonths,
             StabilityMonths = StabilityMonths,
-            ContactLearningMonths = ContactLearningMonths,
+            AnchoredContinuityMonths = AnchoredContinuityMonths,
+            OrganizationalReadinessMonths = OrganizationalReadinessMonths,
             AdvancementProgressById = new Dictionary<string, float>(AdvancementProgressById, StringComparer.Ordinal),
             AdoptionProgressById = new Dictionary<string, float>(AdoptionProgressById, StringComparer.Ordinal)
         };

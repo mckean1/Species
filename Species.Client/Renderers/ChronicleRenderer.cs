@@ -2,6 +2,8 @@ using Species.Client.Enums;
 using Species.Client.Models;
 using Species.Client.Presentation;
 using Species.Client.ViewModels;
+using Species.Domain.Enums;
+using Species.Domain.Models;
 
 namespace Species.Client.Renderers;
 
@@ -11,6 +13,7 @@ public static class ChronicleRenderer
     private const string Dim = "\u001b[38;5;245m";
     private const string PaneTitle = "\u001b[38;5;222m";
     private const string Blue = "\u001b[38;5;111m";
+    private const string Teal = "\u001b[38;5;80m";
     private const string Cyan = "\u001b[38;5;117m";
     private const string Purple = "\u001b[38;5;141m";
     private const string Orange = "\u001b[38;5;215m";
@@ -118,7 +121,7 @@ public static class ChronicleRenderer
                     ? $"{HighlightBackground}{Blue}> {Reset}{HighlightBackground}"
                     : "  ";
                 var milestoneBadge = entry.IsMilestone ? $"{Orange}[!]{Reset} " : string.Empty;
-                var row = $"{milestoneBadge}{Dim}{entry.DateText}{Reset} {entry.Headline}";
+                var row = $"{milestoneBadge}{Dim}{entry.DateText}{Reset} {RenderTokens(entry.HeadlineTokens)}";
                 if (index == selectedIndex && data.SelectedArea == ChronicleSelectionArea.Entries)
                 {
                     lines.Add($"{prefix}{PlayerScreenShell.FitVisible(row, Math.Max(0, width - 2))}{Reset}");
@@ -166,7 +169,7 @@ public static class ChronicleRenderer
         else if (data.SelectedEntry is not null)
         {
             lines.Add($"{PaneTitle}Selected Entry{Reset}");
-            lines.AddRange(RendererTextWrap.WrapText($"{Blue}{data.SelectedEntry.Headline}{Reset}", width, returnEmptyLineWhenBlank: true));
+            lines.AddRange(RendererTextWrap.WrapText(RenderTokens(data.SelectedEntry.HeadlineTokens), width, returnEmptyLineWhenBlank: true));
             lines.AddRange(RendererTextWrap.WrapText($"{Dim}{data.SelectedEntry.DateText}{Reset}  {Purple}{data.SelectedEntry.Category}{Reset}", width, returnEmptyLineWhenBlank: true));
             lines.Add($"{Dim}{new string('-', width)}{Reset}");
             lines.AddRange(RendererTextWrap.WrapText(data.SelectedEntry.Impact, width, returnEmptyLineWhenBlank: true));
@@ -235,6 +238,37 @@ public static class ChronicleRenderer
             ChronicleMode.Archive => "Browse older visible entries without snapping back.",
             _ => "Only higher-value turning points are shown here."
         };
+    }
+
+    private static string RenderTokens(IReadOnlyList<ChronicleTextToken> tokens)
+    {
+        if (tokens.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Concat(tokens.Select(RenderToken));
+    }
+
+    private static string RenderToken(ChronicleTextToken token)
+    {
+        var color = token.Type switch
+        {
+            ChronicleTextTokenType.Polity => Blue,
+            ChronicleTextTokenType.Region => Teal,
+            ChronicleTextTokenType.Discovery => Purple,
+            ChronicleTextTokenType.Advancement => Yellow,
+            ChronicleTextTokenType.Sapient => Cyan,
+            ChronicleTextTokenType.Settlement => Green,
+            ChronicleTextTokenType.GovernmentForm => Orange,
+            ChronicleTextTokenType.PositiveKeyword => Green,
+            ChronicleTextTokenType.NegativeKeyword => Red,
+            _ => string.Empty
+        };
+
+        return string.IsNullOrEmpty(color)
+            ? token.Text
+            : $"{color}{token.Text}{Reset}";
     }
 
 }

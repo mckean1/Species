@@ -54,7 +54,7 @@ public static class RegionRenderer
         rows.Add(
             PlayerScreenShell.FitVisible("Name", columnWidths[0]) + " | " +
             PlayerScreenShell.FitVisible("Biome", columnWidths[1]) + " | " +
-            PlayerScreenShell.FitVisible("Knowledge", columnWidths[2]) + " | " +
+            PlayerScreenShell.FitVisible("Discovery", columnWidths[2]) + " | " +
             PlayerScreenShell.FitVisible("Presence", columnWidths[3]) + " | " +
             PlayerScreenShell.FitVisible("Threat", columnWidths[4]));
 
@@ -144,8 +144,8 @@ public static class RegionRenderer
         lines.AddRange(BuildBulletLines(selectedRegion.Materials.Select(item => $"Material: {item}"), width, Yellow));
         lines.AddRange(BuildBulletLines(selectedRegion.Biology.Select(item => $"Biology: {item}"), width, Purple));
         lines.Add($"{Dim}{new string('-', width)}{Reset}");
-        lines.Add($"{PaneTitle}Knowledge{Reset}");
-        lines.AddRange(BuildBulletLines(selectedRegion.Knowledge, width, Purple));
+        lines.Add($"{PaneTitle}Discoveries{Reset}");
+        lines.AddRange(BuildBulletLines(selectedRegion.Discoveries, width, Purple));
 
         return lines;
     }

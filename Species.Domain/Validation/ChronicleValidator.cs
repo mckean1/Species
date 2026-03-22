@@ -9,6 +9,7 @@ public static class ChronicleValidator
     public static IReadOnlyList<string> Validate(World world, SimulationTickResult? tickResult = null)
     {
         var errors = new List<string>();
+        errors.AddRange(ValidateCanonicalDiscoveryTemplates());
 
         if (world.Chronicle is null)
         {
@@ -40,6 +41,29 @@ public static class ChronicleValidator
                 errors.Add($"Chronicle entry {entry.RecordSequence} has a blank message.");
             }
 
+            if (entry.Tokens.Count == 0)
+            {
+                errors.Add($"Chronicle entry {entry.RecordSequence} is missing render tokens.");
+            }
+            else
+            {
+                var tokenText = string.Concat(entry.Tokens.Select(token => token.Text));
+                if (!string.Equals(tokenText, entry.Message, StringComparison.Ordinal))
+                {
+                    errors.Add($"Chronicle entry {entry.RecordSequence} token text does not match the plain fallback message.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.DedupeKey))
+            {
+                errors.Add($"Chronicle entry {entry.RecordSequence} is missing a dedupe key.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.CooldownFamily))
+            {
+                errors.Add($"Chronicle entry {entry.RecordSequence} is missing a cooldown family.");
+            }
+
             if (entry.IsRevealed)
             {
                 if (entry.RevealedYear is null || entry.RevealedMonth is null || entry.RevealSequence is null)
@@ -53,9 +77,9 @@ public static class ChronicleValidator
             }
 
             if (entry.Category == ChronicleEventCategory.Discovery &&
-                !IsValidKnowledgeChronicleLine(entry.Message))
+                !IsValidDiscoveryChronicleLine(entry.Message))
             {
-                errors.Add($"Chronicle discovery entry {entry.RecordSequence} does not use valid knowledge wording.");
+                errors.Add($"Chronicle discovery entry {entry.RecordSequence} does not use canonical discovery wording.");
             }
 
             if (entry.Category == ChronicleEventCategory.Advancement &&
@@ -101,6 +125,25 @@ public static class ChronicleValidator
             }
         }
 
+        var alertSequences = new HashSet<int>();
+        foreach (var alert in world.Chronicle.Alerts)
+        {
+            if (!alertSequences.Add(alert.Sequence))
+            {
+                errors.Add($"Chronicle alert sequence {alert.Sequence} is duplicated.");
+            }
+
+            if (string.IsNullOrWhiteSpace(alert.Message))
+            {
+                errors.Add($"Chronicle alert {alert.Sequence} has a blank message.");
+            }
+
+            if (string.IsNullOrWhiteSpace(alert.DedupeKey) || string.IsNullOrWhiteSpace(alert.CooldownFamily))
+            {
+                errors.Add($"Chronicle alert {alert.Sequence} is missing dedupe or cooldown metadata.");
+            }
+        }
+
         if (tickResult is null)
         {
             return errors;
@@ -127,16 +170,20 @@ public static class ChronicleValidator
         return message.Contains(' ');
     }
 
-    private static bool IsValidKnowledgeChronicleLine(string message)
+    private static bool IsValidDiscoveryChronicleLine(string message)
     {
         if (string.IsNullOrWhiteSpace(message) || !message.EndsWith(".", StringComparison.Ordinal))
         {
             return false;
         }
 
+        if (message.Contains("conditions", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return message.Contains(" discovered ", StringComparison.Ordinal) ||
-               message.Contains(" learned ", StringComparison.Ordinal) ||
-               message.Contains(" exposed ", StringComparison.Ordinal);
+               message.Contains(" encountered ", StringComparison.Ordinal);
     }
 
     private static bool IsValidCapabilityChronicleLine(string message)
@@ -146,8 +193,82 @@ public static class ChronicleValidator
             return false;
         }
 
-        return message.Contains(" learned ", StringComparison.Ordinal) ||
-               message.Contains(" adopted ", StringComparison.Ordinal) ||
-               message.Contains(" improved ", StringComparison.Ordinal);
+        return message.Contains(" learned ", StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyList<string> ValidateCanonicalDiscoveryTemplates()
+    {
+        var errors = new List<string>();
+
+        var discovered = ChronicleFormatter.Format(BuildDiscoveryCandidate(
+            ChronicleTriggerKind.Discovered,
+            discoveryName: "Mist Hollow"));
+        if (!string.Equals(discovered, "Blue River discovered Mist Hollow.", StringComparison.Ordinal))
+        {
+            errors.Add("Chronicle non-encounter discovery template no longer uses the canonical discovered wording.");
+        }
+
+        var scoutedDiscovery = ChronicleFormatter.Format(BuildDiscoveryCandidate(
+            ChronicleTriggerKind.Discovered,
+            discoveryName: "Mist Hollow",
+            regionName: "Mist Hollow",
+            isScoutSourced: true));
+        if (!string.Equals(scoutedDiscovery, "Blue River scouts discovered Mist Hollow in Mist Hollow.", StringComparison.Ordinal))
+        {
+            errors.Add("Chronicle scout discovery template no longer uses the canonical discovered wording.");
+        }
+
+        var encountered = ChronicleFormatter.Format(BuildDiscoveryCandidate(
+            ChronicleTriggerKind.Encountered,
+            otherPartyName: "Hill Folk"));
+        if (!string.Equals(encountered, "Blue River encountered Hill Folk.", StringComparison.Ordinal))
+        {
+            errors.Add("Chronicle encounter template no longer uses the canonical encountered wording.");
+        }
+
+        var scoutedEncounter = ChronicleFormatter.Format(BuildDiscoveryCandidate(
+            ChronicleTriggerKind.Encountered,
+            otherPartyName: "Hill Folk",
+            regionName: "Mist Hollow",
+            isScoutSourced: true));
+        if (!string.Equals(scoutedEncounter, "Blue River scouts encountered Hill Folk in Mist Hollow.", StringComparison.Ordinal))
+        {
+            errors.Add("Chronicle scout encounter template no longer uses the canonical encountered wording.");
+        }
+
+        if (new[] { discovered, scoutedDiscovery, encountered, scoutedEncounter }
+            .Any(message => message.Contains("conditions", StringComparison.OrdinalIgnoreCase)))
+        {
+            errors.Add("Chronicle canonical discovery templates still include forbidden discovery wording.");
+        }
+
+        return errors;
+    }
+
+    private static ChronicleEventCandidate BuildDiscoveryCandidate(
+        ChronicleTriggerKind triggerKind,
+        string? discoveryName = null,
+        string? otherPartyName = null,
+        string? regionName = null,
+        bool isScoutSourced = false)
+    {
+        return new ChronicleEventCandidate
+        {
+            EventYear = 1,
+            EventMonth = 1,
+            PolityId = "polity-blue-river",
+            PolityName = "Blue River",
+            EventType = "discovery",
+            Category = ChronicleCandidateCategory.Discovery,
+            Severity = ChronicleEventSeverity.Notable,
+            TriggerKind = triggerKind,
+            DiscoveryName = discoveryName,
+            OtherPartyName = otherPartyName,
+            RegionName = regionName,
+            IsScoutSourced = isScoutSourced,
+            DedupeKey = $"validation:{triggerKind}:{discoveryName}:{otherPartyName}:{regionName}:{isScoutSourced}",
+            CooldownFamily = "validation",
+            Tags = ["validation"]
+        };
     }
 }

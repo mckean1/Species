@@ -5,10 +5,13 @@ namespace Species.Domain.Catalogs;
 
 public sealed class DiscoveryCatalog
 {
+    public const string ToolStoneId = "discovery-tool-stone";
     public const string ClayShapingId = "discovery-clay-shaping";
     public const string SeasonalTrackingId = "discovery-seasonal-tracking";
     public const string PreservationCluesId = "discovery-preservation-clues";
     public const string ShelterMethodsId = "discovery-shelter-methods";
+    private const string LocalRegionDiscoveryPrefix = "discovery-local-region:";
+    private const string LegacyLocalRegionConditionsDiscoveryPrefix = "discovery-local-region-conditions:";
 
     private readonly Dictionary<string, DiscoveryDefinition> definitionsById;
 
@@ -22,6 +25,11 @@ public sealed class DiscoveryCatalog
 
     public DiscoveryDefinition? GetById(string id)
     {
+        if (TryNormalizeDiscoveryId(id, out var normalizedId))
+        {
+            id = normalizedId;
+        }
+
         return definitionsById.GetValueOrDefault(id);
     }
 
@@ -31,7 +39,33 @@ public sealed class DiscoveryCatalog
 
     public string GetLocalWaterSourcesDiscoveryId(string regionId) => $"discovery-local-water-sources:{regionId}";
 
-    public string GetLocalRegionConditionsDiscoveryId(string regionId) => $"discovery-local-region-conditions:{regionId}";
+    public string GetLocalRegionDiscoveryId(string regionId) => $"{LocalRegionDiscoveryPrefix}{regionId}";
+
+    public string GetLegacyLocalRegionConditionsDiscoveryId(string regionId) => $"{LegacyLocalRegionConditionsDiscoveryPrefix}{regionId}";
+
+    public bool IsLocalRegionDiscoveryId(string discoveryId)
+    {
+        return discoveryId.StartsWith(LocalRegionDiscoveryPrefix, StringComparison.Ordinal) ||
+               discoveryId.StartsWith(LegacyLocalRegionConditionsDiscoveryPrefix, StringComparison.Ordinal);
+    }
+
+    public bool IsLocalRegionDiscoveryKnown(IReadOnlySet<string> knownDiscoveryIds, string regionId)
+    {
+        return knownDiscoveryIds.Contains(GetLocalRegionDiscoveryId(regionId)) ||
+               knownDiscoveryIds.Contains(GetLegacyLocalRegionConditionsDiscoveryId(regionId));
+    }
+
+    public bool TryNormalizeDiscoveryId(string discoveryId, out string normalizedId)
+    {
+        if (discoveryId.StartsWith(LegacyLocalRegionConditionsDiscoveryPrefix, StringComparison.Ordinal))
+        {
+            normalizedId = $"{LocalRegionDiscoveryPrefix}{discoveryId[LegacyLocalRegionConditionsDiscoveryPrefix.Length..]}";
+            return true;
+        }
+
+        normalizedId = discoveryId;
+        return discoveryId.StartsWith(LocalRegionDiscoveryPrefix, StringComparison.Ordinal);
+    }
 
     public string GetRouteKey(string firstRegionId, string secondRegionId)
     {
@@ -49,6 +83,16 @@ public sealed class DiscoveryCatalog
     {
         var definitions = new List<DiscoveryDefinition>(world.Regions.Count * 4 + 4)
         {
+            new DiscoveryDefinition
+            {
+                Id = ToolStoneId,
+                Name = "Tool Stone",
+                Description = "Knowledge that some local stone can be shaped into practical cutting and processing tools.",
+                Category = DiscoveryCategory.Material,
+                DecisionEffectSummary = "Helps the polity recognize tool-grade stone as a practical resource rather than inert ground.",
+                CausalSummary = "Emerges from repeated stone exposure, processing need, and workable local material access.",
+                ContactSpreadAllowed = true
+            },
             new DiscoveryDefinition
             {
                 Id = ClayShapingId,
@@ -122,9 +166,9 @@ public sealed class DiscoveryCatalog
             });
             definitions.Add(new DiscoveryDefinition
             {
-                Id = $"discovery-local-region-conditions:{region.Id}",
-                Name = $"{region.Name} Conditions",
-                Description = $"Knowledge of the overall living conditions in {region.Name}.",
+                Id = $"{LocalRegionDiscoveryPrefix}{region.Id}",
+                Name = region.Name,
+                Description = $"Knowledge of {region.Name} as a practical region to traverse, use, and return to.",
                 Category = DiscoveryCategory.Region,
                 DecisionEffectSummary = "Improves how the group judges whether staying in or returning to this region is worthwhile.",
                 CausalSummary = "Emerges from repeated residence, pressure, and practical use of the region."

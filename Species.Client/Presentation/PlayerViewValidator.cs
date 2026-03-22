@@ -86,7 +86,7 @@ public static class PlayerViewValidator
             errors.Add("Laws points at an invalid law.");
         }
 
-        var knownSpeciesCount = KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, faunaCatalog, focalPolityId);
+        var knownSpeciesCount = KnownSpeciesViewModelFactory.GetKnownSpeciesCount(world, floraCatalog, faunaCatalog, focalPolityId);
         if (viewState.CurrentKnownSpeciesIndex < 0 ||
             (knownSpeciesCount > 0 && viewState.CurrentKnownSpeciesIndex >= knownSpeciesCount))
         {

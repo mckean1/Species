@@ -58,6 +58,8 @@ public sealed class Polity
 
     public FoodAccountingSnapshot FoodAccounting { get; set; } = new();
 
+    public PolityCuriosityState Curiosity { get; set; } = new();
+
     public List<PolitySpeciesAwarenessState> SpeciesAwareness { get; init; } = [];
 
     public int MaterialShortageMonths { get; set; }
@@ -94,6 +96,7 @@ public sealed class Polity
             MaterialStores = MaterialStores.Clone(),
             MaterialProduction = MaterialProduction.Clone(),
             FoodAccounting = FoodAccounting.Clone(),
+            Curiosity = Curiosity.Clone(),
             SpeciesAwareness = SpeciesAwareness.Select(state => state.Clone()).ToList(),
             MaterialShortageMonths = MaterialShortageMonths,
             MaterialSurplusMonths = MaterialSurplusMonths

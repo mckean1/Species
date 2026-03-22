@@ -116,7 +116,7 @@ public static class KnownPolitiesViewModelFactory
             $"{PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm)} / {PolityPresentation.DescribePoliticalScaleForm(snapshot.ScaleForm)}",
             coreRegionName,
             currentRegionName,
-            KnowledgePresentation.ApproximatePopulation(context.TotalPopulation, exactAllowed: isNearby),
+            DiscoveryPresentation.ApproximatePopulation(context.TotalPopulation, exactAllowed: isNearby),
             ResolveRelationship(context, focusContext, isNearby, relation),
             isNearby ? "Nearby" : "Distant",
             snapshot.Summary,

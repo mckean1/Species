@@ -197,7 +197,7 @@ public sealed class SocialIdentitySystem
             PolityName = polity.Name,
             TraditionId = definition.Id,
             TraditionName = definition.Name,
-            Message = string.Format(definition.ChronicleLineTemplate, polity.Name)
+            Message = string.Format(definition.IdentityChangeTemplate, polity.Name)
         });
     }
 

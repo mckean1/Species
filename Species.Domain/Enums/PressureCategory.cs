@@ -6,5 +6,6 @@ public enum PressureCategory
     Water,
     Threat,
     Overcrowding,
-    Migration
+    Migration,
+    Curiosity
 }

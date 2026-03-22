@@ -1,7 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;

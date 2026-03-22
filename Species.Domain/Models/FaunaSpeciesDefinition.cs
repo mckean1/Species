@@ -40,6 +40,8 @@ public sealed class FaunaSpeciesDefinition
 
     public float FoodYield { get; init; }
 
+    public IReadOnlyList<FaunaTag> Tags { get; init; } = Array.Empty<FaunaTag>();
+
     public BiologicalTraitProfile BaselineTraits { get; init; } = new();
 
     public string ParentSpeciesId { get; init; } = string.Empty;

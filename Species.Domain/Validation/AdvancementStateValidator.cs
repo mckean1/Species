@@ -27,16 +27,20 @@ public static class AdvancementStateValidator
                 }
             }
 
-            if (group.AdvancementEvidence.SuccessfulGatheringWithKnowledgeMonths < 0 ||
-                group.AdvancementEvidence.SuccessfulHuntingWithKnowledgeMonths < 0 ||
-                group.AdvancementEvidence.SurplusStoredFoodMonths < 0 ||
-                group.AdvancementEvidence.KnownRouteTravelMonths < 0 ||
-                group.AdvancementEvidence.SuccessfulResidenceWithRegionKnowledgeMonths < 0 ||
-                group.AdvancementEvidence.MaterialPracticeMonths < 0 ||
-                group.AdvancementEvidence.StoragePressureMonths < 0 ||
-                group.AdvancementEvidence.ShelterReadinessMonths < 0 ||
+            if (group.AdvancementEvidence.ForagingOpportunityMonths < 0 ||
+                group.AdvancementEvidence.SmallPreyOpportunityMonths < 0 ||
+                group.AdvancementEvidence.LargePreyOpportunityMonths < 0 ||
+                group.AdvancementEvidence.AquaticOpportunityMonths < 0 ||
+                group.AdvancementEvidence.SurplusOpportunityMonths < 0 ||
+                group.AdvancementEvidence.SpoilagePressureMonths < 0 ||
+                group.AdvancementEvidence.StoneAccessMonths < 0 ||
+                group.AdvancementEvidence.HideAccessMonths < 0 ||
+                group.AdvancementEvidence.FiberAccessMonths < 0 ||
+                group.AdvancementEvidence.FoodPressureMonths < 0 ||
+                group.AdvancementEvidence.MaterialNeedMonths < 0 ||
                 group.AdvancementEvidence.StabilityMonths < 0 ||
-                group.AdvancementEvidence.ContactLearningMonths < 0)
+                group.AdvancementEvidence.AnchoredContinuityMonths < 0 ||
+                group.AdvancementEvidence.OrganizationalReadinessMonths < 0)
             {
                 errors.Add($"Population group {group.Id} has negative advancement evidence.");
             }
@@ -44,22 +48,22 @@ public static class AdvancementStateValidator
             ValidateProgressCounters(group.Id, group.AdvancementEvidence.AdvancementProgressById, validAdvancementIds, errors, "advancement progress");
             ValidateProgressCounters(group.Id, group.AdvancementEvidence.AdoptionProgressById, validAdvancementIds, errors, "adoption progress");
 
-            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedHuntingId) &&
-                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId))
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LargeGameHuntingId) &&
+                !group.LearnedAdvancementIds.Contains(AdvancementCatalog.SmallGameHuntingId))
             {
-                errors.Add($"Population group {group.Id} has Improved Hunting without Seasonal Tracking.");
+                errors.Add($"Population group {group.Id} has Large Game Hunting without Small Game Hunting.");
             }
 
             if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId) &&
-                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId))
+                !group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodDryingId))
             {
-                errors.Add($"Population group {group.Id} has Food Storage without Preservation Clues.");
+                errors.Add($"Population group {group.Id} has Food Storage without Food Drying.");
             }
 
-            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId) &&
-                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId))
+            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StoneToolmakingId) &&
+                !group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ToolStoneId))
             {
-                errors.Add($"Population group {group.Id} has Stronger Shelter without Shelter Methods.");
+                errors.Add($"Population group {group.Id} has Stone Toolmaking without Tool Stone.");
             }
         }
 

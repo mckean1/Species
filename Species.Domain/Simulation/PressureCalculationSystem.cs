@@ -1,7 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -26,41 +26,35 @@ public sealed class PressureCalculationSystem
                 continue;
             }
 
-            var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
-            var regionKnowledge = knowledgeContext.ObserveRegion(region, group.CurrentRegionId);
+            var discoveryContext = GroupDiscoveryContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
+            var regionDiscovery = discoveryContext.ObserveRegion(region, group.CurrentRegionId);
             var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
             var weightedFoodPotential = SubsistenceSupportModel.CalculateWeightedFoodPotential(
                 group,
-                regionKnowledge.GatheringPotentialFood,
-                regionKnowledge.HuntingPotentialFood);
+                regionDiscovery.GatheringPotentialFood,
+                regionDiscovery.HuntingPotentialFood);
             var visibleFoodSupport = SubsistenceSupportModel.NormalizeFoodSupport(weightedFoodPotential, monthlyFoodNeed);
             var foodContribution = CalculateFoodPressure(group);
-            var waterContribution = CalculateWaterPressure(regionKnowledge.WaterSupport);
-            var threatContribution = CalculateThreatPressure(regionKnowledge.ThreatPressure);
+            var waterContribution = CalculateWaterPressure(regionDiscovery.WaterSupport);
+            var threatContribution = CalculateThreatPressure(regionDiscovery.ThreatPressure);
             var overcrowdingContribution = CalculateOvercrowdingPressure(group.Population, weightedFoodPotential, monthlyFoodNeed);
-
-            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StrongerShelterId))
-            {
-                threatContribution = ClampPressure(threatContribution * AdvancementConstants.StrongerShelterThreatMultiplier);
-                overcrowdingContribution = ClampPressure(overcrowdingContribution * AdvancementConstants.StrongerShelterCrowdingMultiplier);
-            }
 
             var migrationContribution = CalculateMigrationPressure(foodContribution, waterContribution, threatContribution, overcrowdingContribution);
             var foodDetail = BuildPressureDetail(
                 PressureDefinitions.Food,
                 group.Pressures.Food,
                 foodContribution,
-                BuildFoodPressureReason(group, regionKnowledge, visibleFoodSupport, foodContribution));
+                BuildFoodPressureReason(group, regionDiscovery, visibleFoodSupport, foodContribution));
             var waterDetail = BuildPressureDetail(
                 PressureDefinitions.Water,
                 group.Pressures.Water,
                 waterContribution,
-                BuildWaterPressureReason(regionKnowledge, waterContribution));
+                BuildWaterPressureReason(regionDiscovery, waterContribution));
             var threatDetail = BuildPressureDetail(
                 PressureDefinitions.Threat,
                 group.Pressures.Threat,
                 threatContribution,
-                BuildThreatPressureReason(regionKnowledge, threatContribution));
+                BuildThreatPressureReason(regionDiscovery, threatContribution));
             var overcrowdingDetail = BuildPressureDetail(
                 PressureDefinitions.Overcrowding,
                 group.Pressures.Overcrowding,
@@ -99,8 +93,8 @@ public sealed class PressureCalculationSystem
                 UnresolvedFoodDeficit = group.FoodAccounting.UnresolvedDeficit,
                 FinalFoodCondition = group.FoodAccounting.FoodStressState.ToString(),
                 VisibleFoodSupport = visibleFoodSupport,
-                VisibleWaterSupport = regionKnowledge.WaterSupport,
-                WaterKnowledgeLevel = regionKnowledge.WaterKnowledge.ToString(),
+                VisibleWaterSupport = regionDiscovery.WaterSupport,
+                WaterKnowledgeLevel = regionDiscovery.WaterStage.ToString(),
                 Pressures = pressures,
                 Food = foodDetail,
                 Water = waterDetail,
@@ -228,7 +222,7 @@ public sealed class PressureCalculationSystem
         return ComputePressureImpulse(pressure, PressureCalculationConstants.MigrationMonthlyRelief);
     }
 
-    private static string BuildFoodPressureReason(PopulationGroup group, RegionKnowledgeSnapshot knowledge, int visibleFoodSupport, int pressure)
+    private static string BuildFoodPressureReason(PopulationGroup group, RegionDiscoverySnapshot discovery, int visibleFoodSupport, int pressure)
     {
         var accounting = group.FoodAccounting;
         if (pressure >= 70)
@@ -244,14 +238,13 @@ public sealed class PressureCalculationSystem
         return $"Low because ending stores are {accounting.EndingTotalStores}, net food changed by {accounting.NetFoodChange:+#;-#;0}, and unresolved deficit is {accounting.UnresolvedDeficit}.";
     }
 
-    private static string BuildWaterPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
+    private static string BuildWaterPressureReason(RegionDiscoverySnapshot discovery, int contribution)
     {
-        var source = knowledge.WaterKnowledge switch
+        var source = discovery.WaterStage switch
         {
-            KnowledgeLevel.Knowledge => "Derived from established local water knowledge.",
-            KnowledgeLevel.Discovery => "Derived from discovered local water patterns.",
-            KnowledgeLevel.Encounter => "Derived from recent encounters and route exposure rather than established water knowledge.",
-            _ => "Derived from uncertain local water knowledge."
+            DiscoveryStage.Discovered => "Derived from discovered local water patterns.",
+            DiscoveryStage.Encountered => "Derived from recent encounters and route exposure rather than established water discovery.",
+            _ => "Derived from uncertain local water discovery."
         };
 
         return contribution >= 70
@@ -259,11 +252,11 @@ public sealed class PressureCalculationSystem
             : source;
     }
 
-    private static string BuildThreatPressureReason(RegionKnowledgeSnapshot knowledge, int contribution)
+    private static string BuildThreatPressureReason(RegionDiscoverySnapshot discovery, int contribution)
     {
         return contribution >= 60
-            ? $"Elevated because {DescribeKnowledge(knowledge.FaunaKnowledge)} local danger signs are unfavorable."
-            : $"Derived from {DescribeKnowledge(knowledge.FaunaKnowledge)} local threat knowledge.";
+            ? $"Elevated because {DescribeDiscovery(discovery.FaunaStage)} local danger signs are unfavorable."
+            : $"Derived from {DescribeDiscovery(discovery.FaunaStage)} local threat discovery.";
     }
 
     private static string BuildOvercrowdingReason(int population, float weightedFoodPotential, int monthlyFoodNeed, int contribution)
@@ -334,13 +327,12 @@ public sealed class PressureCalculationSystem
         return ClampPressure(MathF.Max(0.0f, rawPressure - monthlyRelief));
     }
 
-    private static string DescribeKnowledge(KnowledgeLevel level)
+    private static string DescribeDiscovery(DiscoveryStage stage)
     {
-        return level switch
+        return stage switch
         {
-            KnowledgeLevel.Knowledge => "known",
-            KnowledgeLevel.Discovery => "discovered",
-            KnowledgeLevel.Encounter => "encountered",
+            DiscoveryStage.Discovered => "discovered",
+            DiscoveryStage.Encountered => "encountered",
             _ => "uncertain"
         };
     }

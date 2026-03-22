@@ -100,7 +100,7 @@ Examples of the intended style:
 - group migrated to a new region
 - group suffered food shortages
 - group discovered local flora
-- group learned improved gathering
+- group learned foraging
 - group died out
 
 ## Output Model Change

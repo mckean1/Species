@@ -12,7 +12,6 @@ The distinction remains strict:
 
 - Encounter = "we have signs/contact"
 - Discovery = "we have a durable finding"
-- Knowledge = "we understand enough to operate from it"
 - Advancement = "we can"
 
 Discoveries improve decision-making only.
@@ -49,11 +48,16 @@ Advancement names are written to read naturally after "learned".
 
 Current content includes:
 
-- Improved Gathering
-- Improved Hunting
+- Foraging
+- Small Game Hunting
+- Large Game Hunting
+- Fishing
+- Trapping
+- Food Drying
 - Food Storage
-- Organized Travel
-- Local Resource Use
+- Stone Toolmaking
+- Hide Working
+- Fiber Working
 
 These are capabilities and methods, not facts.
 
@@ -61,11 +65,10 @@ These are capabilities and methods, not facts.
 
 Each group now keeps lightweight advancement evidence for:
 
-- successful gathering after relevant flora knowledge
-- successful hunting after relevant fauna knowledge
-- months with food surplus / stored food
-- repeated travel on known routes
-- repeated successful survival in known regions
+- repeated edible-flora, prey, aquatic, hide, fiber, and tool-stone opportunity
+- months of food pressure, spoilage pressure, material need, and organizational viability
+- repeated surplus opportunity and anchored continuity for preservation/storage
+- stability and continuity where retention matters
 
 There is no large skill framework and no sharing in this phase. Advancement pacing now includes slow progress loss when required conditions disappear, so dormant opportunities do not sit at a hidden threshold and burst into multiple same-tick unlocks later.
 
@@ -75,8 +78,9 @@ Advancements now unlock through paced progress rather than raw threshold checks.
 
 Typical pattern:
 
-- a relevant discovery prerequisite exists when appropriate
-- the group repeats a practical behavior or use case
+- a relevant species or resource discovery prerequisite exists when appropriate
+- the group has real current access to the needed species or material
+- the group repeats a practical behavior or opportunity under pressure or incentive
 - capability progress accumulates
 - adoption progress follows more slowly
 - the advancement is learned only after both are complete
@@ -87,11 +91,11 @@ This preserves the distinction that discovery is awareness while advancement is 
 
 Advancements now directly affect execution:
 
-- Improved Gathering increases food gained when gathering
-- Improved Hunting increases food gained when hunting
-- Food Storage improves the effective value of StoredFood when it is used
-- Organized Travel improves migration execution on known routes
-- Local Resource Use improves extraction in regions the group understands well
+- Foraging improves gathering from discovered edible flora
+- hunting-related capabilities improve practical hunting output as prey opportunities broaden
+- Food Drying and Food Storage improve the effective value of stored food when preservation is real
+- Stone Toolmaking improves gathering, hunting, and material extraction through practical tool use
+- Hide Working and Fiber Working improve practical material support from hides and fiber
 
 These are direct capability effects and are therefore advancements, not discoveries.
 
@@ -99,9 +103,9 @@ These are direct capability effects and are therefore advancements, not discover
 
 Advancement names are authored so future Chronicle text can naturally say things like:
 
-- group learned Improved Gathering
+- group learned Foraging
 - group learned Food Storage
-- group learned Organized Travel
+- group learned Stone Toolmaking
 
 Chronicle generation itself remains deferred.
 

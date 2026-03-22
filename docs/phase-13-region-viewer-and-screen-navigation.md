@@ -37,6 +37,14 @@ The MVP screen set is intentionally small and wraps when cycling:
 
 The screen set is broader than the original phase scope now, but the same Chronicle-first navigation model remains in place.
 
+`Known Species` remains one screen rather than three separate screens, but it is now presented in three internal sections:
+
+- Flora
+- Fauna
+- Sapients
+
+The screen uses category-specific columns rather than one universal species layout. Flora and fauna appear only once discovered; sapients appear once encountered.
+
 ## Default Screen
 
 Chronicle remains the default screen on startup.

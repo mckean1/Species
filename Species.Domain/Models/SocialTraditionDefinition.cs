@@ -8,5 +8,5 @@ public sealed class SocialTraditionDefinition
 
     public required string Summary { get; init; }
 
-    public required string ChronicleLineTemplate { get; init; }
+    public required string IdentityChangeTemplate { get; init; }
 }

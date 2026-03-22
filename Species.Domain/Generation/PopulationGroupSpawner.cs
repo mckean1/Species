@@ -1,6 +1,6 @@
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Domain.Catalogs;
@@ -159,7 +159,7 @@ public static class PopulationGroupSpawner
         yield return $"discovery-local-flora:{region.Id}";
         yield return $"discovery-local-fauna:{region.Id}";
         yield return $"discovery-local-water-sources:{region.Id}";
-        yield return $"discovery-local-region-conditions:{region.Id}";
+        yield return $"discovery-local-region:{region.Id}";
     }
 
     private static List<PolitySpeciesAwarenessState> BuildInitialSpeciesAwareness(Region region)
@@ -171,8 +171,7 @@ public static class PopulationGroupSpawner
                 SpeciesId = DefaultSpeciesId,
                 SpeciesClass = SpeciesClass.Sapient,
                 EncounterProgress = 100.0f,
-                DiscoveryProgress = 100.0f,
-                KnowledgeProgress = 100.0f
+                DiscoveryProgress = 100.0f
             }
         };
 
@@ -194,8 +193,7 @@ public static class PopulationGroupSpawner
                 SpeciesId = entry.Key,
                 SpeciesClass = speciesClass,
                 EncounterProgress = 100.0f,
-                DiscoveryProgress = 100.0f,
-                KnowledgeProgress = 100.0f
+                DiscoveryProgress = 100.0f
             });
     }
 

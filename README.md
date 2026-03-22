@@ -24,9 +24,12 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - `Backspace` returns Chronicle to `Live` and snaps back to the latest/current view.
 - Simulation auto-advances while unpaused.
 - Tick delay is `1000ms`.
-- Player-facing screens are focal-polity knowledge-aware rather than omniscient.
-- `Encounter -> Discovery -> Knowledge` is the canonical knowledge-state ladder for world familiarity.
-- Flora/fauna species awareness uses `Encounter -> Discovery -> Knowledge`, and intentional species exploitation requires `Knowledge`.
+- Player-facing screens are focal-polity discovery-aware rather than omniscient.
+- Discovery is what the polity knows.
+- Advancement is what the polity can do.
+- Flora/fauna species awareness is player-facingly simple: `Unknown -> Encountered -> Discovered`.
+- The `Known Species` screen remains a single screen but is now split into `Flora`, `Fauna`, and `Sapients`, with flora/fauna shown on discovery and sapients shown on encounter.
+- Intentional flora/fauna exploitation requires real discovery, not mere contact or abstract unlocks.
 - Sapient groups survive ecologically by intentionally hunting/foraging only known usable species, depleting real regional abundance, and starving when known usable food is insufficient.
 - Advancements remain capability.
 - `SpeciesClass` is the canonical biology classification model: `Flora`, `Fauna`, `Sapient`.
@@ -42,6 +45,9 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 - Settlements, polity regional presence, and place-based anchoring are now implemented in lightweight form.
 - Aggregate material extraction, limited non-food stores, and simple production bridges are now implemented in lightweight form.
 - Discoveries now emerge from repeated exposure, pressure, continuity, and contact; advancements now require grounded capability prerequisites.
+- The first-wave advancement set is now causal and capability-driven: `Foraging`, `Small Game Hunting`, `Large Game Hunting`, `Fishing`, `Trapping`, `Food Drying`, `Food Storage`, `Stone Toolmaking`, `Hide Working`, and `Fiber Working`.
+- Scouting is now a lightweight polity-level discovery extension: it can reveal nearby regions, species, resources, and sapient encounters without granting exploitation capability or advancements.
+- Curiosity is now a real polity pressure: novelty drought plus reachable nearby unknowns can raise it, real discoveries/encounters/advancements reduce it, and it primarily feeds scouting motivation rather than revealing anything directly.
 - Governance now uses broader structural laws, government-form baselines, legitimacy/cohesion/authority, and uneven law compliance.
 - Polities now accumulate social memory, identity tendencies, and traditions from lived simulation history.
 - Long-horizon biological change now emerges regionally through inherited local profiles, divergence, rare speciation, extinction, and fossils.
@@ -65,15 +71,17 @@ The simulation is now split between `PopulationGroup` constituents and explicit 
 9. Migration decision and movement
 10. Settlement / polity presence update
 11. Material extraction / production bridge update
-12. Discovery evaluation
-13. Advancement evaluation
-14. Social identity / tradition update
-15. Inter-polity interaction / external pressure update
-16. Political scaling / attachment / fragmentation update
-17. Political bloc monthly update
-18. Law proposal update
-19. Chronicle update and feed progression
-20. End-of-tick finalization
+12. Scouting evaluation
+13. Discovery evaluation
+14. Advancement evaluation
+15. Curiosity pressure update
+16. Social identity / tradition update
+17. Inter-polity interaction / external pressure update
+18. Political scaling / attachment / fragmentation update
+19. Political bloc monthly update
+20. Law proposal update
+21. Chronicle update and feed progression
+22. End-of-tick finalization
 
 `SimulationEngine` remains the canonical orchestrator for this flow.
 
@@ -91,7 +99,7 @@ Implemented prototype layers already include:
 
 - Chronicle-first presentation
 - paused startup with Chronicle-centered browsing controls
-- knowledge-aware region and polity screens
+- discovery-aware region and polity screens
 - explicit `Polity` actors in `World`
 - Chronicle `Live` / `Archive` / `Milestones` browsing with persistent urgent alerts
 - law proposals and player `Pass` / `Veto` decisions through contextual UI selection
@@ -150,6 +158,7 @@ Still deferred:
 - [docs/phase-10-discovery-mvp.md](docs/phase-10-discovery-mvp.md)
 - [docs/phase-11-advancement-mvp.md](docs/phase-11-advancement-mvp.md)
 - [docs/phase-12-chronicle-mvp.md](docs/phase-12-chronicle-mvp.md)
+- [docs/chronicle-architecture-note.md](docs/chronicle-architecture-note.md)
 - [docs/phase-13-region-viewer-and-screen-navigation.md](docs/phase-13-region-viewer-and-screen-navigation.md)
 - [docs/phase-14-resource-extraction-production-economy-bridges.md](docs/phase-14-resource-extraction-production-economy-bridges.md)
 - [docs/phase-15-knowledge-and-advancement-deepening.md](docs/phase-15-knowledge-and-advancement-deepening.md)

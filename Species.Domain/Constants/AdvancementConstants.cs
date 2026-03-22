@@ -2,18 +2,27 @@ namespace Species.Domain.Constants;
 
 public static class AdvancementConstants
 {
-    public const int ImprovedGatheringMonthsRequired = 2;
-    public const int ImprovedHuntingMonthsRequired = 2;
-    public const int FoodStorageSurplusMonthsRequired = 2;
-    public const int OrganizedTravelKnownRouteMonthsRequired = 2;
-    public const int LocalResourceUseMonthsRequired = 2;
-    public const int StrongerShelterMonthsRequired = 2;
-    public const float ImprovedGatheringMultiplier = 1.15f;
-    public const float ImprovedHuntingMultiplier = 1.15f;
+    public const int ForagingOpportunityMonthsRequired = 2;
+    public const int SmallGameHuntingOpportunityMonthsRequired = 2;
+    public const int LargeGameHuntingOpportunityMonthsRequired = 3;
+    public const int FishingOpportunityMonthsRequired = 3;
+    public const int TrappingOpportunityMonthsRequired = 3;
+    public const int FoodDryingOpportunityMonthsRequired = 2;
+    public const int FoodStorageOpportunityMonthsRequired = 2;
+    public const int StoneToolmakingOpportunityMonthsRequired = 2;
+    public const int HideWorkingOpportunityMonthsRequired = 2;
+    public const int FiberWorkingOpportunityMonthsRequired = 2;
+    public const float ForagingMultiplier = 1.12f;
+    public const float SmallGameHuntingMultiplier = 1.10f;
+    public const float LargeGameHuntingMultiplier = 1.12f;
+    public const float FishingMultiplier = 1.10f;
+    public const float TrappingMultiplier = 1.08f;
+    public const float FoodDryingStoredFoodMultiplier = 1.10f;
     public const float FoodStorageStoredFoodMultiplier = 1.20f;
-    public const float LocalResourceUseMultiplier = 1.10f;
-    public const float OrganizedTravelKnownRouteBonus = 6.0f;
     public const float FoodStorageSettlementReserveMultiplier = 1.20f;
-    public const float StrongerShelterThreatMultiplier = 0.88f;
-    public const float StrongerShelterCrowdingMultiplier = 0.90f;
+    public const float StoneToolmakingGatheringMultiplier = 1.06f;
+    public const float StoneToolmakingHuntingMultiplier = 1.08f;
+    public const float StoneToolmakingMaterialExtractionMultiplier = 1.12f;
+    public const float HideWorkingTextileSupportBonus = 6.0f;
+    public const float FiberWorkingTextileSupportBonus = 8.0f;
 }

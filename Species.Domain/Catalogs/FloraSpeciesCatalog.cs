@@ -54,6 +54,7 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.84f,
                 RegionalAbundance = 0.88f,
                 Conspicuousness = 0.62f,
+                Tags = [FloraTag.Edible, FloraTag.StapleFood],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 48,
@@ -82,6 +83,7 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.56f,
                 RegionalAbundance = 0.58f,
                 Conspicuousness = 0.48f,
+                Tags = [FloraTag.Edible, FloraTag.EmergencyFood, FloraTag.FiberSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 42,
@@ -110,6 +112,7 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.74f,
                 RegionalAbundance = 0.72f,
                 Conspicuousness = 0.54f,
+                Tags = [FloraTag.FiberSource],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 38,
@@ -138,6 +141,7 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.42f,
                 RegionalAbundance = 0.46f,
                 Conspicuousness = 0.78f,
+                Tags = [FloraTag.Edible, FloraTag.StapleFood],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 46,
@@ -166,6 +170,7 @@ public sealed class FloraSpeciesCatalog
                 SpreadTendency = 0.48f,
                 RegionalAbundance = 0.54f,
                 Conspicuousness = 0.28f,
+                Tags = [FloraTag.Edible, FloraTag.EmergencyFood],
                 BaselineTraits = new BiologicalTraitProfile
                 {
                     ColdTolerance = 62,

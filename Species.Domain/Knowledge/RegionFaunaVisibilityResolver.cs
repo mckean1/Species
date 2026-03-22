@@ -2,7 +2,7 @@ using Species.Domain.Catalogs;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
-namespace Species.Domain.Knowledge;
+namespace Species.Domain.Discovery;
 
 public static class RegionFaunaVisibilityResolver
 {
@@ -11,7 +11,7 @@ public static class RegionFaunaVisibilityResolver
 
     public static RegionFaunaVisibility Resolve(
         Region region,
-        RegionKnowledgeSnapshot? snapshot,
+        RegionDiscoverySnapshot? snapshot,
         FaunaSpeciesCatalog faunaCatalog)
     {
         var simulatedFauna = region.Ecosystem.FaunaPopulations
@@ -36,7 +36,7 @@ public static class RegionFaunaVisibilityResolver
                                         snapshot.MonthsSpent > 0 ||
                                         snapshot.HuntingEvidenceMonths > 0 ||
                                         snapshot.WaterEvidenceMonths > 0);
-        var canShowEncounterFauna = snapshot?.FaunaKnowledge >= KnowledgeLevel.Encounter &&
+        var canShowEncounterFauna = snapshot?.FaunaStage >= DiscoveryStage.Encountered &&
                                     hasMeaningfulObservation &&
                                     simulatedFauna.Length > 0;
         var encounterEntries = simulatedFauna
@@ -58,19 +58,19 @@ public static class RegionFaunaVisibilityResolver
                 ["No fauna observed"],
                 encounterEntries,
                 discoveryEntries,
-                "No fauna shown because the polity lacks encounter-level local fauna awareness for this region.");
+                "No fauna shown because the polity has not yet encountered local fauna in this region.");
         }
 
-        if (snapshot!.FaunaKnowledge >= KnowledgeLevel.Discovery)
+        if (snapshot!.FaunaStage == DiscoveryStage.Discovered)
         {
             return new RegionFaunaVisibility(
-                "Known fauna",
+                "Discovered fauna",
                 discoveryEntries.Length > 0 ? discoveryEntries : ["No fauna observed"],
                 encounterEntries,
                 discoveryEntries,
                 discoveryEntries.Length > 0
-                    ? "Discovery-level fauna knowledge allows a broader and more reliable local fauna list."
-                    : "Discovery-level fauna knowledge is present, but no fauna currently qualifies for display.");
+                    ? "Discovered fauna can be listed more broadly and reliably."
+                    : "Local fauna is discovered here, but no fauna currently qualifies for display.");
         }
 
         var visibleEntries = encounterEntries.ToList();
@@ -84,7 +84,7 @@ public static class RegionFaunaVisibilityResolver
             visibleEntries,
             encounterEntries,
             discoveryEntries,
-            "Encounter-level fauna knowledge shows only the most obvious locally observed fauna and keeps the list partial.");
+            "Encountered fauna stays partial until the polity fully discovers the local fauna.");
     }
 
     private static float ResolveEncounterPriority(VisibleFaunaCandidate candidate)

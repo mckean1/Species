@@ -47,6 +47,14 @@ public static class PressureDefinitions
         PressureCalculationConstants.MigrationPressureDecayRate,
         DefaultSafetyBound);
 
+    public static readonly PressureDefinition Curiosity = new(
+        PressureCategory.Curiosity,
+        PressureShape.OneSided,
+        PressureCurveType.Persistent,
+        PressureDecayMode.PassiveTowardZero,
+        PressureCalculationConstants.PersistentPressureDecayRate,
+        DefaultSafetyBound);
+
     public static PressureDefinition Get(PressureCategory category)
     {
         return category switch
@@ -56,6 +64,7 @@ public static class PressureDefinitions
             PressureCategory.Threat => Threat,
             PressureCategory.Overcrowding => Overcrowding,
             PressureCategory.Migration => Migration,
+            PressureCategory.Curiosity => Curiosity,
             _ => throw new ArgumentOutOfRangeException(nameof(category), category, null)
         };
     }

@@ -16,7 +16,7 @@ public sealed class RegionSummary
         string faunaLabel,
         IReadOnlyList<string> fauna,
         IReadOnlyList<string> materials,
-        IReadOnlyList<string> knowledge,
+        IReadOnlyList<string> discoveries,
         IReadOnlyList<string> context,
         IReadOnlyList<string> opportunities,
         IReadOnlyList<string> risks,
@@ -38,7 +38,7 @@ public sealed class RegionSummary
         FaunaLabel = faunaLabel;
         Fauna = fauna;
         Materials = materials;
-        Knowledge = knowledge;
+        Discoveries = discoveries;
         Context = context;
         Opportunities = opportunities;
         Risks = risks;
@@ -74,7 +74,7 @@ public sealed class RegionSummary
 
     public IReadOnlyList<string> Materials { get; }
 
-    public IReadOnlyList<string> Knowledge { get; }
+    public IReadOnlyList<string> Discoveries { get; }
 
     public IReadOnlyList<string> Context { get; }
 

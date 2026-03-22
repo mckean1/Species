@@ -16,5 +16,16 @@ public sealed class DiscoveryChange
 
     public required string DecisionEffectSummary { get; init; }
 
-    public required string ChronicleLinesSummary { get; init; }
+    public IReadOnlyList<DiscoveryUnlock> UnlockedEntries { get; init; } = Array.Empty<DiscoveryUnlock>();
+}
+
+public sealed class DiscoveryUnlock
+{
+    public required string Name { get; init; }
+
+    public bool IsEncounter { get; init; }
+
+    public bool IsScoutSourced { get; init; }
+
+    public string? RegionName { get; init; }
 }

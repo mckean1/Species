@@ -32,6 +32,8 @@ public sealed class FloraSpeciesDefinition
 
     public float Conspicuousness { get; init; }
 
+    public IReadOnlyList<FloraTag> Tags { get; init; } = Array.Empty<FloraTag>();
+
     public BiologicalTraitProfile BaselineTraits { get; init; } = new();
 
     public string ParentSpeciesId { get; init; } = string.Empty;

@@ -415,7 +415,9 @@ public sealed class SettlementSystem
     private static void DepositSettlementStores(Settlement settlement, IReadOnlyList<PopulationGroup> localGroups, IDictionary<string, PopulationGroup> groupsById)
     {
         var localPopulation = localGroups.Sum(group => group.Population);
-        var hasFoodStorage = localGroups.Any(group => group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId));
+        var hasFoodStorage = localGroups.Any(group =>
+            group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodDryingId) ||
+            group.LearnedAdvancementIds.Contains(AdvancementCatalog.FoodStorageId));
         var targetReserve = settlement.Type switch
         {
             SettlementType.Village => Math.Max(40, localPopulation),

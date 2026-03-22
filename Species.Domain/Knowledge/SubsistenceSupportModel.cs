@@ -3,7 +3,7 @@ using Species.Domain.Constants;
 using Species.Domain.Enums;
 using Species.Domain.Models;
 
-namespace Species.Domain.Knowledge;
+namespace Species.Domain.Discovery;
 
 public static class SubsistenceSupportModel
 {
@@ -178,15 +178,14 @@ public static class SubsistenceSupportModel
     {
         var multiplier = 1.0f;
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedGatheringId))
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ForagingId))
         {
-            multiplier *= AdvancementConstants.ImprovedGatheringMultiplier;
+            multiplier *= AdvancementConstants.ForagingMultiplier;
         }
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LocalResourceUseId) &&
-            group.KnownDiscoveryIds.Contains($"discovery-local-region-conditions:{region.Id}"))
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StoneToolmakingId))
         {
-            multiplier *= AdvancementConstants.LocalResourceUseMultiplier;
+            multiplier *= AdvancementConstants.StoneToolmakingGatheringMultiplier;
         }
 
         return multiplier;
@@ -196,15 +195,29 @@ public static class SubsistenceSupportModel
     {
         var multiplier = 1.0f;
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.ImprovedHuntingId))
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.SmallGameHuntingId))
         {
-            multiplier *= AdvancementConstants.ImprovedHuntingMultiplier;
+            multiplier *= AdvancementConstants.SmallGameHuntingMultiplier;
         }
 
-        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LocalResourceUseId) &&
-            group.KnownDiscoveryIds.Contains($"discovery-local-region-conditions:{region.Id}"))
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.LargeGameHuntingId))
         {
-            multiplier *= AdvancementConstants.LocalResourceUseMultiplier;
+            multiplier *= AdvancementConstants.LargeGameHuntingMultiplier;
+        }
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.FishingId))
+        {
+            multiplier *= AdvancementConstants.FishingMultiplier;
+        }
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.TrappingId))
+        {
+            multiplier *= AdvancementConstants.TrappingMultiplier;
+        }
+
+        if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.StoneToolmakingId))
+        {
+            multiplier *= AdvancementConstants.StoneToolmakingHuntingMultiplier;
         }
 
         return multiplier;

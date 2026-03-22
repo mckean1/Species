@@ -115,57 +115,54 @@ Fauna boundary:
 Sapient ecology boundary:
 
 - sapients are intentional ecological actors, but they are still bound to usable-food truth
-- sapients may intentionally hunt or forage only species their polity knows at `Knowledge` level
-- `Encounter` and `Discovery` can support awareness and future progress, but not reliable extraction
+- sapients may intentionally hunt or forage only species their polity has actually discovered
+- `Encountered` contact can support awareness and future progress, but not reliable extraction
 - sapient extraction depletes the same regional flora/fauna abundance used by the food web
 - if known usable species plus accessible reserves do not cover need, sapients accumulate hunger and then starve
 
-## Encounter, Discovery, Knowledge
+## Encounter and Discovery
 
-The canonical knowledge-state naming is:
+The canonical player-facing discovery-state naming is:
 
-- `Encounter`: a group has contact, signs, or limited observation, but not durable established understanding
-- `Discovery`: a group has unlocked a durable specific finding from repeated exposure
-- `Knowledge`: a group has strong operational understanding, usually through sustained local familiarity plus discovery-backed context
+- `Encountered`: a polity has contact, signs, or limited observation, but has not yet unlocked a durable finding
+- `Discovered`: a polity has unlocked a durable finding from repeated exposure, contact, pressure, or continuity
 
 `Unknown` remains the absence state when none of the above exist.
 
 Boundary rule:
 
-- `Encounter` is not yet durable discovery
-- `Discovery` is not yet full operational knowledge
-- `Knowledge` is the strongest player/simulation-facing state short of omniscience
+- `Encountered` is not yet durable discovery
+- `Discovered` is the durable informational unlock that should affect polity decision-making
+- there is no separate player-facing `Knowledge` layer
 
 For flora/fauna awareness specifically:
 
-- `Encounter` = signs, sightings, or incidental contact with a species
-- `Discovery` = the polity recognizes the species as a distinct resource, prey, threat, or recurring organism
-- `Knowledge` = the polity has reliable practical understanding of how to use or respond to that species
+- `Encountered` = signs, sightings, or incidental contact with a species
+- `Discovered` = the polity recognizes the species as a distinct resource, prey, threat, or recurring organism closely enough to use it intentionally
 
 System boundary:
 
 - species awareness is tracked per polity-species relationship
 - progress is staged and monthly, not instant full unlock
 - lower abundance slows progress because scarce species generate less repeatable contact
-- passive regional presence alone should usually only build `Encounter` slowly
-- `Discovery` requires repeated exposure over time
-- `Knowledge` requires repeated successful practical interaction, not just co-presence
-- intentional flora/fauna exploitation requires `Knowledge`
-- `Discovery` may inform planning, messaging, and future progress, but it does not authorize deliberate extraction
+- passive regional presence alone should usually only build `Encountered` slowly
+- `Discovered` requires repeated exposure over time
+- intentional flora/fauna exploitation requires `Discovered`
+- discovery may inform planning, messaging, and future progress, but it does not come from arbitrary timers or abstract research
 - this is still separate from broader research or speculative science systems
 
 ## Progression Ownership
 
 The progression ownership split is:
 
-- species awareness owns flora/fauna species familiarity through `Encounter -> Discovery -> Knowledge`
+- species awareness owns flora/fauna species familiarity through `Unknown -> Encountered -> Discovered`
 - broader discoveries own non-species findings such as routes, materials, conditions, and methods
 - advancements own repeatable operational capability
 
 These systems are related, but they do not mean the same thing.
 
-- species awareness answers "do we know this species well enough to use it intentionally?"
-- discoveries answer "what durable finding have we learned about the world?"
+- species awareness answers "have we encountered or discovered this species yet?"
+- discoveries answer "what durable finding has the polity learned about the world?"
 - advancements answer "what can we now do reliably?"
 
 ## System Boundaries
@@ -183,6 +180,6 @@ The biology stack is tuned around a few explicit failure modes:
 
 - proto-life hidden respawn is controlled by decay, harshness drag, saturation suppression, readiness windows, candidate windows, and cooldowns
 - food-web oscillation is controlled by conversion inefficiency, prey refuge, fallback penalties, lagged reproduction, and migration relief
-- sapient food-truth violations are controlled by `Knowledge`-gated intentional use plus starvation from usable-food shortfall
+- sapient food-truth violations are controlled by discovery-gated intentional use plus starvation from usable-food shortfall
 - discovery burstiness is controlled by staged awareness and monthly gain caps
 - starvation chaos is controlled by progressive hunger and shortage carryover rather than one-tick binary survival

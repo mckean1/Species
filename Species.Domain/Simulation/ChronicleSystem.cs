@@ -6,6 +6,8 @@ namespace Species.Domain.Simulation;
 
 public sealed class ChronicleSystem
 {
+    private static readonly ChroniclePolicy Policy = new();
+
     public ChronicleUpdateResult Run(
         World world,
         IReadOnlyList<GroupPressureChange> pressureChanges,
@@ -21,16 +23,35 @@ public sealed class ChronicleSystem
         IReadOnlyList<SettlementChange> settlementChanges,
         IReadOnlyList<MaterialEconomyChange> materialEconomyChanges)
     {
-        var recordedEntries = BuildRecordedEntries(world, pressureChanges, survivalChanges, migrationChanges, biologicalHistoryChanges, discoveryChanges, advancementChanges, socialIdentityChanges, interPolityChanges, politicalScaleChanges, lawProposalChanges, settlementChanges, materialEconomyChanges);
-        var updatedChronicle = RecordEntries(world.Chronicle, recordedEntries, world.CurrentYear, world.CurrentMonth);
+        var candidates = BuildCandidates(
+            world,
+            pressureChanges,
+            survivalChanges,
+            migrationChanges,
+            biologicalHistoryChanges,
+            discoveryChanges,
+            advancementChanges,
+            socialIdentityChanges,
+            interPolityChanges,
+            politicalScaleChanges,
+            lawProposalChanges,
+            settlementChanges,
+            materialEconomyChanges).ToList();
+        foreach (var alertCandidate in BuildAlertCandidates(world))
+        {
+            candidates.Add(alertCandidate);
+        }
+        var policyResult = Policy.Evaluate(world, candidates);
+        var updatedChronicle = Policy.Apply(world, policyResult);
         var revealedEntries = RevealEntries(updatedChronicle, world.CurrentYear, world.CurrentMonth, out var revealedChronicle);
         return new ChronicleUpdateResult(
             new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, revealedChronicle, world.Polities, world.FocalPolityId),
-            recordedEntries,
-            revealedEntries);
+            policyResult.ChronicleEntries,
+            revealedEntries,
+            policyResult.Alerts);
     }
 
-    private static IReadOnlyList<ChronicleEntry> BuildRecordedEntries(
+    private static IReadOnlyList<ChronicleEventCandidate> BuildCandidates(
         World world,
         IReadOnlyList<GroupPressureChange> pressureChanges,
         IReadOnlyList<GroupSurvivalChange> survivalChanges,
@@ -45,22 +66,23 @@ public sealed class ChronicleSystem
         IReadOnlyList<SettlementChange> settlementChanges,
         IReadOnlyList<MaterialEconomyChange> materialEconomyChanges)
     {
-        var entries = new List<ChronicleEntry>();
-        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
-        var nextRecordSequence = world.Chronicle.NextRecordSequence;
+        var candidates = new List<ChronicleEventCandidate>();
         var pressureChangesByGroupId = pressureChanges.ToDictionary(change => change.GroupId, StringComparer.Ordinal);
 
         foreach (var change in migrationChanges.Where(change => change.Moved))
         {
-            AddEntry(entries, seenKeys, BuildEntry(
+            candidates.Add(CreateCandidate(
                 world,
-                nextRecordSequence++,
                 change.GroupId,
                 change.GroupName,
-                ChronicleEventCategory.Migration,
-                $"{change.GroupName} migrated to {change.NewRegionName}.",
                 "migration",
-                change.NewRegionId));
+                ChronicleCandidateCategory.Territory,
+                ChronicleEventSeverity.Notable,
+                ChronicleTriggerKind.Migrated,
+                $"{change.GroupId}:migration:{change.NewRegionId}",
+                "migration",
+                regionId: change.NewRegionId,
+                regionName: change.NewRegionName));
         }
 
         foreach (var change in survivalChanges)
@@ -69,236 +91,335 @@ public sealed class ChronicleSystem
 
             if (ShouldRecordHardshipEntry(change, pressureChange))
             {
-                AddEntry(entries, seenKeys, BuildEntry(
+                candidates.Add(CreateCandidate(
                     world,
-                    nextRecordSequence++,
                     change.GroupId,
                     change.GroupName,
-                    ChronicleEventCategory.Shortage,
-                    BuildHardshipMessage(change, pressureChange),
+                    change.StarvationLoss > 0 ? "famine" : "shortage",
+                    ChronicleCandidateCategory.Survival,
+                    change.StarvationLoss > 0 ? ChronicleEventSeverity.Critical : ChronicleEventSeverity.Major,
+                    change.StarvationLoss > 0 ? ChronicleTriggerKind.Escalated : ChronicleTriggerKind.Started,
+                    $"{change.GroupId}:shortage:{ResolveTopPressureKey(pressureChange)}:{change.CurrentRegionId}",
                     "shortage",
-                    change.CurrentRegionId));
+                    regionId: change.CurrentRegionId));
             }
 
             if (-change.NetPopulationChange >= ChronicleConstants.MeaningfulDeclineThreshold && change.FinalPopulation > 0)
             {
-                AddEntry(entries, seenKeys, BuildEntry(
+                candidates.Add(CreateCandidate(
                     world,
-                    nextRecordSequence++,
                     change.GroupId,
                     change.GroupName,
-                    ChronicleEventCategory.Decline,
-                    BuildDeclineMessage(change),
                     "decline",
-                    change.CurrentRegionId));
+                    ChronicleCandidateCategory.Demography,
+                    ChronicleEventSeverity.Major,
+                    ChronicleTriggerKind.BecameUnstable,
+                    $"{change.GroupId}:decline:{world.CurrentYear}:{world.CurrentMonth}",
+                    "decline",
+                    regionId: change.CurrentRegionId));
             }
 
             if (change.FinalPopulation == 0)
             {
-                AddEntry(entries, seenKeys, BuildEntry(
+                candidates.Add(CreateCandidate(
                     world,
-                    nextRecordSequence++,
                     change.GroupId,
                     change.GroupName,
-                    ChronicleEventCategory.Extinction,
-                    $"{change.GroupName} died out.",
+                    "losses",
+                    ChronicleCandidateCategory.Demography,
+                    ChronicleEventSeverity.Critical,
+                    ChronicleTriggerKind.Collapsed,
+                    $"{change.GroupId}:extinction",
                     "extinction",
-                    change.CurrentRegionId));
+                    regionId: change.CurrentRegionId));
             }
         }
 
-        foreach (var change in biologicalHistoryChanges)
+        foreach (var change in discoveryChanges.Where(change => change.UnlockedEntries.Count > 0))
         {
-            AddEntry(entries, seenKeys, BuildEntry(
-                world,
-                nextRecordSequence++,
-                change.SpeciesId,
-                change.SpeciesName,
-                ChronicleEventCategory.Biological,
-                change.Message,
-                "biology",
-                change.RegionId));
-        }
-
-        foreach (var change in discoveryChanges.Where(change => !string.Equals(change.UnlockedDiscoveriesSummary, "none", StringComparison.OrdinalIgnoreCase)))
-        {
-            foreach (var chronicleLine in SplitChronicleSummary(change.ChronicleLinesSummary, change.UnlockedDiscoveriesSummary, change.GroupName, "discovered"))
+            foreach (var unlocked in change.UnlockedEntries)
             {
-                AddEntry(entries, seenKeys, BuildEntry(
+                candidates.Add(CreateCandidate(
                     world,
-                    nextRecordSequence++,
                     change.GroupId,
                     change.GroupName,
-                    ChronicleEventCategory.Discovery,
-                    chronicleLine,
-                    "discovery"));
+                    "discovery",
+                    ChronicleCandidateCategory.Discovery,
+                    ChronicleEventSeverity.Notable,
+                    unlocked.IsEncounter ? ChronicleTriggerKind.Encountered : ChronicleTriggerKind.Discovered,
+                    $"{change.GroupId}:discovery:{Normalize(unlocked.Name)}:{(unlocked.IsEncounter ? "encounter" : "discover")}:{Normalize(unlocked.RegionName ?? string.Empty)}:{unlocked.IsScoutSourced}",
+                    "discovery",
+                    regionName: unlocked.RegionName,
+                    discoveryName: unlocked.IsEncounter ? null : unlocked.Name,
+                    otherPartyName: unlocked.IsEncounter ? unlocked.Name : null,
+                    isScoutSourced: unlocked.IsScoutSourced));
             }
         }
 
-        foreach (var change in advancementChanges.Where(change => !string.Equals(change.UnlockedAdvancementsSummary, "none", StringComparison.OrdinalIgnoreCase)))
+        foreach (var change in advancementChanges.Where(change => change.UnlockedAdvancementNames.Count > 0))
         {
-            foreach (var chronicleLine in SplitChronicleSummary(change.ChronicleLinesSummary, change.UnlockedAdvancementsSummary, change.GroupName, "learned"))
+            foreach (var advancementName in change.UnlockedAdvancementNames)
             {
-                AddEntry(entries, seenKeys, BuildEntry(
+                candidates.Add(CreateCandidate(
                     world,
-                    nextRecordSequence++,
                     change.GroupId,
                     change.GroupName,
-                    ChronicleEventCategory.Advancement,
-                    chronicleLine,
-                    "advancement"));
+                    "advancement",
+                    ChronicleCandidateCategory.Advancement,
+                    ChronicleEventSeverity.Major,
+                    ChronicleTriggerKind.Learned,
+                    $"{change.GroupId}:advancement:{Normalize(advancementName)}",
+                    "advancement",
+                    advancementName: advancementName));
             }
-        }
-
-        foreach (var change in socialIdentityChanges)
-        {
-            AddEntry(entries, seenKeys, BuildEntry(
-                world,
-                nextRecordSequence++,
-                change.PolityId,
-                change.PolityName,
-                ChronicleEventCategory.Social,
-                change.Message,
-                "social"));
         }
 
         foreach (var change in interPolityChanges)
         {
-            AddEntry(entries, seenKeys, BuildEntry(
+            candidates.Add(CreateCandidate(
                 world,
-                nextRecordSequence++,
                 change.PrimaryPolityId,
                 change.PrimaryPolityName,
-                ChronicleEventCategory.External,
-                change.Message,
-                "external",
-                change.Kind));
+                change.EventType,
+                ChronicleCandidateCategory.Conflict,
+                ResolveExternalSeverity(change.EventType),
+                ResolveConflictTrigger(change.EventType),
+                $"{change.PrimaryPolityId}:external:{change.Kind}:{Normalize(change.EventType)}:{change.OtherPolityId}",
+                $"external:{change.Kind}",
+                otherPartyName: change.OtherPolityName));
         }
 
         foreach (var change in politicalScaleChanges)
         {
-            AddEntry(entries, seenKeys, BuildEntry(
+            candidates.Add(CreateCandidate(
                 world,
-                nextRecordSequence++,
                 change.PolityId,
                 change.PolityName,
-                ChronicleEventCategory.Political,
-                change.Message,
                 "political",
-                change.Kind));
+                ChronicleCandidateCategory.Polity,
+                ResolvePoliticalSeverity(change.TriggerKind),
+                change.TriggerKind,
+                $"{change.PolityId}:political:{change.Kind}:{Normalize(change.GovernmentFormName)}:{change.OtherPolityId}",
+                $"political:{change.Kind}",
+                governmentFormName: string.IsNullOrWhiteSpace(change.GovernmentFormName) ? null : change.GovernmentFormName));
         }
 
         foreach (var change in lawProposalChanges)
         {
-            AddEntry(entries, seenKeys, BuildEntry(
+            candidates.Add(CreateCandidate(
                 world,
-                nextRecordSequence++,
                 change.GroupId,
                 change.GroupName,
-                ChronicleEventCategory.Law,
-                string.IsNullOrWhiteSpace(change.ChronicleLine)
-                    ? (change.Status == Species.Domain.Enums.LawProposalStatus.Passed
-                        ? $"{change.GroupName} passed {change.ProposalTitle}."
-                        : $"{change.GroupName} vetoed {change.ProposalTitle}.")
-                    : change.ChronicleLine,
-                "law"));
+                "law",
+                ChronicleCandidateCategory.Politics,
+                ChronicleEventSeverity.Notable,
+                change.Status == Species.Domain.Enums.LawProposalStatus.Passed ? ChronicleTriggerKind.Secured : ChronicleTriggerKind.Lost,
+                $"{change.GroupId}:law:{Normalize(change.ProposalTitle)}:{change.Status}",
+                "law",
+                lawName: change.ProposalTitle));
         }
 
         foreach (var change in settlementChanges)
         {
-            AddEntry(entries, seenKeys, BuildEntry(
+            if (change.Kind is not (SettlementChangeKind.Founded or SettlementChangeKind.Abandoned))
+            {
+                continue;
+            }
+
+            candidates.Add(CreateCandidate(
                 world,
-                nextRecordSequence++,
                 change.PolityId,
                 change.PolityName,
-                ChronicleEventCategory.Settlement,
-                change.Message,
                 "settlement",
-                change.RegionId));
+                ChronicleCandidateCategory.Settlement,
+                ResolveSettlementSeverity(change.Kind),
+                ResolveSettlementTrigger(change.Kind),
+                $"{change.PolityId}:settlement:{change.RegionId}:{change.Kind}:{Normalize(change.SettlementName)}",
+                "settlement",
+                regionId: change.RegionId,
+                regionName: change.RegionName,
+                settlementName: change.SettlementName));
         }
 
-        foreach (var change in materialEconomyChanges)
+        return candidates;
+    }
+
+    private static IReadOnlyList<ChronicleEventCandidate> BuildAlertCandidates(World world)
+    {
+        var candidates = new List<ChronicleEventCandidate>();
+
+        foreach (var polity in world.Polities.OrderBy(polity => polity.Id, StringComparer.Ordinal))
         {
-            AddEntry(entries, seenKeys, BuildEntry(
-                world,
-                nextRecordSequence++,
-                change.PolityId,
-                change.PolityName,
-                ChronicleEventCategory.Material,
-                change.Message,
-                "material",
-                change.RegionId));
+            var context = PolityData.BuildContext(world, polity);
+            if (context is null)
+            {
+                continue;
+            }
+
+            var monthlyDemand = Math.Max(1, context.FoodAccounting.MonthlyDemand);
+            if (context.FoodAccounting.EndingTotalStores <= monthlyDemand ||
+                context.Pressures.Food.DisplayValue >= ChronicleConstants.HardshipWarningDisplayThreshold)
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "low-food-stores",
+                    ChronicleCandidateCategory.Survival,
+                    ChronicleEventSeverity.Major,
+                    ChronicleTriggerKind.Started,
+                    $"{polity.Id}:active:food-stores",
+                    "active-food-stores",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert));
+            }
+
+            if (context.FoodAccounting.ShortageMonths > 0)
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "shortage-active",
+                    ChronicleCandidateCategory.Survival,
+                    ChronicleEventSeverity.Major,
+                    ChronicleTriggerKind.Started,
+                    $"{polity.Id}:active:shortage",
+                    "active-shortage",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert));
+            }
+
+            if (context.FoodAccounting.UnresolvedDeficit > 0 ||
+                context.FoodAccounting.FoodStressState == FoodStressState.Starvation)
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "famine-active",
+                    ChronicleCandidateCategory.Survival,
+                    ChronicleEventSeverity.Critical,
+                    ChronicleTriggerKind.Escalated,
+                    $"{polity.Id}:active:famine",
+                    "active-famine",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert));
+            }
+
+            if (context.Pressures.Migration.DisplayValue >= ChronicleConstants.PressureConcernDisplayThreshold)
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "migration-pressure",
+                    ChronicleCandidateCategory.Territory,
+                    ChronicleEventSeverity.Notable,
+                    ChronicleTriggerKind.Escalated,
+                    $"{polity.Id}:active:migration",
+                    "active-migration",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert));
+            }
+
+            if (context.ExternalPressure.RaidPressure >= 55 || context.ExternalPressure.Threat >= 70)
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "conflict-active",
+                    ChronicleCandidateCategory.Conflict,
+                    ChronicleEventSeverity.Major,
+                    ChronicleTriggerKind.Escalated,
+                    $"{polity.Id}:active:conflict",
+                    "active-conflict",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert));
+            }
+
+            var primarySettlement = context.PrimarySettlement;
+            if (primarySettlement is not null &&
+                (primarySettlement.MaterialSupport < 40 || primarySettlement.StoredFood <= 0))
+            {
+                candidates.Add(CreateCandidate(
+                    world,
+                    polity.Id,
+                    polity.Name,
+                    "settlement-vulnerable",
+                    ChronicleCandidateCategory.Settlement,
+                    ChronicleEventSeverity.Notable,
+                    ChronicleTriggerKind.BecameUnstable,
+                    $"{polity.Id}:active:settlement:{primarySettlement.Id}",
+                    "active-settlement-vulnerable",
+                    preferredOutputTarget: ChronicleOutputTarget.Alert,
+                    settlementName: primarySettlement.Name,
+                    regionId: primarySettlement.RegionId));
+            }
         }
 
-        return entries;
+        return candidates;
     }
 
     public World RecordLawDecision(World world, LawProposalChange change)
     {
-        var message = string.IsNullOrWhiteSpace(change.ChronicleLine)
-            ? (change.Status == Species.Domain.Enums.LawProposalStatus.Passed
-                ? $"{change.GroupName} passed {change.ProposalTitle}."
-                : $"{change.GroupName} vetoed {change.ProposalTitle}.")
-            : change.ChronicleLine;
-        var entry = BuildEntry(
+        var candidate = CreateCandidate(
             world,
-            world.Chronicle.NextRecordSequence,
             change.GroupId,
             change.GroupName,
-            ChronicleEventCategory.Law,
-            message,
-            "law");
-        var chronicle = RecordEntries(world.Chronicle, [entry], world.CurrentYear, world.CurrentMonth);
+            "law",
+            ChronicleCandidateCategory.Politics,
+            ChronicleEventSeverity.Notable,
+            change.Status == Species.Domain.Enums.LawProposalStatus.Passed ? ChronicleTriggerKind.Secured : ChronicleTriggerKind.Lost,
+            $"{change.GroupId}:law:{Normalize(change.ProposalTitle)}:{change.Status}",
+            "law",
+            lawName: change.ProposalTitle);
+        var policyResult = Policy.Evaluate(world, [candidate]);
+        var chronicle = Policy.Apply(world, policyResult);
         return new World(world.Seed, world.CurrentYear, world.CurrentMonth, world.Regions, world.PopulationGroups, chronicle, world.Polities, world.FocalPolityId);
     }
 
-    private static void AddEntry(ICollection<ChronicleEntry> entries, ISet<string> seenKeys, ChronicleEntry entry)
-    {
-        var key = $"{entry.EventYear}:{entry.EventMonth}:{entry.GroupId}:{entry.Category}:{entry.Message}";
-        if (seenKeys.Add(key))
-        {
-            entries.Add(entry);
-        }
-    }
-
-    private static ChronicleEntry BuildEntry(
+    private static ChronicleEventCandidate CreateCandidate(
         World world,
-        int recordSequence,
-        string groupId,
-        string groupName,
-        ChronicleEventCategory category,
-        string message,
-        params string[] tags)
+        string polityId,
+        string polityName,
+        string eventType,
+        ChronicleCandidateCategory category,
+        ChronicleEventSeverity severity,
+        ChronicleTriggerKind triggerKind,
+        string dedupeKey,
+        string cooldownFamily,
+        ChronicleOutputTarget preferredOutputTarget = ChronicleOutputTarget.Chronicle,
+        string? regionId = null,
+        string? regionName = null,
+        string? settlementName = null,
+        string? discoveryName = null,
+        string? advancementName = null,
+        string? lawName = null,
+        string? otherPartyName = null,
+        string? governmentFormName = null,
+        bool isScoutSourced = false)
     {
-        var (revealYear, revealMonth) = AddMonths(world.CurrentYear, world.CurrentMonth, ChronicleConstants.RevealDelayMonths);
-        return new ChronicleEntry
+        return new ChronicleEventCandidate
         {
             EventYear = world.CurrentYear,
             EventMonth = world.CurrentMonth,
-            RecordSequence = recordSequence,
-            RevealAfterYear = revealYear,
-            RevealAfterMonth = revealMonth,
-            GroupId = groupId,
-            GroupName = groupName,
+            PolityId = polityId,
+            PolityName = polityName,
+            EventType = eventType,
             Category = category,
-            Message = message,
-            Tags = tags
+            Severity = severity,
+            TriggerKind = triggerKind,
+            RegionId = regionId,
+            RegionName = regionName,
+            SettlementName = settlementName,
+            DiscoveryName = discoveryName,
+            AdvancementName = advancementName,
+            LawName = lawName,
+            OtherPartyName = otherPartyName,
+            GovernmentFormName = governmentFormName,
+            IsScoutSourced = isScoutSourced,
+            DedupeKey = dedupeKey,
+            CooldownFamily = cooldownFamily,
+            PreferredOutputTarget = preferredOutputTarget,
+            Tags = [eventType]
         };
-    }
-
-    private static Chronicle RecordEntries(Chronicle chronicle, IReadOnlyList<ChronicleEntry> recordedEntries, int currentYear, int currentMonth)
-    {
-        if (recordedEntries.Count == 0)
-        {
-            return chronicle;
-        }
-
-        var mergedEntries = chronicle.Entries
-            .Concat(recordedEntries)
-            .OrderBy(entry => entry.RecordSequence)
-            .ToArray();
-
-        return new Chronicle(mergedEntries, mergedEntries.Max(entry => entry.RecordSequence) + 1, chronicle.NextRevealSequence);
     }
 
     private static IReadOnlyList<ChronicleEntry> RevealEntries(Chronicle chronicle, int currentYear, int currentMonth, out Chronicle updatedChronicle)
@@ -326,7 +447,13 @@ public sealed class ChronicleSystem
             .OrderBy(entry => entry.RecordSequence)
             .ToArray();
 
-        updatedChronicle = new Chronicle(mergedEntries, chronicle.NextRecordSequence, nextRevealSequence);
+        updatedChronicle = new Chronicle(
+            mergedEntries,
+            chronicle.Alerts,
+            chronicle.EventMemory,
+            chronicle.NextRecordSequence,
+            nextRevealSequence,
+            chronicle.NextAlertSequence);
         return revealedEntriesBySequence.Values
             .OrderByDescending(entry => entry.RevealSequence)
             .ToArray();
@@ -340,34 +467,6 @@ public sealed class ChronicleSystem
         }
 
         return entry.RevealAfterYear == currentYear && entry.RevealAfterMonth <= currentMonth;
-    }
-
-    private static (int Year, int Month) AddMonths(int year, int month, int monthsToAdd)
-    {
-        var absoluteMonth = ((year - 1) * 12) + (month - 1) + monthsToAdd;
-        return (absoluteMonth / 12 + 1, absoluteMonth % 12 + 1);
-    }
-
-    private static IReadOnlyList<string> SplitSummary(string summary)
-    {
-        return summary
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToArray();
-    }
-
-    private static IReadOnlyList<string> SplitChronicleSummary(string chronicleSummary, string fallbackSummary, string groupName, string verb)
-    {
-        if (!string.IsNullOrWhiteSpace(chronicleSummary) &&
-            !string.Equals(chronicleSummary, "none", StringComparison.OrdinalIgnoreCase))
-        {
-            return chronicleSummary
-                .Split(";;", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToArray();
-        }
-
-        return SplitSummary(fallbackSummary)
-            .Select(item => $"{groupName} {verb} {item.ToLowerInvariant()}.")
-            .ToArray();
     }
 
     private static bool ShouldRecordHardshipEntry(GroupSurvivalChange survivalChange, GroupPressureChange? pressureChange)
@@ -419,50 +518,6 @@ public sealed class ChronicleSystem
                 !string.Equals(detail.SeverityLabel, previousSeverity, StringComparison.Ordinal));
     }
 
-    private static string BuildHardshipMessage(GroupSurvivalChange survivalChange, GroupPressureChange? pressureChange)
-    {
-        if (pressureChange is null)
-        {
-            return $"{survivalChange.GroupName} suffered food shortages.";
-        }
-
-        var currentTop = ResolveTopPressure(pressureChange, useCurrent: true);
-        var previousTop = ResolveTopPressure(pressureChange, useCurrent: false);
-        var severityText = currentTop.SeverityLabel.ToLowerInvariant();
-
-        if (!string.Equals(previousTop.Category, currentTop.Category, StringComparison.Ordinal))
-        {
-            return $"{survivalChange.GroupName} suffered shortages as {currentTop.Category.ToLowerInvariant()} pressure became the dominant strain ({severityText}).";
-        }
-
-        if (!string.Equals(previousTop.SeverityLabel, currentTop.SeverityLabel, StringComparison.Ordinal))
-        {
-            return $"{survivalChange.GroupName} suffered shortages as {currentTop.Category.ToLowerInvariant()} pressure turned {currentTop.SeverityLabel.ToLowerInvariant()}.";
-        }
-
-        return $"{survivalChange.GroupName} suffered shortages under {severityText} {currentTop.Category.ToLowerInvariant()} pressure.";
-    }
-
-    private static string BuildDeclineMessage(GroupSurvivalChange change)
-    {
-        if (change.StarvationLoss > 0)
-        {
-            return $"{change.GroupName} declined after hunger and loss.";
-        }
-
-        if (change.WaterStressDeaths > 0)
-        {
-            return $"{change.GroupName} declined under severe water stress.";
-        }
-
-        if (change.HardshipDeaths > 0)
-        {
-            return $"{change.GroupName} declined under mounting hardship.";
-        }
-
-        return $"{change.GroupName} declined as deaths outpaced births.";
-    }
-
     private static PressureStatus ResolveTopPressure(GroupPressureChange pressureChange, bool useCurrent)
     {
         var pressures = new[]
@@ -488,6 +543,75 @@ public sealed class ChronicleSystem
         var previousEffective = PressureMath.ComputeEffectiveValue(definition, detail.PriorRaw);
         var previousDisplay = PressureMath.ComputeDisplayValue(previousEffective);
         return new PressureStatus(category, previousDisplay, PressureMath.ComputeSeverityLabel(previousDisplay));
+    }
+
+    private static string ResolveTopPressureKey(GroupPressureChange? pressureChange)
+    {
+        if (pressureChange is null)
+        {
+            return "unknown";
+        }
+
+        return ResolveTopPressure(pressureChange, useCurrent: true).Category.ToLowerInvariant();
+    }
+
+    private static ChronicleEventSeverity ResolveExternalSeverity(string eventType)
+    {
+        if (string.Equals(eventType, "war", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(eventType, "raid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(eventType, "hostility", StringComparison.OrdinalIgnoreCase))
+        {
+            return ChronicleEventSeverity.Major;
+        }
+
+        return ChronicleEventSeverity.Notable;
+    }
+
+    private static ChronicleEventSeverity ResolvePoliticalSeverity(ChronicleTriggerKind triggerKind)
+    {
+        return triggerKind switch
+        {
+            ChronicleTriggerKind.Collapsed or ChronicleTriggerKind.Fractured => ChronicleEventSeverity.Critical,
+            ChronicleTriggerKind.Unified or ChronicleTriggerKind.Split => ChronicleEventSeverity.Major,
+            _ => ChronicleEventSeverity.Notable
+        };
+    }
+
+    private static ChronicleEventSeverity ResolveSettlementSeverity(SettlementChangeKind kind)
+    {
+        if (kind == SettlementChangeKind.Abandoned)
+        {
+            return ChronicleEventSeverity.Major;
+        }
+
+        return ChronicleEventSeverity.Notable;
+    }
+
+    private static ChronicleTriggerKind ResolveSettlementTrigger(SettlementChangeKind kind)
+    {
+        return kind == SettlementChangeKind.Abandoned
+            ? ChronicleTriggerKind.Abandoned
+            : ChronicleTriggerKind.Founded;
+    }
+
+    private static ChronicleTriggerKind ResolveConflictTrigger(string eventType)
+    {
+        return eventType switch
+        {
+            "peace" => ChronicleTriggerKind.Recovered,
+            "alliance" => ChronicleTriggerKind.Unified,
+            "war" => ChronicleTriggerKind.Escalated,
+            "raid" => ChronicleTriggerKind.Escalated,
+            _ => ChronicleTriggerKind.Encountered
+        };
+    }
+
+    private static string Normalize(string text)
+    {
+        return new string(text
+            .ToLowerInvariant()
+            .Where(character => !char.IsWhiteSpace(character) && !char.IsPunctuation(character))
+            .ToArray());
     }
 
     private sealed record PressureStatus(string Category, int Display, string SeverityLabel);

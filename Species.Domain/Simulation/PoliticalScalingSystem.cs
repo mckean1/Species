@@ -202,6 +202,8 @@ public sealed class PoliticalScalingSystem
                     PolityId = polity.Id,
                     PolityName = polity.Name,
                     Kind = "scale-form",
+                    TriggerKind = ResolveScaleFormTrigger(metrics.Form),
+                    GovernmentFormName = ResolveScaleFormName(metrics.Form),
                     Message = message
                 });
             }
@@ -383,6 +385,7 @@ public sealed class PoliticalScalingSystem
             OtherPolityId = weaker.Id,
             OtherPolityName = weaker.Name,
             Kind = "direct-integration",
+            TriggerKind = ChronicleTriggerKind.Unified,
             Message = $"{stronger.Name} directly integrated {weaker.Name} into the larger realm."
         });
     }
@@ -426,6 +429,7 @@ public sealed class PoliticalScalingSystem
             OtherPolityId = weaker.Id,
             OtherPolityName = weaker.Name,
             Kind = kind == PoliticalAttachmentKind.Subordinate ? "subordinate-bound" : "federated-bound",
+            TriggerKind = ChronicleTriggerKind.Unified,
             Message = BuildAttachmentChronicle(stronger.Name, weaker.Name, kind)
         });
     }
@@ -458,6 +462,7 @@ public sealed class PoliticalScalingSystem
             OtherPolityId = parent.Id,
             OtherPolityName = parent.Name,
             Kind = "independence",
+            TriggerKind = ChronicleTriggerKind.Split,
             Message = $"{polity.Name} broke away after years of poor integration."
         });
     }
@@ -566,6 +571,7 @@ public sealed class PoliticalScalingSystem
             OtherPolityId = parent.Id,
             OtherPolityName = parent.Name,
             Kind = "breakaway",
+            TriggerKind = ChronicleTriggerKind.Split,
             Message = $"{newPolity.Name} broke away after years of poor integration."
         });
     }
@@ -615,6 +621,28 @@ public sealed class PoliticalScalingSystem
             (context.Governance.Authority / 3),
             0,
             400);
+    }
+
+    private static ChronicleTriggerKind ResolveScaleFormTrigger(PoliticalScaleForm form)
+    {
+        return form switch
+        {
+            PoliticalScaleForm.Fragmenting => ChronicleTriggerKind.BecameUnstable,
+            PoliticalScaleForm.LocalPolity => ChronicleTriggerKind.Stabilized,
+            _ => ChronicleTriggerKind.Started
+        };
+    }
+
+    private static string ResolveScaleFormName(PoliticalScaleForm form)
+    {
+        return form switch
+        {
+            PoliticalScaleForm.RegionalState => "regional state",
+            PoliticalScaleForm.KingdomRealm => "kingdom realm",
+            PoliticalScaleForm.CompositeRealm => "composite realm",
+            PoliticalScaleForm.EmpireLike => "empire-like state",
+            _ => string.Empty
+        };
     }
 
     private static PoliticalScaleForm ResolveForm(

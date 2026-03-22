@@ -1,6 +1,6 @@
 using Species.Domain.Catalogs;
+using Species.Domain.Discovery;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Client.Models;
@@ -32,12 +32,12 @@ public static class RegionsViewModelFactory
         var selectedIndex = regionCandidates.Count == 0
             ? 0
             : Math.Clamp(selectedRegionIndex, 0, regionCandidates.Count - 1);
-        var knowledgeContext = focusGroup is null
+        var discoveryContext = focusGroup is null
             ? null
-            : GroupKnowledgeContext.Create(world, focusGroup, discoveryCatalog, floraCatalog, faunaCatalog);
+            : GroupDiscoveryContext.Create(world, focusGroup, discoveryCatalog, floraCatalog, faunaCatalog);
 
         var summaries = regionCandidates
-            .Select(region => BuildSummary(region, world, focusPolity, focusContext, focusGroup, knowledgeContext, floraCatalog, faunaCatalog, discoveryCatalog))
+            .Select(region => BuildSummary(region, world, focusPolity, focusContext, focusGroup, discoveryContext, floraCatalog, faunaCatalog, discoveryCatalog))
             .ToArray();
 
         return new RegionsViewModel(
@@ -76,27 +76,27 @@ public static class RegionsViewModelFactory
         Polity? focusPolity,
         PolityContext? focusContext,
         PopulationGroup? focusGroup,
-        GroupKnowledgeContext? knowledgeContext,
+        GroupDiscoveryContext? discoveryContext,
         FloraSpeciesCatalog floraCatalog,
         FaunaSpeciesCatalog faunaCatalog,
         DiscoveryCatalog discoveryCatalog)
     {
-        var snapshot = focusGroup is null || knowledgeContext is null
+        var snapshot = focusGroup is null || discoveryContext is null
             ? null
-            : knowledgeContext.ObserveRegion(region, focusGroup.CurrentRegionId);
+            : discoveryContext.ObserveRegion(region, focusGroup.CurrentRegionId);
         var groupsHere = world.PopulationGroups
             .Where(group => string.Equals(group.CurrentRegionId, region.Id, StringComparison.Ordinal))
             .OrderByDescending(group => group.Population)
             .ThenBy(group => group.Name, StringComparer.Ordinal)
             .ToArray();
 
-        var exactPresenceVisible = snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery;
+        var exactPresenceVisible = snapshot?.IsCurrentRegion == true || snapshot?.RegionStage == DiscoveryStage.Discovered;
         var presencePopulation = groupsHere.Sum(group => group.Population);
-        var topFlora = snapshot?.FloraKnowledge >= KnowledgeLevel.Discovery
+        var topFlora = snapshot?.FloraStage == DiscoveryStage.Discovered
             ? ResolveTopPopulationNames(region.Ecosystem.FloraPopulations, floraCatalog.GetById).Take(3).ToArray()
             : Array.Empty<string>();
         var faunaVisibility = RegionFaunaVisibilityResolver.Resolve(region, snapshot, faunaCatalog);
-        var knowledge = BuildKnowledge(region, snapshot, focusGroup, discoveryCatalog);
+        var discoveries = BuildDiscoveries(region, snapshot, focusGroup, discoveryCatalog);
         var carnivoreThreat = region.Ecosystem.FaunaPopulations.Sum(entry =>
         {
             var fauna = faunaCatalog.GetById(entry.Key);
@@ -117,7 +117,7 @@ public static class RegionsViewModelFactory
                 >= 40 => "Watchful",
                 _ => "Calm"
             }
-            : KnowledgePresentation.DescribeThreat(snapshot);
+            : DiscoveryPresentation.DescribeThreat(snapshot);
 
         var context = new List<string>();
         if (focusGroup is not null)
@@ -163,37 +163,37 @@ public static class RegionsViewModelFactory
             context.Add("Other groups are present");
         }
 
-        if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.High)
+        if (snapshot?.WaterStage == DiscoveryStage.Discovered && region.WaterAvailability == WaterAvailability.High)
         {
             context.Add("Water is reliable");
         }
-        else if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.Low)
+        else if (snapshot?.WaterStage == DiscoveryStage.Discovered && region.WaterAvailability == WaterAvailability.Low)
         {
             context.Add("Water is scarce");
         }
 
-        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility >= 0.70)
+        if (snapshot?.RegionStage == DiscoveryStage.Discovered && region.Fertility >= 0.70)
         {
             context.Add("Land looks productive");
         }
-        else if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility <= 0.35)
+        else if (snapshot?.RegionStage == DiscoveryStage.Discovered && region.Fertility <= 0.35)
         {
             context.Add("Resources appear thin");
         }
 
         var opportunities = new List<string>();
-        if (snapshot is not null && snapshot.WaterKnowledge != KnowledgeLevel.Unknown)
+        if (snapshot is not null && snapshot.WaterStage != DiscoveryStage.Unknown)
         {
-            opportunities.Add(KnowledgePresentation.DescribeWater(snapshot));
+            opportunities.Add(DiscoveryPresentation.DescribeWater(snapshot));
         }
 
-        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery && region.Fertility >= 0.65)
+        if (snapshot?.RegionStage == DiscoveryStage.Discovered && region.Fertility >= 0.65)
         {
             opportunities.Add("Fertile ground");
         }
-        else if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter)
+        else if (snapshot?.RegionStage == DiscoveryStage.Encountered)
         {
-            opportunities.Add("Land quality is only encountered so far");
+            opportunities.Add("Land quality remains uncertain");
         }
 
         if (topFlora.Length > 0)
@@ -202,7 +202,7 @@ public static class RegionsViewModelFactory
         }
         else if (snapshot is not null)
         {
-            opportunities.Add(KnowledgePresentation.DescribeFoodSigns(snapshot.FloraKnowledge, "Local flora cataloged", "Useful plants observed", "Rumors of forage", "Flora not yet observed"));
+            opportunities.Add(DiscoveryPresentation.DescribeFoodSigns(snapshot.FloraStage, "Useful plants discovered", "Useful plants observed", "Flora not yet observed"));
         }
 
         opportunities.Add(DescribeMaterials(region, snapshot));
@@ -210,18 +210,18 @@ public static class RegionsViewModelFactory
         var risks = new List<string>();
         if (snapshot is not null)
         {
-            risks.Add(KnowledgePresentation.DescribeThreat(snapshot));
+            risks.Add(DiscoveryPresentation.DescribeThreat(snapshot));
         }
         else if (threatScore >= 40)
         {
-            risks.Add($"{threatText} local conditions");
+            risks.Add($"{threatText} local threats");
         }
 
-        if (snapshot?.WaterKnowledge >= KnowledgeLevel.Discovery && region.WaterAvailability == WaterAvailability.Low)
+        if (snapshot?.WaterStage == DiscoveryStage.Discovered && region.WaterAvailability == WaterAvailability.Low)
         {
             risks.Add("Limited water");
         }
-        else if (snapshot?.WaterKnowledge == KnowledgeLevel.Encounter)
+        else if (snapshot?.WaterStage == DiscoveryStage.Encountered)
         {
             risks.Add("Water availability uncertain");
         }
@@ -234,10 +234,10 @@ public static class RegionsViewModelFactory
         return new RegionSummary(
             region.Id,
             region.Name,
-            snapshot is null ? "Known" : KnowledgePresentation.DescribeRegionFamiliarity(snapshot),
-            snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsKnownRegion == true ? region.Biome.ToString() : "Unknown",
-            snapshot is null ? region.WaterAvailability.ToString() : KnowledgePresentation.DescribeWater(snapshot),
-            snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery ? region.Fertility.ToString("0.00") : snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter ? "Encountered" : "Unknown",
+            snapshot is null ? "Known" : DiscoveryPresentation.DescribeRegionFamiliarity(snapshot),
+            snapshot?.RegionStage == DiscoveryStage.Discovered || snapshot?.IsKnownRegion == true ? region.Biome.ToString() : "Unknown",
+            snapshot is null ? region.WaterAvailability.ToString() : DiscoveryPresentation.DescribeWater(snapshot),
+            snapshot?.RegionStage == DiscoveryStage.Discovered ? region.Fertility.ToString("0.00") : snapshot?.RegionStage == DiscoveryStage.Encountered ? "Encountered" : "Unknown",
             exactPresenceVisible ? presencePopulation : 0,
             exactPresenceVisible ? presencePopulation.ToString("N0") : (groupsHere.Length > 0 ? "Signs" : "None"),
             BuildGroupPresence(groupsHere, exactPresenceVisible),
@@ -245,7 +245,7 @@ public static class RegionsViewModelFactory
             faunaVisibility.DisplayLabel,
             faunaVisibility.VisibleEntries,
             BuildMaterialLines(region, snapshot),
-            knowledge,
+            discoveries,
             context.Count > 0 ? context.ToArray() : ["No special connection noted"],
             opportunities.Count > 0 ? opportunities.ToArray() : ["No standout opportunities"],
             risks.Count > 0 ? risks.ToArray() : ["No major risks detected"],
@@ -255,46 +255,46 @@ public static class RegionsViewModelFactory
             threatScore);
     }
 
-    private static IReadOnlyList<string> BuildKnowledge(Region region, RegionKnowledgeSnapshot? snapshot, PopulationGroup? focusGroup, DiscoveryCatalog discoveryCatalog)
+    private static IReadOnlyList<string> BuildDiscoveries(Region region, RegionDiscoverySnapshot? snapshot, PopulationGroup? focusGroup, DiscoveryCatalog discoveryCatalog)
     {
         if (focusGroup is null)
         {
-            return ["General regional knowledge only"];
+            return ["General regional discovery only"];
         }
 
-        var knowledge = new List<string>();
+        var discoveries = new List<string>();
 
         if (snapshot is not null)
         {
-            knowledge.Add($"Familiarity: {KnowledgePresentation.Describe(snapshot.OverallKnowledge)}");
+            discoveries.Add($"Familiarity: {DiscoveryPresentation.Describe(snapshot.OverallStage)}");
         }
 
         if (focusGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalWaterSourcesDiscoveryId(region.Id)))
         {
-            knowledge.Add("Water sources known");
+            discoveries.Add("Water sources discovered");
         }
 
         if (focusGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFloraDiscoveryId(region.Id)))
         {
-            knowledge.Add("Local flora identified");
+            discoveries.Add("Local flora discovered");
         }
 
         if (focusGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalFaunaDiscoveryId(region.Id)))
         {
-            knowledge.Add("Local fauna identified");
+            discoveries.Add("Local fauna discovered");
         }
 
-        if (focusGroup.KnownDiscoveryIds.Contains(discoveryCatalog.GetLocalRegionConditionsDiscoveryId(region.Id)))
+        if (discoveryCatalog.IsLocalRegionDiscoveryKnown(focusGroup.KnownDiscoveryIds, region.Id))
         {
-            knowledge.Add("Regional conditions learned");
+            discoveries.Add($"Region discovered: {region.Name}");
         }
 
-        return knowledge.Count > 0 ? knowledge : ["Not yet discovered"];
+        return discoveries.Count > 0 ? discoveries : ["Not yet discovered"];
     }
 
-    private static IReadOnlyList<string> BuildMaterialLines(Region region, RegionKnowledgeSnapshot? snapshot)
+    private static IReadOnlyList<string> BuildMaterialLines(Region region, RegionDiscoverySnapshot? snapshot)
     {
-        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsCurrentRegion == true)
+        if (snapshot?.RegionStage == DiscoveryStage.Discovered || snapshot?.IsCurrentRegion == true)
         {
             var stores = region.MaterialProfile.Opportunities;
             return
@@ -307,17 +307,17 @@ public static class RegionsViewModelFactory
             ];
         }
 
-        if (snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter)
+        if (snapshot?.RegionStage == DiscoveryStage.Encountered)
         {
-            return ["Material strengths have only been encountered"];
+            return ["Material strengths remain uncertain"];
         }
 
         return ["Material potential not yet known"];
     }
 
-    private static IReadOnlyList<string> BuildBiology(Region region, RegionKnowledgeSnapshot? snapshot, FloraSpeciesCatalog floraCatalog, FaunaSpeciesCatalog faunaCatalog)
+    private static IReadOnlyList<string> BuildBiology(Region region, RegionDiscoverySnapshot? snapshot, FloraSpeciesCatalog floraCatalog, FaunaSpeciesCatalog faunaCatalog)
     {
-        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.FaunaKnowledge >= KnowledgeLevel.Discovery || snapshot?.FloraKnowledge >= KnowledgeLevel.Discovery))
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.RegionStage == DiscoveryStage.Discovered || snapshot?.FaunaStage == DiscoveryStage.Discovered || snapshot?.FloraStage == DiscoveryStage.Discovered))
         {
             return ["Biological differences are not yet understood"];
         }
@@ -347,9 +347,9 @@ public static class RegionsViewModelFactory
         return lines.Count > 0 ? lines : ["No major regional divergence is evident"];
     }
 
-    private static IReadOnlyList<string> BuildFossils(Region region, RegionKnowledgeSnapshot? snapshot)
+    private static IReadOnlyList<string> BuildFossils(Region region, RegionDiscoverySnapshot? snapshot)
     {
-        if (!(snapshot?.IsCurrentRegion == true || snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery))
+        if (!(snapshot?.IsCurrentRegion == true || snapshot?.RegionStage == DiscoveryStage.Discovered))
         {
             return ["Deep history is unknown here"];
         }
@@ -363,9 +363,9 @@ public static class RegionsViewModelFactory
             .ToArray();
     }
 
-    private static string DescribeMaterials(Region region, RegionKnowledgeSnapshot? snapshot)
+    private static string DescribeMaterials(Region region, RegionDiscoverySnapshot? snapshot)
     {
-        if (snapshot?.ConditionsKnowledge >= KnowledgeLevel.Discovery || snapshot?.IsCurrentRegion == true)
+        if (snapshot?.RegionStage == DiscoveryStage.Discovered || snapshot?.IsCurrentRegion == true)
         {
             var top = region.MaterialProfile.Opportunities.AsDictionary()
                 .OrderByDescending(entry => entry.Value)
@@ -378,8 +378,8 @@ public static class RegionsViewModelFactory
                 : $"Material strengths: {string.Join(", ", top)}";
         }
 
-        return snapshot?.ConditionsKnowledge == KnowledgeLevel.Encounter
-            ? "Material opportunities have only been encountered"
+        return snapshot?.RegionStage == DiscoveryStage.Encountered
+            ? "Material opportunities remain uncertain"
             : "Material opportunities not yet known";
     }
 

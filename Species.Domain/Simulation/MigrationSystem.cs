@@ -1,7 +1,7 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Enums;
-using Species.Domain.Knowledge;
+using Species.Domain.Discovery;
 using Species.Domain.Models;
 
 namespace Species.Domain.Simulation;
@@ -29,12 +29,12 @@ public sealed class MigrationSystem
             }
 
             survivalByGroupId.TryGetValue(group.Id, out var survivalChange);
-            var knowledgeContext = GroupKnowledgeContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
+            var discoveryContext = GroupDiscoveryContext.Create(world, group, discoveryCatalog, floraCatalog, faunaCatalog);
             var consideration = ResolveMigrationConsideration(group, survivalChange);
-            var currentScore = ScoreRegion(group, currentRegion, knowledgeContext.ObserveRegion(currentRegion, currentRegion.Id));
+            var currentScore = ScoreRegion(group, currentRegion, discoveryContext.ObserveRegion(currentRegion, currentRegion.Id));
             var evaluatedNeighbors = currentRegion.NeighborIds
                 .Where(regionsById.ContainsKey)
-                .Select(neighborId => BuildCandidate(group, currentRegion, regionsById[neighborId], knowledgeContext))
+                .Select(neighborId => BuildCandidate(group, currentRegion, regionsById[neighborId], discoveryContext))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Region.Id, StringComparer.Ordinal)
                 .ToArray();
@@ -169,25 +169,25 @@ public sealed class MigrationSystem
         PopulationGroup group,
         Region currentRegion,
         Region region,
-        GroupKnowledgeContext knowledgeContext)
+        GroupDiscoveryContext discoveryContext)
     {
-        return new CandidateScore(region, ScoreRegion(group, currentRegion, knowledgeContext.ObserveRegion(region, currentRegion.Id)));
+        return new CandidateScore(region, ScoreRegion(group, currentRegion, discoveryContext.ObserveRegion(region, currentRegion.Id)));
     }
 
     private static float ScoreRegion(
         PopulationGroup group,
         Region currentRegion,
-        RegionKnowledgeSnapshot knowledge)
+        RegionDiscoverySnapshot discovery)
     {
         var monthlyFoodNeed = SubsistenceSupportModel.CalculateMonthlyFoodNeed(group.Population);
-        var floraSupport = SubsistenceSupportModel.NormalizeFoodSupport(knowledge.GatheringPotentialFood, monthlyFoodNeed);
-        var faunaSupport = SubsistenceSupportModel.NormalizeFoodSupport(knowledge.HuntingPotentialFood, monthlyFoodNeed);
-        var waterSupport = knowledge.WaterSupport;
-        var threatPenalty = knowledge.ThreatPressure;
-        var floraConfidence = ResolveConfidence(knowledge.FloraKnowledge);
-        var faunaConfidence = ResolveConfidence(knowledge.FaunaKnowledge);
-        var waterConfidence = ResolveConfidence(knowledge.WaterKnowledge);
-        var routeConfidence = ResolveConfidence(knowledge.RouteKnowledge);
+        var floraSupport = SubsistenceSupportModel.NormalizeFoodSupport(discovery.GatheringPotentialFood, monthlyFoodNeed);
+        var faunaSupport = SubsistenceSupportModel.NormalizeFoodSupport(discovery.HuntingPotentialFood, monthlyFoodNeed);
+        var waterSupport = discovery.WaterSupport;
+        var threatPenalty = discovery.ThreatPressure;
+        var floraConfidence = ResolveConfidence(discovery.FloraStage);
+        var faunaConfidence = ResolveConfidence(discovery.FaunaStage);
+        var waterConfidence = ResolveConfidence(discovery.WaterStage);
+        var routeConfidence = ResolveConfidence(discovery.RouteStage);
 
         var (floraWeight, faunaWeight, waterWeight, threatWeight) = group.SubsistenceMode switch
         {
@@ -213,31 +213,26 @@ public sealed class MigrationSystem
                     (waterSupport * waterConfidence) * waterWeight +
                     (100.0f - (threatPenalty * routeConfidence)) * threatWeight;
 
-        score += knowledge.IsKnownRegion
+        score += discovery.IsKnownRegion
             ? MigrationConstants.KnownRegionBonus
             : -MigrationConstants.UnknownRegionPenalty;
 
-        if (knowledge.ConditionsKnowledge >= KnowledgeLevel.Discovery)
+        if (discovery.RegionStage == DiscoveryStage.Discovered)
         {
-            score += DiscoveryConstants.LocalRegionConditionsBonus;
+            score += DiscoveryConstants.LocalRegionKnowledgeBonus;
         }
 
-        if (!string.Equals(currentRegion.Id, knowledge.RegionId, StringComparison.Ordinal))
+        if (!string.Equals(currentRegion.Id, discovery.RegionId, StringComparison.Ordinal))
         {
-            score += knowledge.RouteKnowledge >= KnowledgeLevel.Discovery
+            score += discovery.RouteStage == DiscoveryStage.Discovered
                 ? DiscoveryConstants.KnownRouteBonus
-                : knowledge.RouteKnowledge == KnowledgeLevel.Encounter
+                : discovery.RouteStage == DiscoveryStage.Encountered
                     ? -DiscoveryConstants.UnknownRoutePenalty * 0.5f
                     : -DiscoveryConstants.UnknownRoutePenalty;
 
-            if (group.LearnedAdvancementIds.Contains(AdvancementCatalog.OrganizedTravelId) &&
-                knowledge.RouteKnowledge >= KnowledgeLevel.Discovery)
-            {
-                score += AdvancementConstants.OrganizedTravelKnownRouteBonus;
-            }
         }
 
-        if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, knowledge.RegionId, StringComparison.Ordinal))
+        if (!string.IsNullOrWhiteSpace(group.LastRegionId) && string.Equals(group.LastRegionId, discovery.RegionId, StringComparison.Ordinal))
         {
             score -= MigrationConstants.ReturnToLastRegionPenalty;
         }
@@ -245,13 +240,12 @@ public sealed class MigrationSystem
         return score;
     }
 
-    private static float ResolveConfidence(KnowledgeLevel level)
+    private static float ResolveConfidence(DiscoveryStage stage)
     {
-        return level switch
+        return stage switch
         {
-            KnowledgeLevel.Knowledge => 1.00f,
-            KnowledgeLevel.Discovery => 0.82f,
-            KnowledgeLevel.Encounter => 0.62f,
+            DiscoveryStage.Discovered => 0.82f,
+            DiscoveryStage.Encountered => 0.62f,
             _ => 0.45f
         };
     }

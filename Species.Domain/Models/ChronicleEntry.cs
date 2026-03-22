@@ -28,6 +28,16 @@ public sealed class ChronicleEntry
 
     public required string Message { get; init; }
 
+    public string DedupeKey { get; init; } = string.Empty;
+
+    public string CooldownFamily { get; init; } = string.Empty;
+
+    public ChronicleEventSeverity Severity { get; init; } = ChronicleEventSeverity.Notable;
+
+    public ChronicleTriggerKind TriggerKind { get; init; } = ChronicleTriggerKind.Started;
+
+    public IReadOnlyList<ChronicleTextToken> Tokens { get; init; } = Array.Empty<ChronicleTextToken>();
+
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
 
     public bool IsRevealed => RevealSequence.HasValue;
@@ -48,6 +58,15 @@ public sealed class ChronicleEntry
             GroupName = GroupName,
             Category = Category,
             Message = Message,
+            DedupeKey = DedupeKey,
+            CooldownFamily = CooldownFamily,
+            Severity = Severity,
+            TriggerKind = TriggerKind,
+            Tokens = Tokens.Select(token => new ChronicleTextToken
+            {
+                Type = token.Type,
+                Text = token.Text
+            }).ToArray(),
             Tags = Tags.ToArray()
         };
     }

@@ -10,7 +10,13 @@ public static class DiscoveryStateValidator
     public static IReadOnlyList<string> Validate(World world, DiscoveryCatalog discoveryCatalog, SimulationTickResult tickResult)
     {
         var errors = new List<string>();
-        var validDiscoveryIds = discoveryCatalog.Definitions.Select(definition => definition.Id).ToHashSet(StringComparer.Ordinal);
+        var validDiscoveryIds = new HashSet<string>(
+            discoveryCatalog.Definitions.Select(definition => definition.Id),
+            StringComparer.Ordinal);
+        foreach (var region in world.Regions)
+        {
+            validDiscoveryIds.Add(discoveryCatalog.GetLegacyLocalRegionConditionsDiscoveryId(region.Id));
+        }
         var validRegionIds = world.Regions.Select(region => region.Id).ToHashSet(StringComparer.Ordinal);
         var validPolityIds = world.Polities.Select(polity => polity.Id).ToHashSet(StringComparer.Ordinal);
         var validRouteKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -79,8 +85,7 @@ public static class DiscoveryStateValidator
                 }
 
                 if (awareness.EncounterProgress is < 0.0f or > 100.0f ||
-                    awareness.DiscoveryProgress is < 0.0f or > 100.0f ||
-                    awareness.KnowledgeProgress is < 0.0f or > 100.0f)
+                    awareness.DiscoveryProgress is < 0.0f or > 100.0f)
                 {
                     errors.Add($"Polity {polity.Id} has species-awareness progress outside the canonical 0-100 range.");
                 }
@@ -92,6 +97,14 @@ public static class DiscoveryStateValidator
             if (string.IsNullOrWhiteSpace(change.GroupId))
             {
                 errors.Add("A discovery change is missing a group ID.");
+            }
+
+            foreach (var unlocked in change.UnlockedEntries)
+            {
+                if (unlocked.Name.Contains("conditions", StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add($"Discovery change for group {change.GroupId} still exposes forbidden discovery wording: {unlocked.Name}.");
+                }
             }
         }
 

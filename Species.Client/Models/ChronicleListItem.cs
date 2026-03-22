@@ -1,3 +1,5 @@
+using Species.Domain.Models;
+
 namespace Species.Client.Models;
 
 public sealed class ChronicleListItem
@@ -8,6 +10,7 @@ public sealed class ChronicleListItem
         int eventMonth,
         string dateText,
         string headline,
+        IReadOnlyList<ChronicleTextToken> headlineTokens,
         string category,
         string impact,
         bool isMilestone)
@@ -17,6 +20,7 @@ public sealed class ChronicleListItem
         EventMonth = eventMonth;
         DateText = dateText;
         Headline = headline;
+        HeadlineTokens = headlineTokens;
         Category = category;
         Impact = impact;
         IsMilestone = isMilestone;
@@ -31,6 +35,8 @@ public sealed class ChronicleListItem
     public string DateText { get; }
 
     public string Headline { get; }
+
+    public IReadOnlyList<ChronicleTextToken> HeadlineTokens { get; }
 
     public string Category { get; }
 

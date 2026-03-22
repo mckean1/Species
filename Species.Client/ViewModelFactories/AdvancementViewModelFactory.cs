@@ -1,5 +1,4 @@
 using Species.Domain.Catalogs;
-using Species.Domain.Constants;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Client.Enums;
@@ -21,6 +20,8 @@ public static class AdvancementViewModelFactory
         string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
         AdvancementCatalog advancementCatalog,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog,
         int selectedIndex,
         bool isSimulationRunning = false)
     {
@@ -28,8 +29,9 @@ public static class AdvancementViewModelFactory
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+        var region = focusGroup is null ? null : regionsById.GetValueOrDefault(focusGroup.CurrentRegionId);
         var items = advancementCatalog.Definitions
-            .Select(definition => BuildItem(definition, focusGroup, focusContext, regionsById, discoveryCatalog))
+            .Select(definition => BuildItem(definition, focusPolity, focusGroup, focusContext, region, advancementCatalog, floraCatalog, faunaCatalog))
             .OrderBy(item => GetSortOrder(item.Status))
             .ThenBy(item => item.Name, StringComparer.Ordinal)
             .ToArray();
@@ -52,10 +54,13 @@ public static class AdvancementViewModelFactory
 
     private static AdvancementScreenItem BuildItem(
         AdvancementDefinition definition,
+        Polity? focusPolity,
         PopulationGroup? focusGroup,
         PolityContext? focusContext,
-        IReadOnlyDictionary<string, Region> regionsById,
-        DiscoveryCatalog discoveryCatalog)
+        Region? region,
+        AdvancementCatalog advancementCatalog,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
     {
         if (focusGroup is null)
         {
@@ -73,10 +78,8 @@ public static class AdvancementViewModelFactory
                 "Unknown");
         }
 
-        var currentRegion = regionsById.GetValueOrDefault(focusGroup.CurrentRegionId);
-        var regionName = currentRegion?.Name ?? "Current region";
+        var requirement = BuildRequirement(definition, focusGroup, focusPolity, focusContext, region, floraCatalog, faunaCatalog);
         var learned = focusGroup.LearnedAdvancementIds.Contains(definition.Id);
-        var requirement = BuildRequirement(definition, focusGroup, focusContext, discoveryCatalog, regionName);
         var status = learned
             ? AdvancementStatus.Completed
             : requirement.IsSatisfied
@@ -90,7 +93,7 @@ public static class AdvancementViewModelFactory
         }
         else if (status == AdvancementStatus.Available)
         {
-            notes.Add("All known conditions are met for this advancement.");
+            notes.Add("The causal prerequisites are in place and learning can progress now.");
         }
         else
         {
@@ -118,263 +121,25 @@ public static class AdvancementViewModelFactory
 
     private static AdvancementRequirementInfo BuildRequirement(
         AdvancementDefinition definition,
-        PopulationGroup focusGroup,
-        PolityContext? focusContext,
-        DiscoveryCatalog discoveryCatalog,
-        string regionName)
-    {
-        return definition.Id switch
-        {
-            AdvancementCatalog.ImprovedGatheringId => BuildGatheringRequirement(focusGroup, discoveryCatalog, regionName),
-            AdvancementCatalog.ImprovedHuntingId => BuildHuntingRequirement(focusGroup, discoveryCatalog, regionName),
-            AdvancementCatalog.FoodStorageId => BuildStorageRequirement(focusGroup, focusContext),
-            AdvancementCatalog.OrganizedTravelId => BuildTravelRequirement(focusGroup),
-            AdvancementCatalog.LocalResourceUseId => BuildLocalResourceRequirement(focusGroup, focusContext, discoveryCatalog, regionName),
-            AdvancementCatalog.StrongerShelterId => BuildShelterRequirement(focusGroup, focusContext),
-            _ => new AdvancementRequirementInfo(
-                false,
-                "Requirements are not yet exposed.",
-                ["Requirement details are not available."],
-                string.Empty,
-                "unknown requirements",
-                "Requirements are not yet exposed.")
-        };
-    }
-
-    private static AdvancementRequirementInfo BuildGatheringRequirement(
         PopulationGroup group,
-        DiscoveryCatalog discoveryCatalog,
-        string regionName)
+        Polity? polity,
+        PolityContext? polityContext,
+        Region? region,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
     {
-        var discoveryId = discoveryCatalog.GetLocalFloraDiscoveryId(group.CurrentRegionId);
-        var knowsFlora = group.KnownDiscoveryIds.Contains(discoveryId);
-        var evidenceProgress = group.AdvancementEvidence.SuccessfulGatheringWithKnowledgeMonths;
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.ImprovedGatheringId, $"Gathering after local flora knowledge: {evidenceProgress}/{AdvancementConstants.ImprovedGatheringMonthsRequired + 1} months.");
-        var requirements = new List<string>
-        {
-            $"{(knowsFlora ? "Known" : "Missing")} discovery: {regionName} Flora",
-            $"Need {AdvancementConstants.ImprovedGatheringMonthsRequired + 1} successful gathering months with that knowledge.",
-            $"{(group.DiscoveryEvidence.RecurringFoodPressureMonths > 0 ? "Has" : "Needs")} repeated food pressure."
-        };
+        var evaluation = FirstWaveAdvancementEvaluator.Evaluate(definition, group, polity, polityContext, region, floraCatalog, faunaCatalog);
+        var capability = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(definition.Id);
+        var adoption = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(definition.Id);
+        var progressSummary = $"Opportunity: {evaluation.OpportunityCount}/{Math.Max(1, evaluation.RequiredOpportunityCount)}. Capability progress: {capability:0}/100. Adoption progress: {adoption:0}/100.";
 
-        if (!knowsFlora)
-        {
-            return new AdvancementRequirementInfo(
-                false,
-                $"Missing local flora knowledge for {regionName}.",
-                requirements,
-                progressSummary,
-                "needs flora discovery",
-                "Waiting on local flora discovery.");
-        }
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.ImprovedGatheringId,
-            evidenceProgress,
-            AdvancementConstants.ImprovedGatheringMonthsRequired + 1,
-            "Local flora knowledge is in place.",
-            requirements,
-            progressSummary,
-            "flora-ready");
-    }
-
-    private static AdvancementRequirementInfo BuildHuntingRequirement(
-        PopulationGroup group,
-        DiscoveryCatalog discoveryCatalog,
-        string regionName)
-    {
-        var discoveryId = discoveryCatalog.GetLocalFaunaDiscoveryId(group.CurrentRegionId);
-        var knowsFauna = group.KnownDiscoveryIds.Contains(discoveryId);
-        var evidenceProgress = group.AdvancementEvidence.SuccessfulHuntingWithKnowledgeMonths;
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.ImprovedHuntingId, $"Hunting after local fauna knowledge: {evidenceProgress}/{AdvancementConstants.ImprovedHuntingMonthsRequired + 1} months.");
-        var requirements = new List<string>
-        {
-            $"{(knowsFauna ? "Known" : "Missing")} discovery: {regionName} Fauna",
-            $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.SeasonalTrackingId) ? "Known" : "Missing")} discovery: Seasonal Tracking",
-            $"Need {AdvancementConstants.ImprovedHuntingMonthsRequired + 1} successful hunting months with that knowledge."
-        };
-
-        if (!knowsFauna)
-        {
-            return new AdvancementRequirementInfo(
-                false,
-                $"Missing local fauna knowledge for {regionName}.",
-                requirements,
-                progressSummary,
-                "needs fauna discovery",
-                "Waiting on local fauna discovery.");
-        }
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.ImprovedHuntingId,
-            evidenceProgress,
-            AdvancementConstants.ImprovedHuntingMonthsRequired + 1,
-            "Local fauna knowledge is in place.",
-            requirements,
-            progressSummary,
-            "fauna-ready");
-    }
-
-    private static AdvancementRequirementInfo BuildStorageRequirement(PopulationGroup group, PolityContext? focusContext)
-    {
-        var evidenceProgress = Math.Min(group.AdvancementEvidence.SurplusStoredFoodMonths, group.AdvancementEvidence.StoragePressureMonths);
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.FoodStorageId, $"Stored food under pressure: {evidenceProgress}/{AdvancementConstants.FoodStorageSurplusMonthsRequired}.");
-        var requirements = new List<string>
-        {
-            $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.PreservationCluesId) ? "Known" : "Missing")} discovery: Preservation Clues",
-            $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ClayShapingId) || (focusContext?.MaterialProduction.StorageSupport ?? 0) >= 20 ? "Has" : "Needs")} clay knowledge or storage support",
-            $"{(focusContext is not null && focusContext.AnchoringKind is not Species.Domain.Enums.PolityAnchoringKind.Mobile ? "Has" : "Needs")} durable anchoring",
-            $"Need {AdvancementConstants.FoodStorageSurplusMonthsRequired} months of repeated storage pressure."
-        };
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.FoodStorageId,
-            evidenceProgress,
-            AdvancementConstants.FoodStorageSurplusMonthsRequired,
-            "Repeated food surplus has been achieved.",
-            requirements,
-            progressSummary,
-            "food surplus");
-    }
-
-    private static AdvancementRequirementInfo BuildTravelRequirement(PopulationGroup group)
-    {
-        var hasKnownRouteUse = group.AdvancementEvidence.KnownRouteTravelMonths > 0;
-        var evidenceProgress = group.AdvancementEvidence.KnownRouteTravelMonths;
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.OrganizedTravelId, $"Known-route travel months: {evidenceProgress}/{AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired}.");
-        var requirements = new List<string>
-        {
-            $"{(hasKnownRouteUse ? "Has" : "Needs")} successful travel along a known route",
-            $"{(group.AdvancementEvidence.StabilityMonths > 0 ? "Has" : "Needs")} continuity and stability",
-            $"Need {AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired} known-route travel months."
-        };
-
-        if (!hasKnownRouteUse)
-        {
-            return new AdvancementRequirementInfo(
-                false,
-                "No known-route travel has been completed yet.",
-                requirements,
-                progressSummary,
-                "needs route use",
-                "Waiting on known-route travel.");
-        }
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.OrganizedTravelId,
-            evidenceProgress,
-            AdvancementConstants.OrganizedTravelKnownRouteMonthsRequired,
-            "Known-route travel has begun.",
-            requirements,
-            progressSummary,
-            "route use");
-    }
-
-    private static AdvancementRequirementInfo BuildLocalResourceRequirement(
-        PopulationGroup group,
-        PolityContext? focusContext,
-        DiscoveryCatalog discoveryCatalog,
-        string regionName)
-    {
-        var discoveryId = discoveryCatalog.GetLocalRegionConditionsDiscoveryId(group.CurrentRegionId);
-        var knowsRegion = group.KnownDiscoveryIds.Contains(discoveryId);
-        var evidenceProgress = Math.Min(group.AdvancementEvidence.SuccessfulResidenceWithRegionKnowledgeMonths, group.AdvancementEvidence.MaterialPracticeMonths);
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.LocalResourceUseId, $"Stable local material practice: {evidenceProgress}/{AdvancementConstants.LocalResourceUseMonthsRequired}.");
-        var requirements = new List<string>
-        {
-            $"{(knowsRegion ? "Known" : "Missing")} discovery: {regionName} Conditions",
-            $"{((focusContext?.MaterialProduction.ToolSupport ?? 0) >= 20 ? "Has" : "Needs")} material/tool support",
-            $"{(group.AdvancementEvidence.StabilityMonths > 0 ? "Has" : "Needs")} continuity and stability",
-            $"Need {AdvancementConstants.LocalResourceUseMonthsRequired} successful residence months with that knowledge."
-        };
-
-        if (!knowsRegion)
-        {
-            return new AdvancementRequirementInfo(
-                false,
-                $"Missing local region knowledge for {regionName}.",
-                requirements,
-                progressSummary,
-                "needs region discovery",
-                "Waiting on local region knowledge.");
-        }
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.LocalResourceUseId,
-            evidenceProgress,
-            AdvancementConstants.LocalResourceUseMonthsRequired,
-            "Local region knowledge is in place.",
-            requirements,
-            progressSummary,
-            "region-ready");
-    }
-
-    private static AdvancementRequirementInfo BuildShelterRequirement(PopulationGroup group, PolityContext? focusContext)
-    {
-        var evidenceProgress = group.AdvancementEvidence.ShelterReadinessMonths;
-        var progressSummary = BuildPacedProgressSummary(group, AdvancementCatalog.StrongerShelterId, $"Shelter-readiness months: {evidenceProgress}/{AdvancementConstants.StrongerShelterMonthsRequired}.");
-        var requirements = new List<string>
-        {
-            $"{(group.KnownDiscoveryIds.Contains(DiscoveryCatalog.ShelterMethodsId) ? "Known" : "Missing")} discovery: Shelter Methods",
-            $"{(focusContext?.PrimarySettlement is not null ? "Has" : "Needs")} a durable primary site",
-            $"{((focusContext?.MaterialProduction.ShelterSupport ?? 0) >= 25 ? "Has" : "Needs")} shelter materials/support",
-            $"Need {AdvancementConstants.StrongerShelterMonthsRequired} months of shelter readiness."
-        };
-
-        return BuildEvidenceResult(
-            group,
-            AdvancementCatalog.StrongerShelterId,
-            evidenceProgress,
-            AdvancementConstants.StrongerShelterMonthsRequired,
-            "Shelter knowledge and material readiness are in place.",
-            requirements,
-            progressSummary,
-            "shelter-ready");
-    }
-
-    private static AdvancementRequirementInfo BuildEvidenceResult(
-        PopulationGroup group,
-        string advancementId,
-        int progress,
-        int required,
-        string prerequisiteMessage,
-        IReadOnlyList<string> requirements,
-        string progressSummary,
-        string listHint)
-    {
-        var capability = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
-        var adoption = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
-        if (capability >= 100.0f && adoption >= 100.0f)
-        {
-            return new AdvancementRequirementInfo(
-                true,
-                "All known requirements are met.",
-                requirements,
-                progressSummary,
-                listHint,
-                "Ready to adopt.");
-        }
-
-        var remaining = required - progress;
         return new AdvancementRequirementInfo(
-            false,
-            $"{prerequisiteMessage} Needs {remaining} more month{(remaining == 1 ? string.Empty : "s")} of matching evidence and more paced capability/adoption progress.",
-            requirements,
+            evaluation.PrerequisitesMet,
+            string.IsNullOrWhiteSpace(evaluation.LockReason) ? "Waiting on additional causal opportunity." : evaluation.LockReason,
+            evaluation.Requirements,
             progressSummary,
-            listHint,
-            "Building toward unlock.");
-    }
-
-    private static string BuildPacedProgressSummary(PopulationGroup group, string advancementId, string evidenceSummary)
-    {
-        var capability = group.AdvancementEvidence.AdvancementProgressById.GetValueOrDefault(advancementId);
-        var adoption = group.AdvancementEvidence.AdoptionProgressById.GetValueOrDefault(advancementId);
-        return $"{evidenceSummary} Capability progress: {capability:0}/100. Adoption progress: {adoption:0}/100.";
+            evaluation.ListHint,
+            evaluation.StatusSummary);
     }
 
     private static int GetSortOrder(AdvancementStatus status)

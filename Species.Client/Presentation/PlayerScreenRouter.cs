@@ -29,7 +29,7 @@ public static class PlayerScreenRouter
                 GovernmentViewModelFactory.Build(world, viewState.FocalPolityId, viewState.IsSimulationRunning),
                 viewport),
             PlayerScreen.Advancements => AdvancementsRenderer.Render(
-                AdvancementViewModelFactory.Build(world, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex, viewState.IsSimulationRunning),
+                AdvancementViewModelFactory.Build(world, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, floraCatalog, faunaCatalog, viewState.CurrentAdvancementIndex, viewState.IsSimulationRunning),
                 viewport),
             PlayerScreen.Laws => LawsRenderer.Render(
                 LawsViewModelFactory.Build(world, viewState.FocalPolityId, viewState.CurrentLawIndex, viewState.IsSimulationRunning, viewState.IsLawActionMenuOpen, viewState.CurrentLawActionIndex),
@@ -41,7 +41,7 @@ public static class PlayerScreenRouter
                 KnownPolitiesViewModelFactory.Build(world, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog, viewState.IsSimulationRunning),
                 viewport),
             PlayerScreen.KnownSpecies => KnownSpeciesRenderer.Render(
-                KnownSpeciesViewModelFactory.Build(world, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex, viewState.IsSimulationRunning),
+                KnownSpeciesViewModelFactory.Build(world, floraCatalog, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex, viewState.IsSimulationRunning),
                 viewport),
             _ => throw new NotSupportedException($"Unsupported screen {viewState.CurrentScreen}.")
         };
