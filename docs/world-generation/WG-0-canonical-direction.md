@@ -302,6 +302,8 @@ WG-0 is complete when all of the following are true:
 
 This document is the governing direction for later World Generation Roadmap phases.
 
+`docs/world-generation/WG-1-current-state-audit.md` records the current-state audit against this direction.
+
 Future WG phases should refine implementation details, phase sequencing, and subsystem changes without violating the architectural rules established here.
 
 If a later phase proposes behavior that conflicts with this document, the default assumption should be that the later phase is wrong unless this document is intentionally revised.
