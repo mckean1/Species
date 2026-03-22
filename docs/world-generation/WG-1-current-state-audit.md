@@ -8,6 +8,8 @@ WG-1 is an assessment phase, not a broad implementation phase. Its purpose is to
 
 This audit uses the current codebase as the source of truth. It is intended to be a practical architecture document for later WG phases rather than aspirational design writing.
 
+The physical-world follow-on to this audit is documented in `docs/world-generation/WG-2-physical-world-foundation.md`.
+
 ## 2. Current Startup / Initialization Pipeline
 
 ### 2.1 What currently happens at startup

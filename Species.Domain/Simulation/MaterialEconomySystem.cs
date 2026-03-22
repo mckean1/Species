@@ -173,19 +173,39 @@ public sealed class MaterialEconomySystem
 
     public static RegionMaterialProfile BuildRegionMaterialProfile(Region region)
     {
-        var floraTotal = region.Ecosystem.FloraPopulations.Values.Sum(value => (long)value);
         var faunaTotal = region.Ecosystem.FaunaPopulations.Values.Sum(value => (long)value);
         var waterModifier = region.WaterAvailability switch
         {
-            WaterAvailability.High => 1.15,
+            WaterAvailability.High => 1.18,
             WaterAvailability.Medium => 1.0,
-            _ => 0.8
+            _ => 0.76
         };
-        var fertilityFactor = 0.65 + (region.Fertility * 0.9);
-        var timber = ScoreBiome(region.Biome, 12, 6, 4, 2, 1) + Scale(floraTotal, 0.0035 * waterModifier);
-        var stone = ScoreBiome(region.Biome, 3, 5, 11, 12, 2) + Scale(1.0 - region.Fertility, 10.0);
-        var fiber = ScoreBiome(region.Biome, 8, 7, 5, 2, 2) + Scale(floraTotal, 0.0026 * waterModifier);
-        var clay = ScoreBiome(region.Biome, 5, 6, 4, 3, 3) + Scale(fertilityFactor, 8.0) + (region.WaterAvailability == WaterAvailability.High ? 3 : 0);
+        var fertilityFactor = 0.45 + (region.Fertility * 0.95);
+        var temperatureModifier = region.TemperatureBand switch
+        {
+            TemperatureBand.Cold => 0.78,
+            TemperatureBand.Temperate => 1.00,
+            TemperatureBand.Hot => 0.88,
+            _ => 0.90
+        };
+        var ruggednessFactor = region.TerrainRuggedness switch
+        {
+            TerrainRuggedness.Flat => 0.32,
+            TerrainRuggedness.Rolling => 0.66,
+            TerrainRuggedness.Rugged => 1.00,
+            _ => 0.60
+        };
+        var basinFactor = region.TerrainRuggedness switch
+        {
+            TerrainRuggedness.Flat => 1.00,
+            TerrainRuggedness.Rolling => 0.72,
+            TerrainRuggedness.Rugged => 0.38,
+            _ => 0.65
+        };
+        var timber = ScoreBiome(region.Biome, 12, 6, 3, 1, 5) + Scale(fertilityFactor * waterModifier * temperatureModifier, 10.0);
+        var stone = ScoreBiome(region.Biome, 3, 5, 11, 12, 2) + Scale(ruggednessFactor, 10.0) + Scale(1.0 - region.Fertility, 3.5);
+        var fiber = ScoreBiome(region.Biome, 7, 8, 4, 2, 6) + Scale(fertilityFactor * waterModifier, 8.0);
+        var clay = ScoreBiome(region.Biome, 4, 6, 3, 2, 5) + Scale(basinFactor * waterModifier, 9.0) + Scale(fertilityFactor, 3.0);
         var hides = ScoreBiome(region.Biome, 4, 5, 4, 6, 3) + Scale(faunaTotal, 0.0022);
 
         return new RegionMaterialProfile

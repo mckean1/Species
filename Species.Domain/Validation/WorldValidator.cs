@@ -41,6 +41,11 @@ public static class WorldValidator
                 errors.Add($"Duplicate region ID detected: {region.Id}");
             }
 
+            if (region.Fertility < 0.0 || region.Fertility > 1.0)
+            {
+                errors.Add($"Region {region.Id} has fertility outside the normalized range.");
+            }
+
             if (region.MaterialProfile is null)
             {
                 errors.Add($"Region {region.Id} is missing material profile.");
@@ -49,7 +54,12 @@ public static class WorldValidator
                      region.MaterialProfile.Opportunities.Stone < 0 ||
                      region.MaterialProfile.Opportunities.Fiber < 0 ||
                      region.MaterialProfile.Opportunities.Clay < 0 ||
-                     region.MaterialProfile.Opportunities.Hides < 0)
+                     region.MaterialProfile.Opportunities.Hides < 0 ||
+                     region.MaterialProfile.ShelterPotential < 0 ||
+                     region.MaterialProfile.StoragePotential < 0 ||
+                     region.MaterialProfile.ToolPotential < 0 ||
+                     region.MaterialProfile.TextilePotential < 0 ||
+                     region.MaterialProfile.HidePotential < 0)
             {
                 errors.Add($"Region {region.Id} has invalid material opportunities.");
             }

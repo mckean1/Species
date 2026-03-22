@@ -55,7 +55,21 @@ public static class RegionEcosystemSeeder
             WaterAvailability.Medium => 0.72f,
             _ => 0.42f
         };
-        var terrainFactor = region.Biome switch
+        var temperatureFactor = region.TemperatureBand switch
+        {
+            TemperatureBand.Cold => 0.48f,
+            TemperatureBand.Temperate => 1.00f,
+            TemperatureBand.Hot => 0.76f,
+            _ => 0.72f
+        };
+        var terrainFactor = region.TerrainRuggedness switch
+        {
+            TerrainRuggedness.Flat => 1.00f,
+            TerrainRuggedness.Rolling => 0.78f,
+            TerrainRuggedness.Rugged => 0.54f,
+            _ => 0.72f
+        };
+        var biomeFactor = region.Biome switch
         {
             Biome.Wetlands => 1.00f,
             Biome.Forest => 0.92f,
@@ -66,8 +80,8 @@ public static class RegionEcosystemSeeder
             _ => 0.60f
         };
 
-        var protoFloraCapacity = ClampNormalized((fertility * 0.55f) + (waterFactor * 0.30f) + (terrainFactor * 0.15f));
-        var protoFaunaCapacity = ClampNormalized((protoFloraCapacity * 0.60f) + (terrainFactor * 0.25f) + (waterFactor * 0.15f));
+        var protoFloraCapacity = ClampNormalized((fertility * 0.42f) + (waterFactor * 0.24f) + (temperatureFactor * 0.18f) + (terrainFactor * 0.08f) + (biomeFactor * 0.08f));
+        var protoFaunaCapacity = ClampNormalized((protoFloraCapacity * 0.56f) + (temperatureFactor * 0.14f) + (terrainFactor * 0.14f) + (biomeFactor * 0.10f) + (waterFactor * 0.06f));
         var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(value => (long)value), protoFloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
         var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(value => (long)value), protoFaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
         var floraOccupancyDeficit = ClampNormalized(1.0f - floraOccupancy);

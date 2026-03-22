@@ -50,21 +50,44 @@ public static class WorldGenerator
         var random = new Random(worldSeed);
 
         var neighborMap = BuildNeighborMap(totalRegions, random);
+        var temperatureScores = BuildRegionalSignal(totalRegions, random, 0.50, 0.26, 0.08, 2.0, 0.06);
+        var moistureScores = BuildRegionalSignal(totalRegions, random, 0.48, 0.22, 0.10, 2.5, 0.07);
+        var ruggednessScores = BuildRegionalSignal(totalRegions, random, 0.44, 0.18, 0.12, 3.0, 0.08);
         var regions = new List<Region>(totalRegions);
 
         for (var index = 0; index < totalRegions; index++)
         {
-            var waterAvailability = RollWaterAvailability(random);
-            var biome = ResolveBiome(waterAvailability, random);
-            var fertility = RollFertility(biome, waterAvailability, random);
+            var temperatureBand = ResolveTemperatureBand(temperatureScores[index]);
+            var terrainRuggedness = ResolveTerrainRuggedness(ruggednessScores[index]);
+            var waterAvailability = ResolveWaterAvailability(moistureScores[index], temperatureScores[index], terrainRuggedness);
+            var biome = ResolveBiome(temperatureBand, waterAvailability, terrainRuggedness, moistureScores[index]);
+            var fertility = ResolveFertility(temperatureScores[index], moistureScores[index], terrainRuggedness, biome, random);
             var regionId = $"region-{index + 1:D2}";
             var regionName = BuildRegionName(index);
             var neighbors = neighborMap[index]
                 .Select(neighborIndex => $"region-{neighborIndex + 1:D2}")
                 .OrderBy(neighborId => neighborId, StringComparer.Ordinal)
                 .ToArray();
-            var provisionalRegion = new Region(regionId, regionName, fertility, biome, waterAvailability, neighbors);
+            var provisionalRegion = new Region(
+                regionId,
+                regionName,
+                fertility,
+                biome,
+                waterAvailability,
+                neighbors,
+                temperatureBand: temperatureBand,
+                terrainRuggedness: terrainRuggedness);
             var ecosystem = RegionEcosystemSeeder.Seed(provisionalRegion, floraCatalog, faunaCatalog, random);
+            var seededRegion = new Region(
+                regionId,
+                regionName,
+                fertility,
+                biome,
+                waterAvailability,
+                neighbors,
+                ecosystem,
+                temperatureBand: temperatureBand,
+                terrainRuggedness: terrainRuggedness);
 
             regions.Add(new Region(
                 regionId,
@@ -74,7 +97,9 @@ public static class WorldGenerator
                 waterAvailability,
                 neighbors,
                 ecosystem,
-                Species.Domain.Simulation.MaterialEconomySystem.BuildRegionMaterialProfile(provisionalRegion)));
+                Species.Domain.Simulation.MaterialEconomySystem.BuildRegionMaterialProfile(seededRegion),
+                temperatureBand,
+                terrainRuggedness));
         }
 
         var provisionalWorld = new World(worldSeed, 1, 1, regions);
@@ -99,27 +124,23 @@ public static class WorldGenerator
         var neighbors = Enumerable.Range(0, regionCount)
             .ToDictionary(index => index, _ => new HashSet<int>());
 
-        for (var index = 1; index < regionCount; index++)
-        {
-            var neighborIndex = random.Next(index);
-            Connect(neighbors, index, neighborIndex);
-        }
-
         for (var index = 0; index < regionCount; index++)
         {
             var nextIndex = (index + 1) % regionCount;
             Connect(neighbors, index, nextIndex);
         }
 
+        var targetNeighborCount = Math.Min(WorldGenerationConstants.TargetNeighborCount, Math.Max(0, regionCount - 1));
+
         for (var index = 0; index < regionCount; index++)
         {
-            while (neighbors[index].Count < WorldGenerationConstants.TargetNeighborCount)
+            var attempts = 0;
+            while (neighbors[index].Count < targetNeighborCount && attempts < regionCount * 4)
             {
-                var candidate = random.Next(regionCount);
-                if (candidate == index)
-                {
-                    continue;
-                }
+                attempts++;
+                var direction = random.Next(2) == 0 ? -1 : 1;
+                var distance = random.Next(2, Math.Min(WorldGenerationConstants.MaximumLocalNeighborDistance, regionCount - 1) + 1);
+                var candidate = NormalizeRegionIndex(index + (direction * distance), regionCount);
 
                 Connect(neighbors, index, candidate);
             }
@@ -142,80 +163,175 @@ public static class WorldGenerator
         return cycle == 1 ? $"{prefix} {suffix}" : $"{prefix} {suffix} {cycle}";
     }
 
-    private static WaterAvailability RollWaterAvailability(Random random)
+    private static double[] BuildRegionalSignal(
+        int regionCount,
+        Random random,
+        double baseline,
+        double primaryAmplitude,
+        double secondaryAmplitude,
+        double harmonic,
+        double noiseRange)
     {
-        return random.NextDouble() switch
+        var raw = new double[regionCount];
+        var primaryPhase = random.NextDouble() * Math.PI * 2.0;
+        var secondaryPhase = random.NextDouble() * Math.PI * 2.0;
+        var bias = (random.NextDouble() * 0.14) - 0.07;
+
+        for (var index = 0; index < regionCount; index++)
         {
-            < 0.25 => WaterAvailability.Low,
-            < 0.75 => WaterAvailability.Medium,
+            var angle = (index / (double)regionCount) * Math.PI * 2.0;
+            var primary = Math.Sin(angle + primaryPhase) * primaryAmplitude;
+            var secondary = Math.Sin((angle * harmonic) + secondaryPhase) * secondaryAmplitude;
+            var noise = (random.NextDouble() * noiseRange * 2.0) - noiseRange;
+            raw[index] = ClampNormalizedSignal(baseline + bias + primary + secondary + noise);
+        }
+
+        return SmoothSignal(raw);
+    }
+
+    private static double[] SmoothSignal(IReadOnlyList<double> raw)
+    {
+        var smoothed = new double[raw.Count];
+
+        for (var index = 0; index < raw.Count; index++)
+        {
+            var previous = raw[NormalizeRegionIndex(index - 1, raw.Count)];
+            var next = raw[NormalizeRegionIndex(index + 1, raw.Count)];
+            var farPrevious = raw[NormalizeRegionIndex(index - 2, raw.Count)];
+            var farNext = raw[NormalizeRegionIndex(index + 2, raw.Count)];
+
+            smoothed[index] = ClampNormalizedSignal(
+                (raw[index] * 0.42) +
+                (previous * 0.22) +
+                (next * 0.22) +
+                (farPrevious * 0.07) +
+                (farNext * 0.07));
+        }
+
+        return smoothed;
+    }
+
+    private static TemperatureBand ResolveTemperatureBand(double score)
+    {
+        return score switch
+        {
+            < 0.34 => TemperatureBand.Cold,
+            < 0.68 => TemperatureBand.Temperate,
+            _ => TemperatureBand.Hot
+        };
+    }
+
+    private static TerrainRuggedness ResolveTerrainRuggedness(double score)
+    {
+        return score switch
+        {
+            < 0.34 => TerrainRuggedness.Flat,
+            < 0.68 => TerrainRuggedness.Rolling,
+            _ => TerrainRuggedness.Rugged
+        };
+    }
+
+    private static WaterAvailability ResolveWaterAvailability(
+        double moistureScore,
+        double temperatureScore,
+        TerrainRuggedness terrainRuggedness)
+    {
+        var evaporationPenalty = temperatureScore > 0.62
+            ? (temperatureScore - 0.62) * 0.34
+            : 0.0;
+        var terrainModifier = terrainRuggedness switch
+        {
+            TerrainRuggedness.Flat => 0.06,
+            TerrainRuggedness.Rolling => 0.01,
+            TerrainRuggedness.Rugged => -0.05,
+            _ => 0.0
+        };
+        var waterScore = ClampNormalizedSignal((moistureScore * 0.86) + 0.08 + terrainModifier - evaporationPenalty);
+
+        return waterScore switch
+        {
+            < 0.36 => WaterAvailability.Low,
+            < 0.70 => WaterAvailability.Medium,
             _ => WaterAvailability.High
         };
     }
 
     private static Biome ResolveBiome(
+        TemperatureBand temperatureBand,
         WaterAvailability waterAvailability,
-        Random random)
+        TerrainRuggedness terrainRuggedness,
+        double moistureScore)
     {
-        var roll = random.NextDouble();
+        if (temperatureBand == TemperatureBand.Cold)
+        {
+            return waterAvailability == WaterAvailability.High && terrainRuggedness != TerrainRuggedness.Rugged
+                ? Biome.Forest
+                : Biome.Tundra;
+        }
 
         if (waterAvailability == WaterAvailability.Low)
         {
-            return roll switch
+            if (temperatureBand == TemperatureBand.Hot)
             {
-                < 0.45 => Biome.Desert,
-                < 0.70 => Biome.Plains,
-                < 0.88 => Biome.Highlands,
-                _ => Biome.Tundra
-            };
+                return Biome.Desert;
+            }
+
+            return terrainRuggedness == TerrainRuggedness.Rugged
+                ? Biome.Highlands
+                : Biome.Plains;
         }
 
         if (waterAvailability == WaterAvailability.High)
         {
-            return roll switch
+            if (terrainRuggedness == TerrainRuggedness.Flat || moistureScore >= 0.74)
             {
-                < 0.45 => Biome.Wetlands,
-                < 0.75 => Biome.Forest,
-                < 0.88 => Biome.Plains,
-                _ => Biome.Highlands
-            };
+                return Biome.Wetlands;
+            }
+
+            return terrainRuggedness == TerrainRuggedness.Rugged
+                ? Biome.Highlands
+                : Biome.Forest;
         }
 
-        return roll switch
+        if (terrainRuggedness == TerrainRuggedness.Rugged)
         {
-            < 0.10 => Biome.Desert,
-            < 0.18 => Biome.Tundra,
-            < 0.40 => Biome.Highlands,
-            < 0.72 => Biome.Plains,
-            < 0.92 => Biome.Forest,
-            _ => Biome.Wetlands
-        };
+            return Biome.Highlands;
+        }
+
+        return moistureScore >= 0.58 ? Biome.Forest : Biome.Plains;
     }
 
-    private static double RollFertility(
+    private static double ResolveFertility(
+        double temperatureScore,
+        double moistureScore,
+        TerrainRuggedness terrainRuggedness,
         Biome biome,
-        WaterAvailability waterAvailability,
         Random random)
     {
-        var fertility = biome switch
+        var climateSupport = ClampNormalizedSignal(1.0 - (Math.Abs(temperatureScore - 0.56) / 0.56));
+        var terrainSupport = terrainRuggedness switch
         {
-            Biome.Desert => 0.18,
+            TerrainRuggedness.Flat => 0.86,
+            TerrainRuggedness.Rolling => 0.70,
+            TerrainRuggedness.Rugged => 0.44,
+            _ => 0.65
+        };
+        var biomeSupport = biome switch
+        {
+            Biome.Desert => 0.12,
             Biome.Tundra => 0.22,
             Biome.Highlands => 0.36,
-            Biome.Plains => 0.62,
-            Biome.Forest => 0.72,
-            Biome.Wetlands => 0.68,
+            Biome.Plains => 0.68,
+            Biome.Forest => 0.74,
+            Biome.Wetlands => 0.64,
             _ => 0.50
         };
-
-        fertility += waterAvailability switch
-        {
-            WaterAvailability.Low => -0.18,
-            WaterAvailability.Medium => 0.00,
-            WaterAvailability.High => 0.12,
-            _ => 0.00
-        };
-
-        fertility += (random.NextDouble() * 0.16) - 0.08;
+        var fertility =
+            (moistureScore * 0.42) +
+            (climateSupport * 0.24) +
+            (terrainSupport * 0.20) +
+            (biomeSupport * 0.14) +
+            ((random.NextDouble() * 0.08) - 0.04);
 
         return Math.Round(
             Math.Clamp(
@@ -223,5 +339,15 @@ public static class WorldGenerator
                 WorldGenerationConstants.MinimumFertility,
                 WorldGenerationConstants.MaximumFertility),
             2);
+    }
+
+    private static double ClampNormalizedSignal(double value)
+    {
+        return Math.Clamp(value, 0.0, 1.0);
+    }
+
+    private static int NormalizeRegionIndex(int index, int regionCount)
+    {
+        return ((index % regionCount) + regionCount) % regionCount;
     }
 }

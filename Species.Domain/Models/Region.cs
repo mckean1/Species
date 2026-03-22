@@ -9,6 +9,8 @@ public sealed class Region
     public double Fertility { get; }
     public Biome Biome { get; }
     public WaterAvailability WaterAvailability { get; }
+    public TemperatureBand TemperatureBand { get; }
+    public TerrainRuggedness TerrainRuggedness { get; }
     public IReadOnlyList<string> NeighborIds { get; }
     public RegionEcosystem Ecosystem { get; }
     public RegionMaterialProfile MaterialProfile { get; }
@@ -21,13 +23,17 @@ public sealed class Region
         WaterAvailability waterAvailability,
         IReadOnlyList<string> neighborIds,
         RegionEcosystem? ecosystem = null,
-        RegionMaterialProfile? materialProfile = null)
+        RegionMaterialProfile? materialProfile = null,
+        TemperatureBand temperatureBand = TemperatureBand.Temperate,
+        TerrainRuggedness terrainRuggedness = TerrainRuggedness.Rolling)
     {
         Id = id;
         Name = name;
         Fertility = fertility;
         Biome = biome;
         WaterAvailability = waterAvailability;
+        TemperatureBand = temperatureBand;
+        TerrainRuggedness = terrainRuggedness;
         NeighborIds = neighborIds;
         Ecosystem = ecosystem ?? new RegionEcosystem();
         MaterialProfile = materialProfile ?? new RegionMaterialProfile();

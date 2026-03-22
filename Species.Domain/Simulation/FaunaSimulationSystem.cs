@@ -954,17 +954,18 @@ public sealed class FaunaSimulationSystem
 
     private static float ResolveClimateFit(Region region, BiologicalTraitProfile traits)
     {
-        var coldDemand = region.Biome switch
+        var coldDemand = region.TemperatureBand switch
         {
-            Biome.Tundra => 82,
-            Biome.Highlands => 62,
+            TemperatureBand.Cold => 82,
+            TemperatureBand.Temperate => 44,
+            TemperatureBand.Hot => 18,
             _ => 34
         };
-        var heatDemand = region.Biome switch
+        var heatDemand = region.TemperatureBand switch
         {
-            Biome.Desert => 84,
-            Biome.Wetlands => 54,
-            Biome.Plains => 50,
+            TemperatureBand.Hot => 84,
+            TemperatureBand.Temperate => 52,
+            TemperatureBand.Cold => 24,
             _ => 34
         };
         var droughtDemand = region.WaterAvailability switch
