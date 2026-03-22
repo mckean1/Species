@@ -1,10 +1,12 @@
 using Species.Domain.Models;
-using Species.Client.DataBuilders;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModelFactories;
+using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
 
-public static class PolityScreenRenderer
+public static class PolityRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
@@ -21,7 +23,7 @@ public static class PolityScreenRenderer
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = PolityScreenDataBuilder.Build(world, focalPolityId);
+        var data = PolityViewModelFactory.Build(world, focalPolityId);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var bodyHeight = Math.Max(16, viewport.Height - 7);
         var bodyLines = BuildBodyLines(data, innerWidth);
@@ -51,12 +53,12 @@ public static class PolityScreenRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static List<string> BuildBodyLines(PolityScreenData data, int width)
+    private static List<string> BuildBodyLines(PolityViewModel data, int width)
     {
         var lines = new List<string>();
 
         lines.Add($"{PaneTitle}Overview{Reset}");
-        lines.AddRange(CompactStatRowRenderer.RenderRows(
+        lines.AddRange(CompactStatRowLayout.RenderRows(
             width,
             2,
             new CompactStatItem($"{Dim}Government Form{Reset}", $"{Blue}{data.GovernmentForm}{Reset}"),

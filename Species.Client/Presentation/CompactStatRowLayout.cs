@@ -1,8 +1,6 @@
-using Species.Client.Presentation;
+namespace Species.Client.Presentation;
 
-namespace Species.Client.Renderers;
-
-public static class CompactStatRowRenderer
+public static class CompactStatRowLayout
 {
     private const int GapWidth = 3;
     private const int MinimumColumnWidth = 22;

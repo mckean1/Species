@@ -1,10 +1,12 @@
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class PolityScreenDataBuilder
+public static class PolityViewModelFactory
 {
     private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
@@ -16,13 +18,13 @@ public static class PolityScreenDataBuilder
         Critical
     }
 
-    public static PolityScreenData Build(World world, string focalPolityId)
+    public static PolityViewModel Build(World world, string focalPolityId)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var context = PlayerFocus.ResolveContext(world, focalPolityId);
         if (focusPolity is null || context?.LeadGroup is null)
         {
-            return new PolityScreenData(
+            return new PolityViewModel(
                 "Unknown polity",
                 FormatMonthYear(world.CurrentMonth, world.CurrentYear),
                 "Unknown",
@@ -40,7 +42,7 @@ public static class PolityScreenDataBuilder
         var pressureItems = BuildPressureItems(context.Pressures);
         var pressureState = ResolvePressureState(pressureItems);
 
-        return new PolityScreenData(
+        return new PolityViewModel(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm),
@@ -230,17 +232,3 @@ public static class PolityScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record PolityScreenData(
-    string PolityName,
-    string CurrentDate,
-    string GovernmentForm,
-    string Population,
-    string SettlementCount,
-    string FoodStores,
-    string PressureState,
-    IReadOnlyList<PolityPressureItem> TopPressures,
-    string Strength,
-    string Concern);
-
-public sealed record PolityPressureItem(string Label, int Value, string SeverityLabel);

@@ -3,11 +3,10 @@ using Species.Domain.Generation;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Domain.Validation;
-using Species.Client.DataBuilders;
 using Species.Client.Enums;
 using Species.Client.Presentation;
-using Species.Client.Renderers;
 using System.Diagnostics;
+using Species.Client.ViewModelFactories;
 
 const int TickDelayMilliseconds = 1000;
 const int InputPollDelayMilliseconds = 25;
@@ -36,7 +35,7 @@ var simulationEngine = new SimulationEngine(world, floraCatalog, faunaCatalog, s
 var viewState = new PlayerViewState();
 viewState.EnsureFocalPolity(simulationEngine.CurrentWorld);
 simulationEngine.PlayerPolityId = viewState.FocalPolityId;
-var chronicleFrameRenderer = new ConsoleFrameRenderer();
+var chronicleFrameRenderer = new ConsoleFrameWriter();
 var viewErrors = PlayerViewValidator.Validate(viewState, simulationEngine.CurrentWorld, floraCatalog, faunaCatalog, discoveryCatalog, advancementCatalog).ToArray();
 if (viewErrors.Length > 0)
 {
@@ -78,7 +77,7 @@ while (true)
         }
         else if (key.Key == ConsoleKey.Backspace && viewState.CurrentScreen == PlayerScreen.Chronicle)
         {
-            var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+            var chronicleData = ChronicleViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
             viewState.ReturnChronicleToLive(chronicleData.UrgentItems.Count);
             shouldRender = true;
         }
@@ -118,21 +117,21 @@ while (true)
                     break;
                 case ConsoleKey.UpArrow:
                     {
-                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        var chronicleData = ChronicleViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
                         viewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, -1);
                         shouldRender = true;
                         break;
                     }
                 case ConsoleKey.DownArrow:
                     {
-                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        var chronicleData = ChronicleViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
                         viewState.MoveChronicleSelection(chronicleData.UrgentItems.Count, chronicleData.Entries.Count, 1);
                         shouldRender = true;
                         break;
                     }
                 case ConsoleKey.Enter:
                     {
-                        var chronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+                        var chronicleData = ChronicleViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
                         if (chronicleData.SelectedUrgent is not null)
                         {
                             viewState.SetScreen(chronicleData.SelectedUrgent.TargetScreen);
@@ -164,7 +163,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownPolities)
         {
-            var polityCount = KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
+            var polityCount = KnownPolitiesViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
             switch (key.Key)
             {
                 case ConsoleKey.UpArrow:
@@ -185,7 +184,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.Advancements)
         {
-            var advancementCount = AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
+            var advancementCount = AdvancementViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
             switch (key.Key)
             {
                 case ConsoleKey.UpArrow:
@@ -206,7 +205,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.Laws)
         {
-            var lawsData = LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex);
+            var lawsData = LawsViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex);
             var lawCount = lawsData.Laws.Count;
             switch (key.Key)
             {
@@ -266,7 +265,7 @@ while (true)
         }
         else if (viewState.CurrentScreen == PlayerScreen.KnownSpecies)
         {
-            var speciesCount = KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
+            var speciesCount = KnownSpeciesViewModelFactory.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
             switch (key.Key)
             {
                 case ConsoleKey.UpArrow:
@@ -301,12 +300,12 @@ while (true)
 
     viewState.EnsureFocalPolity(simulationEngine.CurrentWorld);
     simulationEngine.PlayerPolityId = viewState.FocalPolityId;
-    viewState.ClampRegionIndex(RegionsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
-    viewState.ClampKnownPolityIndex(KnownPolitiesScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
-    viewState.ClampAdvancementIndex(AdvancementsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
-    viewState.ClampLawIndex(LawsScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count);
-    viewState.ClampKnownSpeciesIndex(KnownSpeciesScreenDataBuilder.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count);
-    var currentChronicleData = ChronicleScreenDataBuilder.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
+    viewState.ClampRegionIndex(RegionsViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count);
+    viewState.ClampKnownPolityIndex(KnownPolitiesViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count);
+    viewState.ClampAdvancementIndex(AdvancementViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count);
+    viewState.ClampLawIndex(LawsViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState.CurrentLawIndex).Laws.Count);
+    viewState.ClampKnownSpeciesIndex(KnownSpeciesViewModelFactory.Build(simulationEngine.CurrentWorld, faunaCatalog, viewState.FocalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count);
+    var currentChronicleData = ChronicleViewModelFactory.Build(simulationEngine.CurrentWorld, viewState.FocalPolityId, viewState);
     viewState.ClampChronicleSelection(currentChronicleData.UrgentItems.Count, currentChronicleData.Entries.Count);
 
     if (shouldRender)
@@ -352,7 +351,7 @@ bool AdvanceOneMonth()
 void RenderCurrentScreen()
 {
     var viewport = TerminalViewport.GetCurrent();
-    var frame = PlayerScreenRenderer.Render(
+    var frame = PlayerScreenRouter.Render(
         simulationEngine.CurrentWorld,
         viewState,
         floraCatalog,

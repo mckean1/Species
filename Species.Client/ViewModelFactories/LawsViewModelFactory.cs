@@ -1,11 +1,13 @@
 using Species.Domain.Models;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class LawsScreenDataBuilder
+public static class LawsViewModelFactory
 {
-    public static LawsScreenData Build(World world, string focalPolityId, int selectedIndex)
+    public static LawsViewModel Build(World world, string focalPolityId, int selectedIndex)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var polityName = focusPolity?.Name ?? "Unknown polity";
@@ -15,7 +17,7 @@ public static class LawsScreenDataBuilder
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
         var selected = items.Count == 0 ? null : items[clampedIndex];
 
-        return new LawsScreenData(
+        return new LawsViewModel(
             polityName,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             items,
@@ -173,49 +175,3 @@ public static class LawsScreenDataBuilder
         return "Active";
     }
 }
-
-public sealed record LawsScreenData(
-    string PolityName,
-    string CurrentDate,
-    IReadOnlyList<LawScreenItem> Laws,
-    IReadOnlyList<LawScreenItem> PendingDecisions,
-    IReadOnlyList<LawScreenItem> RecentDecisions,
-    LawScreenItem? SelectedLaw,
-    int SelectedIndex,
-    bool HasActiveProposal,
-    bool HasSelectedPendingDecision,
-    IReadOnlyList<string> GovernanceSummary,
-    IReadOnlyList<EnactedLawScreenItem> EnactedLaws,
-    IReadOnlyList<string> Notes,
-    IReadOnlyList<string> EmptyStateNotes);
-
-public sealed record LawScreenItem(
-    string Id,
-    string Name,
-    Species.Domain.Enums.LawProposalStatus Status,
-    string Category,
-    string Summary,
-    string ReasonSummary,
-    string TradeoffSummary,
-    string BackedBy,
-    int Support,
-    int Opposition,
-    int Urgency,
-    int AgeInMonths,
-    int IgnoredMonths,
-    int ImpactScale);
-
-public sealed record EnactedLawScreenItem(
-    string Id,
-    string Name,
-    string Category,
-    string Summary,
-    string IntentSummary,
-    string TradeoffSummary,
-    string State,
-    int ImpactScale,
-    string Enforcement,
-    string Compliance,
-    string CoreEffectiveness,
-    string PeripheralEffectiveness,
-    string Resistance);

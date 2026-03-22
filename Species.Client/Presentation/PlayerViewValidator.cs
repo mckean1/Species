@@ -1,8 +1,8 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
-using Species.Client.DataBuilders;
 using Species.Client.Enums;
+using Species.Client.ViewModelFactories;
 
 namespace Species.Client.Presentation;
 
@@ -58,41 +58,41 @@ public static class PlayerViewValidator
         }
 
         var focalPolityId = focalPolity?.Id ?? string.Empty;
-        var regionCount = Species.Client.DataBuilders.RegionsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count;
+        var regionCount = RegionsViewModelFactory.Build(world, focalPolityId, viewState.CurrentRegionIndex, floraCatalog, faunaCatalog, discoveryCatalog).Regions.Count;
         if (viewState.CurrentRegionIndex < 0 || (regionCount > 0 && viewState.CurrentRegionIndex >= regionCount))
         {
             errors.Add("Regions points at an invalid region.");
         }
 
-        var polityCount = Species.Client.DataBuilders.KnownPolitiesScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
+        var polityCount = KnownPolitiesViewModelFactory.Build(world, focalPolityId, viewState.CurrentKnownPolityIndex, discoveryCatalog, advancementCatalog).Polities.Count;
         if (viewState.CurrentKnownPolityIndex < 0 ||
             (polityCount > 0 && viewState.CurrentKnownPolityIndex >= polityCount))
         {
             errors.Add("Known Polities points at an invalid polity.");
         }
 
-        var advancementCount = Species.Client.DataBuilders.AdvancementsScreenDataBuilder.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
+        var advancementCount = AdvancementViewModelFactory.Build(world, focalPolityId, discoveryCatalog, advancementCatalog, viewState.CurrentAdvancementIndex).Items.Count;
         if (viewState.CurrentAdvancementIndex < 0 ||
             (advancementCount > 0 && viewState.CurrentAdvancementIndex >= advancementCount))
         {
             errors.Add("Advancements points at an invalid advancement.");
         }
 
-        var lawCount = Species.Client.DataBuilders.LawsScreenDataBuilder.Build(world, focalPolityId, viewState.CurrentLawIndex).Laws.Count;
+        var lawCount = LawsViewModelFactory.Build(world, focalPolityId, viewState.CurrentLawIndex).Laws.Count;
         if (viewState.CurrentLawIndex < 0 ||
             (lawCount > 0 && viewState.CurrentLawIndex >= lawCount))
         {
             errors.Add("Laws points at an invalid law.");
         }
 
-        var knownSpeciesCount = Species.Client.DataBuilders.KnownSpeciesScreenDataBuilder.Build(world, faunaCatalog, focalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
+        var knownSpeciesCount = KnownSpeciesViewModelFactory.Build(world, faunaCatalog, focalPolityId, viewState.CurrentKnownSpeciesIndex).Species.Count;
         if (viewState.CurrentKnownSpeciesIndex < 0 ||
             (knownSpeciesCount > 0 && viewState.CurrentKnownSpeciesIndex >= knownSpeciesCount))
         {
             errors.Add("Known Species points at an invalid species.");
         }
 
-        var chronicleData = Species.Client.DataBuilders.ChronicleScreenDataBuilder.Build(world, focalPolityId, viewState);
+        var chronicleData = ChronicleViewModelFactory.Build(world, focalPolityId, viewState);
         if (viewState.CurrentChronicleUrgentIndex < 0 ||
             (chronicleData.UrgentItems.Count > 0 && viewState.CurrentChronicleUrgentIndex >= chronicleData.UrgentItems.Count))
         {

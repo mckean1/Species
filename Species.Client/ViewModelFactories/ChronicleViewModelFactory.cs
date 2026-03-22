@@ -3,13 +3,15 @@ using Species.Domain.Enums;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Client.Enums;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class ChronicleScreenDataBuilder
+public static class ChronicleViewModelFactory
 {
-    public static ChronicleScreenData Build(World world, string focalPolityId, PlayerViewState viewState)
+    public static ChronicleViewModel Build(World world, string focalPolityId, PlayerViewState viewState)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
@@ -37,7 +39,7 @@ public static class ChronicleScreenDataBuilder
             ? modeEntries[GetEntryIndex(viewState)]
             : null;
 
-        return new ChronicleScreenData(
+        return new ChronicleViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             focusPolity?.Name ?? "Unknown polity",
             viewState.CurrentChronicleMode,
@@ -371,33 +373,3 @@ public static class ChronicleScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record ChronicleScreenData(
-    string CurrentDate,
-    string PolityName,
-    ChronicleMode Mode,
-    IReadOnlyList<ChronicleUrgentItem> UrgentItems,
-    IReadOnlyList<ChronicleListItem> Entries,
-    ChronicleUrgentItem? SelectedUrgent,
-    ChronicleListItem? SelectedEntry,
-    ChronicleSelectionArea SelectedArea,
-    IReadOnlyList<string> ConditionSummary,
-    IReadOnlyList<string> ModeNotes);
-
-public sealed record ChronicleUrgentItem(
-    string Id,
-    string Text,
-    string Cause,
-    string Impact,
-    PlayerScreen TargetScreen,
-    string? TargetId);
-
-public sealed record ChronicleListItem(
-    string Id,
-    int EventYear,
-    int EventMonth,
-    string DateText,
-    string Headline,
-    string Category,
-    string Impact,
-    bool IsMilestone);

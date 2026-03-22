@@ -2,20 +2,21 @@ using Species.Domain.Enums;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class GovernmentScreenDataBuilder
+public static class GovernmentViewModelFactory
 {
     private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
-    public static GovernmentScreenData Build(World world, string focalPolityId)
+    public static GovernmentViewModel Build(World world, string focalPolityId)
     {
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var context = PlayerFocus.ResolveContext(world, focalPolityId);
         if (focusPolity is null || context?.LeadGroup is null)
         {
-            return new GovernmentScreenData(
+            return new GovernmentViewModel(
                 "Unknown polity",
                 FormatMonthYear(world.CurrentMonth, world.CurrentYear),
                 "Unknown",
@@ -26,7 +27,7 @@ public static class GovernmentScreenDataBuilder
         var snapshot = PolityConditionEvaluator.Evaluate(world, focusPolity);
         var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
 
-        return new GovernmentScreenData(
+        return new GovernmentViewModel(
             focusPolity.Name,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             PolityPresentation.DescribeGovernmentForm(snapshot.GovernmentForm),
@@ -153,10 +154,3 @@ public static class GovernmentScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record GovernmentScreenData(
-    string PolityName,
-    string CurrentDate,
-    string GovernmentForm,
-    string Capital,
-    string Founded);

@@ -2,13 +2,16 @@ using Species.Domain.Catalogs;
 using Species.Domain.Constants;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Enums;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class AdvancementsScreenDataBuilder
+public static class AdvancementViewModelFactory
 {
-    public static AdvancementsScreenData Build(
+    public static AdvancementsViewModel Build(
         World world,
         string focalPolityId,
         DiscoveryCatalog discoveryCatalog,
@@ -28,14 +31,14 @@ public static class AdvancementsScreenDataBuilder
             ? 0
             : Math.Clamp(selectedIndex, 0, items.Length - 1);
 
-        return new AdvancementsScreenData(
+        return new AdvancementsViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             items,
             items.Length == 0 ? null : items[clampedIndex],
             clampedIndex,
-            items.Count(item => item.Status == AdvancementScreenStatus.Completed),
-            items.Count(item => item.Status == AdvancementScreenStatus.Available),
-            items.Count(item => item.Status == AdvancementScreenStatus.Locked));
+            items.Count(item => item.Status == AdvancementStatus.Completed),
+            items.Count(item => item.Status == AdvancementStatus.Available),
+            items.Count(item => item.Status == AdvancementStatus.Locked));
     }
 
     private static AdvancementScreenItem BuildItem(
@@ -51,7 +54,7 @@ public static class AdvancementsScreenDataBuilder
                 definition.Id,
                 definition.Name,
                 definition.Category.ToString(),
-                AdvancementScreenStatus.Locked,
+                AdvancementStatus.Locked,
                 definition.Description,
                 definition.PracticalEffectSummary,
                 "no polity data",
@@ -66,17 +69,17 @@ public static class AdvancementsScreenDataBuilder
         var learned = focusGroup.LearnedAdvancementIds.Contains(definition.Id);
         var requirement = BuildRequirement(definition, focusGroup, focusContext, discoveryCatalog, regionName);
         var status = learned
-            ? AdvancementScreenStatus.Completed
+            ? AdvancementStatus.Completed
             : requirement.IsSatisfied
-                ? AdvancementScreenStatus.Available
-                : AdvancementScreenStatus.Locked;
+                ? AdvancementStatus.Available
+                : AdvancementStatus.Locked;
 
         var notes = new List<string>();
-        if (status == AdvancementScreenStatus.Completed)
+        if (status == AdvancementStatus.Completed)
         {
             notes.Add("Already part of the polity's usable capabilities.");
         }
-        else if (status == AdvancementScreenStatus.Available)
+        else if (status == AdvancementStatus.Available)
         {
             notes.Add("All known conditions are met for this advancement.");
         }
@@ -365,13 +368,13 @@ public static class AdvancementsScreenDataBuilder
         return $"{evidenceSummary} Capability progress: {capability:0}/100. Adoption progress: {adoption:0}/100.";
     }
 
-    private static int GetSortOrder(AdvancementScreenStatus status)
+    private static int GetSortOrder(AdvancementStatus status)
     {
         return status switch
         {
-            AdvancementScreenStatus.Available => 0,
-            AdvancementScreenStatus.Locked => 1,
-            AdvancementScreenStatus.Completed => 2,
+            AdvancementStatus.Available => 0,
+            AdvancementStatus.Locked => 1,
+            AdvancementStatus.Completed => 2,
             _ => 3
         };
     }
@@ -397,41 +400,4 @@ public static class AdvancementsScreenDataBuilder
 
         return $"{monthText} {year:D3}";
     }
-}
-
-public sealed record AdvancementsScreenData(
-    string CurrentDate,
-    IReadOnlyList<AdvancementScreenItem> Items,
-    AdvancementScreenItem? SelectedItem,
-    int SelectedIndex,
-    int CompletedCount,
-    int AvailableCount,
-    int LockedCount);
-
-public sealed record AdvancementScreenItem(
-    string Id,
-    string Name,
-    string Category,
-    AdvancementScreenStatus Status,
-    string Description,
-    string CapabilitySummary,
-    string ListHint,
-    IReadOnlyList<string> Requirements,
-    IReadOnlyList<string> Notes,
-    string ProgressSummary,
-    string StatusSummary);
-
-public sealed record AdvancementRequirementInfo(
-    bool IsSatisfied,
-    string LockReason,
-    IReadOnlyList<string> Requirements,
-    string ProgressSummary,
-    string ListHint,
-    string StatusSummary);
-
-public enum AdvancementScreenStatus
-{
-    Completed,
-    Available,
-    Locked
 }

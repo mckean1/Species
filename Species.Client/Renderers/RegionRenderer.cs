@@ -1,12 +1,14 @@
 using System.Text;
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
-using Species.Client.DataBuilders;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModelFactories;
+using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
 
-public static class RegionViewerRenderer
+public static class RegionRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
@@ -31,7 +33,7 @@ public static class RegionViewerRenderer
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = RegionsScreenDataBuilder.Build(world, focalPolityId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
+        var data = RegionsViewModelFactory.Build(world, focalPolityId, regionIndex, floraCatalog, faunaCatalog, discoveryCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var topListHeight = Math.Max(8, Math.Min(12, viewport.Height / 3));
         var lowerHeight = Math.Max(12, viewport.Height - topListHeight - 9);
@@ -60,7 +62,7 @@ public static class RegionViewerRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static IReadOnlyList<string> BuildRegionList(RegionsScreenData data, int innerWidth, int listHeight)
+    private static IReadOnlyList<string> BuildRegionList(RegionsViewModel data, int innerWidth, int listHeight)
     {
         var rows = new List<string>(listHeight);
         var columnWidths = new[] { 24, 12, 13, 11, 10 };

@@ -1,15 +1,17 @@
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class KnownPolitiesScreenDataBuilder
+public static class KnownPolitiesViewModelFactory
 {
     private static readonly PolityConditionEvaluator PolityConditionEvaluator = new();
 
-    public static KnownPolitiesScreenData Build(
+    public static KnownPolitiesViewModel Build(
         World world,
         string focalPolityId,
         int selectedPolityIndex,
@@ -24,7 +26,7 @@ public static class KnownPolitiesScreenDataBuilder
             ? 0
             : Math.Clamp(selectedPolityIndex, 0, knownPolities.Count - 1);
 
-        return new KnownPolitiesScreenData(
+        return new KnownPolitiesViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             knownPolities,
             knownPolities.Count == 0 ? null : knownPolities[clampedIndex],
@@ -350,24 +352,3 @@ public static class KnownPolitiesScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record KnownPolitiesScreenData(
-    string CurrentDate,
-    IReadOnlyList<KnownPolitySummary> Polities,
-    KnownPolitySummary? SelectedPolity,
-    int SelectedIndex);
-
-public sealed record KnownPolitySummary(
-    string Id,
-    string Name,
-    string GovernmentForm,
-    string CoreRegion,
-    string CurrentRegion,
-    string Population,
-    string Relationship,
-    string Proximity,
-    string PressureSummary,
-    IReadOnlyList<string> Traits,
-    IReadOnlyList<string> Risks,
-    IReadOnlyList<string> Notes,
-    IReadOnlyList<string> KnownLaws);

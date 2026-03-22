@@ -1,12 +1,14 @@
 using System.Text;
 using Species.Domain.Catalogs;
 using Species.Domain.Models;
-using Species.Client.DataBuilders;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModelFactories;
+using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
 
-public static class KnownPolitiesScreenRenderer
+public static class KnownPolitiesRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
@@ -28,7 +30,7 @@ public static class KnownPolitiesScreenRenderer
         bool isSimulationRunning,
         TerminalViewport viewport)
     {
-        var data = KnownPolitiesScreenDataBuilder.Build(world, focalPolityId, selectedPolityIndex, discoveryCatalog, advancementCatalog);
+        var data = KnownPolitiesViewModelFactory.Build(world, focalPolityId, selectedPolityIndex, discoveryCatalog, advancementCatalog);
         var innerWidth = Math.Max(76, viewport.Width - 4);
         var listWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var detailWidth = Math.Max(24, innerWidth - listWidth - 3);
@@ -58,7 +60,7 @@ public static class KnownPolitiesScreenRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static IReadOnlyList<string> BuildPolityList(KnownPolitiesScreenData data, int width, int bodyHeight)
+    private static IReadOnlyList<string> BuildPolityList(KnownPolitiesViewModel data, int width, int bodyHeight)
     {
         var lines = new List<string> { $"{PaneTitle}Polities{Reset}" };
         var columnWidths = new[] { 24, 18, 14, 12 };

@@ -3,13 +3,15 @@ using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
 using Species.Domain.Simulation;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class RegionsScreenDataBuilder
+public static class RegionsViewModelFactory
 {
-    public static RegionsScreenData Build(
+    public static RegionsViewModel Build(
         World world,
         string focalPolityId,
         int selectedRegionIndex,
@@ -32,7 +34,7 @@ public static class RegionsScreenDataBuilder
             .Select(region => BuildSummary(region, world, focusPolity, focusContext, focusGroup, knowledgeContext, floraCatalog, faunaCatalog, discoveryCatalog))
             .ToArray();
 
-        return new RegionsScreenData(
+        return new RegionsViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             summaries,
             summaries.Length == 0 ? null : summaries[selectedIndex],
@@ -427,32 +429,3 @@ public static class RegionsScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record RegionsScreenData(
-    string CurrentDate,
-    IReadOnlyList<RegionSummary> Regions,
-    RegionSummary? SelectedRegion,
-    int SelectedIndex);
-
-public sealed record RegionSummary(
-    string Id,
-    string Name,
-    string Familiarity,
-    string Biome,
-    string WaterAvailability,
-    string Fertility,
-    int PresencePopulation,
-    string PresenceText,
-    IReadOnlyList<string> GroupPresence,
-    IReadOnlyList<string> Flora,
-    string FaunaLabel,
-    IReadOnlyList<string> Fauna,
-    IReadOnlyList<string> Materials,
-    IReadOnlyList<string> Knowledge,
-    IReadOnlyList<string> Context,
-    IReadOnlyList<string> Opportunities,
-    IReadOnlyList<string> Risks,
-    IReadOnlyList<string> Biology,
-    IReadOnlyList<string> Fossils,
-    string ThreatText,
-    int ThreatScore);

@@ -1,8 +1,6 @@
-using Species.Client.Presentation;
+namespace Species.Client.Presentation;
 
-namespace Species.Client.Renderers;
-
-public sealed class ConsoleFrameRenderer
+public sealed class ConsoleFrameWriter
 {
     private string _lastFrame = string.Empty;
     private TerminalViewport _lastViewport;

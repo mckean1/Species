@@ -1,12 +1,14 @@
 using System.Text;
 using Species.Domain.Enums;
 using Species.Domain.Models;
-using Species.Client.DataBuilders;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModelFactories;
+using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
 
-public static class LawsScreenRenderer
+public static class LawsRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
@@ -28,7 +30,7 @@ public static class LawsScreenRenderer
         int selectedActionIndex,
         TerminalViewport viewport)
     {
-        var data = LawsScreenDataBuilder.Build(world, focalPolityId, selectedIndex);
+        var data = LawsViewModelFactory.Build(world, focalPolityId, selectedIndex);
         var innerWidth = Math.Max(82, viewport.Width - 4);
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 9) / 20);
         var rightWidth = Math.Max(30, innerWidth - leftWidth - 3);
@@ -92,7 +94,7 @@ public static class LawsScreenRenderer
         return ["Tab: Screens", "Up/Down: Navigate", "Enter: Select", "Space: Pause/Run"];
     }
 
-    private static IReadOnlyList<string> BuildLawList(LawsScreenData data, int width)
+    private static IReadOnlyList<string> BuildLawList(LawsViewModel data, int width)
     {
         var lines = new List<string>
         {
@@ -138,7 +140,7 @@ public static class LawsScreenRenderer
     }
 
     private static IReadOnlyList<string> BuildLawDetail(
-        LawsScreenData data,
+        LawsViewModel data,
         int width,
         bool isSimulationRunning,
         bool isLawActionMenuOpen,

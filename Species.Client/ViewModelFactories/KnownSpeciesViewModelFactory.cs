@@ -2,19 +2,21 @@ using Species.Domain.Catalogs;
 using Species.Domain.Enums;
 using Species.Domain.Knowledge;
 using Species.Domain.Models;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModels;
 
-namespace Species.Client.DataBuilders;
+namespace Species.Client.ViewModelFactories;
 
-public static class KnownSpeciesScreenDataBuilder
+public static class KnownSpeciesViewModelFactory
 {
-    public static KnownSpeciesScreenData Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex)
+    public static KnownSpeciesViewModel Build(World world, FaunaSpeciesCatalog faunaCatalog, string focalPolityId, int selectedIndex)
     {
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
         var items = BuildSpecies(world, focusGroup, faunaCatalog);
         var clampedIndex = items.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, items.Count - 1);
 
-        return new KnownSpeciesScreenData(
+        return new KnownSpeciesViewModel(
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             items,
             items.Count == 0 ? null : items[clampedIndex],
@@ -337,21 +339,3 @@ public static class KnownSpeciesScreenDataBuilder
         return $"{monthText} {year:D3}";
     }
 }
-
-public sealed record KnownSpeciesScreenData(
-    string CurrentDate,
-    IReadOnlyList<KnownSpeciesSummary> Species,
-    KnownSpeciesSummary? SelectedSpecies,
-    int SelectedIndex);
-
-public sealed record KnownSpeciesSummary(
-    string Id,
-    string Name,
-    string Kind,
-    bool IsPlayerSpecies,
-    string Presence,
-    string Status,
-    string Overview,
-    IReadOnlyList<string> Facts,
-    IReadOnlyList<string> Traits,
-    IReadOnlyList<string> Relevance);

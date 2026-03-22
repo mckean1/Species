@@ -1,12 +1,14 @@
 using System.Text;
 using Species.Domain.Models;
-using Species.Client.DataBuilders;
 using Species.Client.Enums;
+using Species.Client.Models;
 using Species.Client.Presentation;
+using Species.Client.ViewModelFactories;
+using Species.Client.ViewModels;
 
 namespace Species.Client.Renderers;
 
-public static class ChronicleScreenRenderer
+public static class ChronicleRenderer
 {
     private const string Reset = "\u001b[0m";
     private const string Dim = "\u001b[38;5;245m";
@@ -22,7 +24,7 @@ public static class ChronicleScreenRenderer
 
     public static string Render(World world, PlayerViewState viewState, TerminalViewport viewport)
     {
-        var data = ChronicleScreenDataBuilder.Build(world, viewState.FocalPolityId, viewState);
+        var data = ChronicleViewModelFactory.Build(world, viewState.FocalPolityId, viewState);
         var innerWidth = Math.Max(84, viewport.Width - 4);
         var headerTitle = $"Chronicle [{DescribeMode(data.Mode)}]";
         var urgentHeight = Math.Clamp(4 + Math.Max(1, data.UrgentItems.Count), 5, 7);
@@ -56,7 +58,7 @@ public static class ChronicleScreenRenderer
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static IReadOnlyList<string> BuildUrgentSection(ChronicleScreenData data, int width, int height)
+    private static IReadOnlyList<string> BuildUrgentSection(ChronicleViewModel data, int width, int height)
     {
         var lines = new List<string>
         {
@@ -94,7 +96,7 @@ public static class ChronicleScreenRenderer
         return lines.Take(height).ToArray();
     }
 
-    private static IReadOnlyList<string> BuildEntryPane(ChronicleScreenData data, int width, int height)
+    private static IReadOnlyList<string> BuildEntryPane(ChronicleViewModel data, int width, int height)
     {
         var lines = new List<string>
         {
@@ -140,7 +142,7 @@ public static class ChronicleScreenRenderer
         return lines.Take(height).ToArray();
     }
 
-    private static IReadOnlyList<string> BuildDetailPane(ChronicleScreenData data, int width, int height)
+    private static IReadOnlyList<string> BuildDetailPane(ChronicleViewModel data, int width, int height)
     {
         var lines = new List<string>();
 
@@ -201,7 +203,7 @@ public static class ChronicleScreenRenderer
         return lines.Take(height).ToArray();
     }
 
-    private static int ResolveSelectedEntryIndex(ChronicleScreenData data)
+    private static int ResolveSelectedEntryIndex(ChronicleViewModel data)
     {
         if (data.SelectedEntry is null)
         {
