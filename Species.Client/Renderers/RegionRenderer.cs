@@ -26,8 +26,9 @@ public static class RegionRenderer
         var leftWidth = Math.Max(34, ((innerWidth - 3) * 11) / 20);
         var rightWidth = Math.Max(24, innerWidth - leftWidth - 3);
 
+        var isPrimitiveWorldMode = data.PolityName == "Primitive World";
         var lines = new List<string>();
-        lines.AddRange(PlayerScreenShell.BuildHeader("Regions", data.PolityName, data.CurrentDate, data.IsSimulationRunning, innerWidth));
+        lines.AddRange(PlayerScreenShell.BuildHeader("Regions", data.PolityName, data.CurrentDate, data.IsSimulationRunning, isPrimitiveWorldMode, innerWidth));
         lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.FitVisible($"{PaneTitle}Known Regions{Reset}", innerWidth), innerWidth));
 
         var listLines = BuildRegionList(data, innerWidth, topListHeight);

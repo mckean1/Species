@@ -31,13 +31,21 @@ public static class KnownSpeciesViewModelFactory
         int selectedIndex,
         bool isSimulationRunning = false)
     {
+        var isPrimitiveWorldMode = world.Polities.Count == 0;
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
-        var selectableSpecies = BuildSelectableSpecies(world, floraCatalog, faunaCatalog, focalPolityId);
+        
+        // In primitive-world mode, show all seeded species
+        var selectableSpecies = isPrimitiveWorldMode
+            ? BuildAllSeededSpecies(world, floraCatalog, faunaCatalog)
+            : BuildSelectableSpecies(world, floraCatalog, faunaCatalog, focalPolityId);
+            
         var sections = BuildSections(selectableSpecies);
         var clampedIndex = selectableSpecies.Count == 0 ? 0 : Math.Clamp(selectedIndex, 0, selectableSpecies.Count - 1);
 
+        var polityName = isPrimitiveWorldMode ? "Primitive World" : (focusPolity?.Name ?? "Unknown polity");
+
         return new KnownSpeciesViewModel(
-            focusPolity?.Name ?? "Unknown polity",
+            polityName,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             isSimulationRunning,
             sections,
@@ -339,6 +347,84 @@ public static class KnownSpeciesViewModelFactory
                     ? "Diplomacy depth is intentionally deferred on this screen."
                     : BuildSapientContactContext(groups, focusPolity)
             ]);
+    }
+
+    private static IReadOnlyList<KnownSpeciesSummary> BuildAllSeededSpecies(
+        World world,
+        FloraSpeciesCatalog floraCatalog,
+        FaunaSpeciesCatalog faunaCatalog)
+    {
+        var species = new List<KnownSpeciesSummary>();
+        var regionsById = world.Regions.ToDictionary(region => region.Id, StringComparer.Ordinal);
+
+        // Gather all seeded flora species
+        var seededFloraIds = world.Regions
+            .SelectMany(r => r.Ecosystem.FloraPopulations.Keys)
+            .Distinct()
+            .ToArray();
+
+        foreach (var speciesId in seededFloraIds)
+        {
+            var definition = floraCatalog.GetById(speciesId);
+            if (definition is null) continue;
+
+            var regionsWithSpecies = world.Regions
+                .Where(r => r.Ecosystem.FloraPopulations.ContainsKey(speciesId))
+                .ToArray();
+
+            species.Add(new KnownSpeciesSummary(
+                speciesId,
+                definition.Name,
+                SpeciesClass.Flora,
+                ResolveFoodRole(definition.Tags),
+                ResolveKnownUses([]),
+                ResolveFloraOutputs(definition.Tags),
+                ResolveFloraHabitat(definition),
+                ResolveFloraDanger([]),
+                ResolveFloraSeasonality(definition),
+                null,
+                null,
+                null,
+                regionsWithSpecies.Length,
+                string.Join(", ", regionsWithSpecies.Take(3).Select(r => r.Name))));
+        }
+
+        // Gather all seeded fauna species
+        var seededFaunaIds = world.Regions
+            .SelectMany(r => r.Ecosystem.FaunaPopulations.Keys)
+            .Distinct()
+            .ToArray();
+
+        foreach (var speciesId in seededFaunaIds)
+        {
+            var definition = faunaCatalog.GetById(speciesId);
+            if (definition is null) continue;
+
+            var regionsWithSpecies = world.Regions
+                .Where(r => r.Ecosystem.FaunaPopulations.ContainsKey(speciesId))
+                .ToArray();
+
+            species.Add(new KnownSpeciesSummary(
+                speciesId,
+                definition.Name,
+                SpeciesClass.Fauna,
+                null,
+                null,
+                ResolveFaunaOutputs(definition.Tags),
+                ResolveFaunaHabitat(definition),
+                ResolveFaunaDanger(definition.Tags),
+                null,
+                ResolveFaunaRole(definition.DietCategory),
+                ResolveFaunaFoodRole(definition.DietCategory),
+                null,
+                regionsWithSpecies.Length,
+                string.Join(", ", regionsWithSpecies.Take(3).Select(r => r.Name))));
+        }
+
+        return species
+            .OrderBy(s => s.SpeciesClass)
+            .ThenBy(s => s.Name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static string BuildFloraUses(FloraSpeciesDefinition flora)

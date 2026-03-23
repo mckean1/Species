@@ -25,10 +25,16 @@ public static class RegionsViewModelFactory
         DiscoveryCatalog discoveryCatalog,
         bool isSimulationRunning = false)
     {
+        var isPrimitiveWorldMode = world.Polities.Count == 0;
         var focusPolity = PlayerFocus.Resolve(world, focalPolityId);
         var focusContext = PlayerFocus.ResolveContext(world, focalPolityId);
         var focusGroup = PlayerFocus.ResolveLeadGroup(world, focalPolityId);
-        var regionCandidates = GetKnownRegions(world, focusGroup);
+        
+        // In primitive-world mode, show all regions since there are no groups to limit discovery
+        var regionCandidates = isPrimitiveWorldMode 
+            ? world.Regions.OrderBy(r => r.Name, StringComparer.Ordinal).ToArray()
+            : GetKnownRegions(world, focusGroup);
+            
         var selectedIndex = regionCandidates.Count == 0
             ? 0
             : Math.Clamp(selectedRegionIndex, 0, regionCandidates.Count - 1);
@@ -40,8 +46,10 @@ public static class RegionsViewModelFactory
             .Select(region => BuildSummary(region, world, focusPolity, focusContext, focusGroup, discoveryContext, floraCatalog, faunaCatalog, discoveryCatalog))
             .ToArray();
 
+        var polityName = isPrimitiveWorldMode ? "Primitive World" : (focusPolity?.Name ?? "Unknown polity");
+
         return new RegionsViewModel(
-            focusPolity?.Name ?? "Unknown polity",
+            polityName,
             FormatMonthYear(world.CurrentMonth, world.CurrentYear),
             isSimulationRunning,
             summaries,

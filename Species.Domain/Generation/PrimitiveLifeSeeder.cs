@@ -36,6 +36,7 @@ public static class PrimitiveLifeSeeder
         FaunaSpeciesCatalog faunaCatalog,
         Random random)
     {
+        // Calculate canonical primitive capacity - this is the source of truth for both substrate models
         var primitiveCapacity = CalculatePrimitiveCapacity(region);
         var floraSeed = SeedPrimitiveFlora(region, floraCatalog, random);
         var faunaPopulations = SeedPrimitiveFauna(region, floraSeed.RoleSupports, faunaCatalog, random);
@@ -49,8 +50,9 @@ public static class PrimitiveLifeSeeder
             PrimitiveFaunaStrength = primitiveStrength.FaunaStrength
         };
 
-        // Build legacy ProtoLifeSubstrate for backward compatibility with existing simulation systems
-        var protoLifeSubstrate = BuildLegacyProtoLifeSubstrate(region, floraPopulations, faunaPopulations);
+        // Build ProtoLifeSubstrate using the same canonical capacity calculation
+        // ProtoLifeSubstrate is the simulation state model that evolves during gameplay
+        var protoLifeSubstrate = BuildProtoLifeSubstrate(region, primitiveCapacity, floraPopulations, faunaPopulations);
 
         var floraProfiles = floraPopulations.Keys.ToDictionary(
             speciesId => speciesId,
@@ -85,6 +87,8 @@ public static class PrimitiveLifeSeeder
             primitiveLifeSubstrate: primitiveSubstrate);
     }
 
+    // Canonical primitive capacity calculation
+    // This is the source of truth for habitat capacity after WG-3 seeding
     private static (float FloraCapacity, float FaunaCapacity) CalculatePrimitiveCapacity(Region region)
     {
         var fertility = (float)Math.Clamp(region.Fertility, 0.0, 1.0);
@@ -423,61 +427,31 @@ public static class PrimitiveLifeSeeder
         return Math.Clamp(value, 0.0f, 1.0f);
     }
 
-    // Build legacy ProtoLifeSubstrate for backward compatibility
-    private static ProtoLifeSubstrate BuildLegacyProtoLifeSubstrate(
+    // Build ProtoLifeSubstrate for ongoing simulation using canonical capacity
+    // ProtoLifeSubstrate is not "legacy" - it's the active simulation state model
+    // PrimitiveLifeSubstrate captures the initial post-WG-3 state
+    // ProtoLifeSubstrate tracks ongoing pressure, genesis, and ecological evolution
+    private static ProtoLifeSubstrate BuildProtoLifeSubstrate(
         Region region,
+        (float FloraCapacity, float FaunaCapacity) canonicalCapacity,
         IReadOnlyDictionary<string, int> floraPopulations,
         IReadOnlyDictionary<string, int> faunaPopulations)
     {
-        var fertility = (float)Math.Clamp(region.Fertility, 0.0, 1.0);
-        var waterFactor = region.WaterAvailability switch
-        {
-            WaterAvailability.High => 1.00f,
-            WaterAvailability.Medium => 0.72f,
-            _ => 0.42f
-        };
-        var temperatureFactor = region.TemperatureBand switch
-        {
-            TemperatureBand.Cold => 0.48f,
-            TemperatureBand.Temperate => 1.00f,
-            TemperatureBand.Hot => 0.76f,
-            _ => 0.72f
-        };
-        var terrainFactor = region.TerrainRuggedness switch
-        {
-            TerrainRuggedness.Flat => 1.00f,
-            TerrainRuggedness.Rolling => 0.78f,
-            TerrainRuggedness.Rugged => 0.54f,
-            _ => 0.72f
-        };
-        var biomeFactor = region.Biome switch
-        {
-            Biome.Wetlands => 1.00f,
-            Biome.Forest => 0.92f,
-            Biome.Plains => 0.86f,
-            Biome.Highlands => 0.64f,
-            Biome.Tundra => 0.38f,
-            Biome.Desert => 0.22f,
-            _ => 0.60f
-        };
-
-        var protoFloraCapacity = ClampNormalized((fertility * 0.42f) + (waterFactor * 0.24f) + (temperatureFactor * 0.18f) + (terrainFactor * 0.08f) + (biomeFactor * 0.08f));
-        var protoFaunaCapacity = ClampNormalized((protoFloraCapacity * 0.56f) + (temperatureFactor * 0.14f) + (terrainFactor * 0.14f) + (biomeFactor * 0.10f) + (waterFactor * 0.06f));
-        var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(value => (long)value), protoFloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
-        var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(value => (long)value), protoFaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
+        var floraOccupancy = NormalizePopulation(floraPopulations.Values.Sum(value => (long)value), canonicalCapacity.FloraCapacity, ProtoLifePressureConstants.FloraCapacityPopulationScale);
+        var faunaOccupancy = NormalizePopulation(faunaPopulations.Values.Sum(value => (long)value), canonicalCapacity.FaunaCapacity, ProtoLifePressureConstants.FaunaCapacityPopulationScale);
         var floraOccupancyDeficit = ClampNormalized(1.0f - floraOccupancy);
         var faunaOccupancyDeficit = ClampNormalized(1.0f - faunaOccupancy);
-        var floraSupportDeficit = ClampNormalized(Math.Max(0.0f, protoFloraCapacity - floraOccupancy));
-        var faunaSupportBaseline = ClampNormalized((floraOccupancy * 0.65f) + (protoFloraCapacity * 0.20f) + (faunaOccupancy * 0.15f));
-        var faunaSupportDeficit = ClampNormalized(Math.Max(0.0f, protoFaunaCapacity - faunaSupportBaseline));
+        var floraSupportDeficit = ClampNormalized(Math.Max(0.0f, canonicalCapacity.FloraCapacity - floraOccupancy));
+        var faunaSupportBaseline = ClampNormalized((floraOccupancy * 0.65f) + (canonicalCapacity.FloraCapacity * 0.20f) + (faunaOccupancy * 0.15f));
+        var faunaSupportDeficit = ClampNormalized(Math.Max(0.0f, canonicalCapacity.FaunaCapacity - faunaSupportBaseline));
         var ecologicalVacancy = ClampNormalized((floraOccupancyDeficit * 0.52f) + (faunaOccupancyDeficit * 0.48f));
 
         return new ProtoLifeSubstrate
         {
-            ProtoFloraCapacity = protoFloraCapacity,
-            ProtoFaunaCapacity = protoFaunaCapacity,
-            ProtoFloraPressure = ClampNormalized(protoFloraCapacity * floraOccupancyDeficit * 0.35f),
-            ProtoFaunaPressure = ClampNormalized(protoFaunaCapacity * faunaSupportBaseline * faunaOccupancyDeficit * 0.28f),
+            ProtoFloraCapacity = canonicalCapacity.FloraCapacity,
+            ProtoFaunaCapacity = canonicalCapacity.FaunaCapacity,
+            ProtoFloraPressure = ClampNormalized(canonicalCapacity.FloraCapacity * floraOccupancyDeficit * 0.35f),
+            ProtoFaunaPressure = ClampNormalized(canonicalCapacity.FaunaCapacity * faunaSupportBaseline * faunaOccupancyDeficit * 0.28f),
             FloraOccupancyDeficit = floraOccupancyDeficit,
             FaunaOccupancyDeficit = faunaOccupancyDeficit,
             FloraSupportDeficit = floraSupportDeficit,

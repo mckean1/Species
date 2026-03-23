@@ -17,9 +17,23 @@ public static class PlayerScreenShell
         string polityName,
         string currentDate,
         bool isSimulationRunning,
+        bool isPrimitiveWorldMode,
         int innerWidth)
     {
         var stateText = isSimulationRunning ? $"{Green}Running{Reset}" : $"{Yellow}Paused{Reset}";
+        
+        if (isPrimitiveWorldMode)
+        {
+            // Primitive-world mode: show clear indicator, no polity line
+            return
+            [
+                HorizontalBorder(innerWidth),
+                BorderLine(PadBetween($"{PaneTitle}{screenName}{Reset}", $"{White}{currentDate}{Reset}", innerWidth), innerWidth),
+                BorderLine(PadBetween($"{Yellow}⚠ Primitive World - Pre-Sapient State{Reset}", $"{White}State:{Reset} {stateText}", innerWidth), innerWidth),
+                HorizontalBorder(innerWidth)
+            ];
+        }
+        
         return
         [
             HorizontalBorder(innerWidth),
@@ -39,8 +53,13 @@ public static class PlayerScreenShell
         return BorderLine(rendered, innerWidth);
     }
 
-    public static string ResolvePolityName(World world, string focalPolityId)
+    public static string ResolvePolityName(World world, string focalPolityId, bool isPrimitiveWorldMode)
     {
+        if (isPrimitiveWorldMode)
+        {
+            return "No polities";
+        }
+        
         return PlayerFocus.Resolve(world, focalPolityId)?.Name ?? "Unknown polity";
     }
 

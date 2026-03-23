@@ -22,10 +22,18 @@ public sealed class RegionEcosystem
         BiologicalHistoryRecords = biologicalHistoryRecords ?? Array.Empty<BiologicalHistoryRecord>();
     }
 
-    // Legacy substrate - still used by simulation systems during transition
+    /// <summary>
+    /// Active simulation substrate - tracks ongoing ecological pressure, vacancy, and genesis conditions.
+    /// Evolves during gameplay via ProtoPressureSystem and BiologicalEvolutionSystem.
+    /// Capacity values initialized from PrimitiveLifeSubstrate after WG-3.
+    /// </summary>
     public ProtoLifeSubstrate ProtoLifeSubstrate { get; }
 
-    // Canonical primitive life substrate - represents the foundational organic state
+    /// <summary>
+    /// Canonical primitive-world snapshot - captures the initial post-WG-3 state.
+    /// Represents capacity and strength immediately after primitive life seeding.
+    /// Serves as a historical baseline reference.
+    /// </summary>
     public PrimitiveLifeSubstrate PrimitiveLifeSubstrate { get; }
 
     public IReadOnlyDictionary<string, int> FloraPopulations { get; }

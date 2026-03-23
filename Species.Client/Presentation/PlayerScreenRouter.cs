@@ -17,6 +17,12 @@ public static class PlayerScreenRouter
         AdvancementCatalog advancementCatalog,
         TerminalViewport viewport)
     {
+        // In primitive-world mode, polity-dependent screens show a placeholder
+        if (viewState.IsPrimitiveWorldMode && IsPolityDependentScreen(viewState.CurrentScreen))
+        {
+            return RenderPrimitiveWorldPlaceholder(viewState.CurrentScreen, world, viewState.IsSimulationRunning, viewport);
+        }
+        
         return viewState.CurrentScreen switch
         {
             PlayerScreen.Chronicle => ChronicleRenderer.Render(
@@ -45,5 +51,65 @@ public static class PlayerScreenRouter
                 viewport),
             _ => throw new NotSupportedException($"Unsupported screen {viewState.CurrentScreen}.")
         };
+    }
+
+    private static bool IsPolityDependentScreen(PlayerScreen screen)
+    {
+        return screen is PlayerScreen.Chronicle 
+            or PlayerScreen.Laws 
+            or PlayerScreen.Government 
+            or PlayerScreen.Polity 
+            or PlayerScreen.KnownPolities 
+            or PlayerScreen.Advancements;
+    }
+
+    private static string RenderPrimitiveWorldPlaceholder(PlayerScreen screen, World world, bool isSimulationRunning, TerminalViewport viewport)
+    {
+        var innerWidth = Math.Max(84, viewport.Width - 4);
+        var bodyHeight = Math.Max(10, viewport.Height - 10);
+        var currentDate = $"Year {world.CurrentYear}, Month {world.CurrentMonth}";
+        
+        var lines = new List<string>();
+        lines.AddRange(PlayerScreenShell.BuildHeader(screen.ToString(), "No polities", currentDate, isSimulationRunning, isPrimitiveWorldMode: true, innerWidth));
+        
+        var message = new[]
+        {
+            "",
+            $"The {screen} screen requires sapient polities to function.",
+            "",
+            "The world is currently in a primitive, pre-sapient state.",
+            "Only primitive flora and fauna have been seeded.",
+            "",
+            "Available screens:",
+            "  • Regions - inspect regional biology and populations",
+            "  • KnownSpecies - view all seeded species and traits",
+            "",
+            "Simulation can still run. Ecological systems will process,",
+            "but no polity or group systems will operate.",
+            "",
+            "Use Tab to navigate to available screens."
+        };
+        
+        var startPadding = Math.Max(0, (bodyHeight - message.Length) / 2);
+        for (var i = 0; i < startPadding; i++)
+        {
+            lines.Add(PlayerScreenShell.BorderLine("", innerWidth));
+        }
+        
+        foreach (var line in message)
+        {
+            lines.Add(PlayerScreenShell.BorderLine(PlayerScreenShell.PadVisible(line, innerWidth), innerWidth));
+        }
+        
+        while (lines.Count < viewport.Height - 3)
+        {
+            lines.Add(PlayerScreenShell.BorderLine("", innerWidth));
+        }
+        
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        lines.Add(PlayerScreenShell.BuildFooter(innerWidth, ["Tab: Screens", "Space: Pause/Run", "N: Next Tick"]));
+        lines.Add(PlayerScreenShell.HorizontalBorder(innerWidth));
+        
+        return string.Join(Environment.NewLine, lines);
     }
 }

@@ -8,6 +8,12 @@ public sealed class PlayerViewState
 
     public string FocalPolityId { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Indicates whether the world is in primitive-world mode (no polities exist).
+    /// When true, polity-dependent screens are disabled or show placeholder content.
+    /// </summary>
+    public bool IsPrimitiveWorldMode { get; private set; }
+
     public int CurrentRegionIndex { get; private set; }
 
     public int CurrentKnownPolityIndex { get; private set; }
@@ -50,11 +56,31 @@ public sealed class PlayerViewState
     public void EnsureFocalPolity(Species.Domain.Models.World world)
     {
         FocalPolityId = PlayerFocus.ResolveId(world, FocalPolityId);
+        
+        // Detect primitive-world mode: world has no polities
+        IsPrimitiveWorldMode = world.Polities.Count == 0;
+        
+        // In primitive-world mode, default to Regions screen if on a polity-dependent screen
+        if (IsPrimitiveWorldMode && IsPolityDependentScreen(CurrentScreen))
+        {
+            CurrentScreen = PlayerScreen.Regions;
+        }
     }
 
     public void CycleScreen()
     {
-        CurrentScreen = PlayerScreenNavigation.GetNext(CurrentScreen);
+        var next = PlayerScreenNavigation.GetNext(CurrentScreen);
+        
+        // In primitive-world mode, skip polity-dependent screens
+        if (IsPrimitiveWorldMode)
+        {
+            while (IsPolityDependentScreen(next) && next != CurrentScreen)
+            {
+                next = PlayerScreenNavigation.GetNext(next);
+            }
+        }
+        
+        CurrentScreen = next;
         if (CurrentScreen != PlayerScreen.Laws)
         {
             CloseLawActionMenu();
@@ -292,5 +318,15 @@ public sealed class PlayerViewState
         }
 
         return (index + delta % count + count) % count;
+    }
+
+    private static bool IsPolityDependentScreen(PlayerScreen screen)
+    {
+        return screen is PlayerScreen.Chronicle 
+            or PlayerScreen.Laws 
+            or PlayerScreen.Government 
+            or PlayerScreen.Polity 
+            or PlayerScreen.KnownPolities 
+            or PlayerScreen.Advancements;
     }
 }
